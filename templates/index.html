@@ -79,32 +79,8 @@
                 <div><strong>FECHA:</strong> <span id="current-date-display" style="font-weight: bold; color: #000000;"></span></div>
                 <div><strong>ORDEN DE TRABAJO:</strong> <span>{{ project.orden_de_trabajo if project else 'N/A' }}</span></div>
                 <div><strong>CLIENTE:</strong> <span>{{ project.cliente if project else 'N/A' }}</span></div>
-                <div><strong>PLANTA:</strong> <span>{{ project.planta if project else 'N/A' }}</span></div>
                 <div><strong>CONTRATISTA:</strong> <span>{{ project.contratista if project else 'N/A' }}</span></div>
                 <div><strong>UBICACIÓN:</strong> <span>{{ project.ubicacion if project else 'N/A' }}</span></div>
-            </div>
-
-            <div class="section-card">
-                <label><strong><i class="fas fa-tools"></i> EQUIPOS Y SUMINISTROS:</strong></label>
-                
-                <div class="input-with-icon" style="margin-top: 10px; display: flex; align-items: center; gap: 5px;">
-                    <input type="text" id="input-equipo" placeholder="Ej: Taladro Milwaukee, Extensiones..." style="flex: 1; margin: 0;">
-                    
-                    <button class="record-btn" type="button" data-target-input="input-equipo" title="Grabar voz">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                    <button class="stop-btn" type="button" data-target-input="input-equipo" style="display: none;" title="Detener">
-                        <i class="fas fa-stop"></i>
-                    </button>
-                </div>
-
-                <div style="margin-top: 10px; text-align: right;">
-                    <button type="button" onclick="addEquipment()" class="activate-camera-button" style="width: auto; padding: 5px 15px; font-size: 0.85em; background-color: #FFAF33;">
-                        <i class="fas fa-plus"></i> Añadir Equipo
-                    </button>
-                </div>
-
-                <div id="equipment-list" style="margin-top: 10px;"></div>
             </div>
 
             <h3 style="color: #000000; margin-bottom: 15px;"><i class="fas fa-clipboard-list"></i> Actividades (Notas Generales)</h3>
@@ -135,6 +111,12 @@
 
             <div class="centrar">
                 <button id="save-record" onclick="saveFullReport()">Guardar Reporte Diario</button>
+            </div>
+
+            <div class="centrar" style="margin-top: 20px;">
+                <button type="button" class="activate-camera-button" style="background-color: #FFAF33;" onclick="window.location.href='/paginaprincipal?project_id={{ request.args.get('project_id') }}&project={{ project.nombre if project else '' }}'">
+                    <i class="fas fa-arrow-left"></i> Regresar
+                </button>
             </div>
 
             <div id="loading-overlay" class="loading-overlay"><div class="spinner"></div></div>

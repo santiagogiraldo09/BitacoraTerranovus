@@ -491,7 +491,7 @@ def get_user_projects(user_id):
         
         cursor.execute(
             """SELECT id_proyecto, nombre_proyecto, fecha_inicio, cliente, user_id 
-               FROM "proyectosVihesa" WHERE user_id = %s ORDER BY fecha_inicio DESC""",
+               FROM proyectosTerranovus WHERE user_id = %s ORDER BY fecha_inicio DESC""",
             (user_id,)
         )
         
@@ -616,7 +616,7 @@ def paginaprincipal():
         cursor = conn.cursor()
         
         # ASEGÚRATE DE QUE ESTE QUERY USE LA TABLA NUEVA
-        cursor.execute('SELECT * FROM "proyectosVihesa" WHERE id_proyecto = %s', (project_id,))
+        cursor.execute('SELECT * FROM proyectosTerranovus WHERE id_proyecto = %s', (project_id,))
         proyecto = cursor.fetchone()
         
         if not proyecto:
@@ -692,8 +692,8 @@ def index():
             cursor = conn.cursor()
             # Consultamos las columnas exactas de tu tabla según las imágenes
             cursor.execute("""
-                SELECT nombre_proyecto, cliente, contratista, orden_de_trabajo, planta, ubicacion 
-                FROM "proyectosVihesa" 
+                SELECT nombre_proyecto, cliente, contratista, orden_de_trabajo, ubicacion 
+                FROM proyectosTerranovus 
                 WHERE id_proyecto = %s
             """, (project_id,))
             row = cursor.fetchone()
@@ -703,8 +703,7 @@ def index():
                     'cliente': row[1],
                     'contratista': row[2],
                     'orden_de_trabajo': row[3],
-                    'planta': row[4],
-                    'ubicacion': row[5]
+                    'ubicacion': row[4]
                 }
             conn.close()
         except Exception as e:
@@ -1077,15 +1076,15 @@ def add_project():
             
             # Query ajustado a la tabla "proyectosVihesa" con sus 10 columnas
             cursor.execute("""
-                INSERT INTO "proyectosVihesa" (
+                INSERT INTO proyectosTerranovus (
                     nombre_proyecto, fecha_inicio, fecha_fin, cliente, contratista, 
-                    orden_de_trabajo, planta, ubicacion, user_id
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) 
+                    orden_de_trabajo, ubicacion, user_id
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) 
                 RETURNING id_proyecto
             """, (
                 data.get('project-name'), data.get('start-date'), data.get('end-date'),
                 data.get('cliente'), data.get('contratista'), data.get('orden-trabajo'),
-                data.get('planta'), data.get('location'), session['user_id']
+                data.get('location'), session['user_id']
             ))
             
             nuevo_id = cursor.fetchone()[0]
