@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Tablero BI - Terranovus</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='history.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 20px;
+        }
+        .kpi-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            border-top: 5px solid #FFAF33;
+        }
+        .chart-container {
+            background: white;
+            margin: 20px;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body style="background-color: #f4f4f9;">
+    <div class="main-container">
+        <h2 style="text-align: center; color: #333;">Indicadores de Gestión</h2>
+        
+        <div class="dashboard-grid">
+            <div class="kpi-card">
+                <h3>Proyectos</h3>
+                <p style="font-size: 2em; font-weight: bold;">{{ total_p }}</p>
+            </div>
+            <div class="kpi-card">
+                <h3>Actividades</h3>
+                <p style="font-size: 2em; font-weight: bold;">{{ total_r }}</p>
+            </div>
+            <div class="kpi-card">
+                <h3>Avance Global</h3>
+                <p style="font-size: 2em; font-weight: bold; color: #FFAF33;">{{ promedio }}%</p>
+            </div>
+        </div>
+
+        <div class="chart-container">
+            <canvas id="estadoChart"></canvas>
+        </div>
+
+        <div class="bottom-menu" style="text-align: center;">
+            <a href="{{ url_for('history') }}" class="back-button" style="text-decoration: none; display: inline-block; width: 200px; background-color: #333;">
+                Volver
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Configuración del gráfico de estados
+        const ctx = document.getElementById('estadoChart').getContext('2d');
+        const dataEstados = {{ datos_estados | tojson }};
+        
+        new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: Object.keys(dataEstados),
+                datasets: [{
+                    label: 'Actividades por Estado',
+                    data: Object.values(dataEstados),
+                    backgroundColor: ['#FFAF33', '#3498db', '#2ecc71', '#e74c3c', '#9b59b6']
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: { display: true, text: 'Distribución de Actividades por Estado' }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

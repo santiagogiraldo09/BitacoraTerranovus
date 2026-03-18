@@ -33,7 +33,10 @@ import json
 import requests
 from datetime import datetime
 import pytz
-
+from fpdf import FPDF
+import io
+import base64
+from tempfile import NamedTemporaryFile
 
 # Configurar zona horaria
 tijuana_tz = pytz.timezone('America/Tijuana')
@@ -1393,6 +1396,210 @@ def exportar_registros_excel():
     finally:
         if conn:
             conn.close()
+
+@app.route('/exportar-proyectos-pdf', methods=['POST'])
+def exportar_proyectos_pdf():
+    project_ids = request.form.getlist('project_ids')
+    if not project_ids:
+        return "No se seleccionaron proyectos", 400
+
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    try:
+        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        cursor = conn.cursor()
+
+        for pid in project_ids:
+            # 1. Info del proyecto (Tabla: proyectosTerranovus)
+            cursor.execute("""
+                SELECT nombre_proyecto, cliente, contratista, orden_de_trabajo, ubicacion, fecha_inicio 
+                FROM proyectosTerranovus WHERE id_proyecto = %s
+            """, (pid,))
+            proyecto = cursor.fetchone()
+            if not proyecto: continue
+
+            nombre, cliente, contratista, ot, ubicacion, f_inicio = proyecto
+            pdf.add_page()
+            
+            # --- ENCABEZADO TÉCNICO (190mm Total) ---
+            y_inicial = pdf.get_y()
+            
+            # Celda Logo (40mm)
+            pdf.rect(10, y_inicial, 40, 20)
+            logo_path = os.path.join('static', 'logo.png')
+            if os.path.exists(logo_path):
+                pdf.image(logo_path, x=15, y=y_inicial + 2, w=30)
+            
+            # Celda Título (150mm)
+            pdf.set_xy(50, y_inicial)
+            pdf.set_font("Arial", 'B', 14)
+            pdf.cell(150, 20, "REPORTE TÉCNICO DE ACTIVIDADES", border=1, ln=True, align='C')
+
+            # Filas de Información (Ancho total 190mm)
+            pdf.set_font("Arial", 'B', 9)
+            pdf.cell(30, 8, "PROYECTO:", border=1)
+            pdf.set_font("Arial", '', 9)
+            pdf.cell(65, 8, f"{nombre}", border=1)
+            pdf.set_font("Arial", 'B', 9)
+            pdf.cell(40, 8, "CLIENTE:", border=1)
+            pdf.set_font("Arial", '', 9)
+            pdf.cell(55, 8, f"{cliente}", border=1, ln=True)
+
+            pdf.set_font("Arial", 'B', 9)
+            pdf.cell(30, 8, "UBICACIÓN:", border=1)
+            pdf.set_font("Arial", '', 9)
+            pdf.cell(65, 8, f"{ubicacion}", border=1)
+            pdf.set_font("Arial", 'B', 9)
+            pdf.cell(40, 8, "ORDEN DE TRABAJO:", border=1)
+            pdf.set_font("Arial", '', 9)
+            pdf.cell(55, 8, f"{ot}", border=1, ln=True)
+            
+            pdf.ln(10)
+
+            # --- REGISTROS DE ACTIVIDAD ---
+            cursor.execute("""
+                SELECT id_registro, actividad, descripcion_actividad, estado, porcentaje_avance, fecha
+                FROM registrosbitacoraterranovus 
+                WHERE id_proyecto = %s ORDER BY fecha DESC
+            """, (pid,))
+            registros = cursor.fetchall()
+
+            for reg in registros:
+                id_reg, actividad, desc, estado, avance, fecha_reg = reg
+                
+                # Encabezado Actividad
+                pdf.set_fill_color(255, 240, 220)
+                pdf.set_font("Arial", 'B', 11)
+                pdf.cell(190, 8, f"FECHA: {fecha_reg} - ACTIVIDAD: {actividad}", ln=True, fill=True, border='T')
+                
+                # Descripción
+                pdf.set_font("Arial", '', 10)
+                pdf.multi_cell(190, 6, f"Descripción: {desc}", border='LR')
+
+                # ESTADO Y AVANCE (Corregidos a 95mm cada uno para sumar 190mm exactos)
+                pdf.set_font("Arial", 'B', 10)
+                pdf.set_fill_color(245, 245, 245)
+                pdf.cell(95, 8, f" ESTADO: {estado}", border=1, fill=True)
+                pdf.cell(95, 8, f" AVANCE: {avance}%", border=1, fill=True, ln=True)
+                
+                # --- SECCIÓN DE EVIDENCIA FOTOGRÁFICA ---
+                cursor.execute("SELECT imagen_base64, description FROM fotos_registro_terranovus WHERE id_registro = %s", (id_reg,))
+                fotos = cursor.fetchall()
+                
+                if fotos:
+                    pdf.ln(2)
+                    pdf.set_font("Arial", 'B', 10)
+                    pdf.cell(0, 8, "EVIDENCIA:", ln=True) # Texto de evidencia ENCIMA de las fotos
+                    
+                    img_w = 60
+                    current_x = 10
+                    
+                    for i, (foto_data, foto_desc) in enumerate(fotos):
+                        # Salto de página preventivo
+                        if pdf.get_y() > 220:
+                            pdf.add_page()
+                            pdf.ln(5)
+                            current_x = 10
+
+                        # Fila de 3 fotos
+                        if i > 0 and i % 3 == 0:
+                            pdf.set_y(pdf.get_y() + 50)
+                            current_x = 10
+
+                        try:
+                            header, encoded = foto_data.split(",", 1) if "," in foto_data else ("", foto_data)
+                            img_bytes = base64.b64decode(encoded)
+                            
+                            with NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                                tmp.write(img_bytes)
+                                tmp_path = tmp.name
+                            
+                            # Imagen
+                            pdf.image(tmp_path, x=current_x, y=pdf.get_y(), w=img_w, h=40)
+                            
+                            # Descripción (Pie de foto opcional)
+                            pdf.set_xy(current_x, pdf.get_y() + 41)
+                            pdf.set_font("Arial", 'I', 7)
+                            desc_txt = (foto_desc[:40]) if foto_desc else ""
+                            pdf.cell(img_w, 4, desc_txt, align='C')
+                            
+                            current_x += img_w + 5
+                            pdf.set_y(pdf.get_y() - 41)
+
+                        except Exception as e:
+                            print(f"Error procesando imagen: {e}")
+                    
+                    pdf.set_y(pdf.get_y() + 55) # Espacio tras bloque de fotos
+                else:
+                    pdf.ln(5)
+
+        response_pdf = pdf.output(dest='S')
+        return send_file(
+            io.BytesIO(response_pdf),
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=f"Reporte_Terranovus_{datetime.now().strftime('%Y%m%d')}.pdf"
+        )
+
+    except Exception as e:
+        print(f"Error PDF: {e}")
+        return f"Error: {str(e)}", 500
+    finally:
+        if conn: conn.close()
+
+
+@app.route('/tablero-bi')
+def tablero_bi():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+    
+    conn = None
+    try:
+        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        cursor = conn.cursor()
+
+        # 1. Estadísticas Generales de Proyectos
+        cursor.execute('SELECT COUNT(*) FROM proyectosTerranovus WHERE user_id = %s', (session['user_id'],))
+        total_proyectos = cursor.fetchone()[0]
+
+        # 2. Avance promedio y total de registros
+        cursor.execute("""
+            SELECT 
+                COUNT(r.id_registro), 
+                AVG(r.porcentaje_avance) 
+            FROM registrosbitacoraterranovus r
+            JOIN proyectosTerranovus p ON r.id_proyecto = p.id_proyecto
+            WHERE p.user_id = %s
+        """, (session['user_id'],))
+        stats = cursor.fetchone()
+        total_registros = stats[0] or 0
+        promedio_avance = round(stats[1], 2) if stats[1] else 0
+
+        # 3. Conteo por Estados (para gráfico de torta)
+        cursor.execute("""
+            SELECT estado, COUNT(*) 
+            FROM registrosbitacoraterranovus r
+            JOIN proyectosTerranovus p ON r.id_proyecto = p.id_proyecto
+            WHERE p.user_id = %s
+            GROUP BY estado
+        """, (session['user_id'],))
+        estados_raw = cursor.fetchall()
+        
+        # Convertimos a diccionario para fácil manejo en JS
+        datos_estados = {row[0]: row[1] for row in estados_raw}
+
+        return render_template('tableroBI.html', 
+                               total_p=total_proyectos,
+                               total_r=total_registros,
+                               promedio=promedio_avance,
+                               datos_estados=datos_estados)
+
+    except Exception as e:
+        print(f"Error en Tablero BI: {e}")
+        return redirect(url_for('history'))
+    finally:
+        if conn: conn.close()
 
 
 @app.route('/exportar-proyectos-excel', methods=['POST'])
