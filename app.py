@@ -1011,54 +1011,56 @@ def projectdetails():
 
 import json
 
-@app.route('/guardar_reporte_vihesa', methods=['POST'])
-def guardar_reporte_vihesa():
+@app.route('/guardar_reporte_terranovus', methods=['POST'])
+def guardar_reporte_terranovus():
     data = request.json
+    conn = None
     try:
         conn = psycopg2.connect(**POSTGRES_CONFIG)
         cursor = conn.cursor()
 
-        # PASO 1: Tabla Maestra (reporteDeTrabajoVihesa)
-        cursor.execute("""
-            INSERT INTO reporteDeTrabajoVihesa (id_proyecto, fecha, user_id) 
-            VALUES (%s, %s, %s) RETURNING id_reporte
-        """, (data['id_proyecto'], fecha_hora_tijuana, session['user_id']))
-        id_reporte = cursor.fetchone()[0]
+        # Extraer el ID del proyecto y del usuario
+        id_proyecto = data.get('id_proyecto')
+        user_id = session.get('user_id')
 
-        # PASO 2: Tabla Equipos (reporteEquiposVihesa)
-        for equipo in data.get('equipos', []):
-            cursor.execute("""
-                INSERT INTO reporteEquiposVihesa (id_reporte, nombre_equipo) 
-                VALUES (%s, %s)
-            """, (id_reporte, equipo))
-
-        # PASO 3, 4 y 5: Bucle de Notas y Multimedia
+        # Recorrer cada actividad enviada desde el frontend
         for nota in data.get('notas', []):
-            # Guardar Nota (reporteNotasVihesa)
+            # 1. Insertar en la tabla maestra de registros
             cursor.execute("""
-                INSERT INTO reporteNotasVihesa (id_reporte, nota_texto) 
-                VALUES (%s, %s) RETURNING id_nota_item
-            """, (id_reporte, nota['texto']))
-            id_nota_item = cursor.fetchone()[0]
+                INSERT INTO registrosbitacoraterranovus (
+                    id_proyecto, actividad, descripcion_actividad, 
+                    estado, porcentaje_avance, user_id
+                ) VALUES (%s, %s, %s, %s, %s, %s) 
+                RETURNING id_registro
+            """, (
+                id_proyecto, 
+                nota.get('titulo'), # Campo 'Actividad' en tu SQL
+                nota.get('texto'),  # Campo 'descripcion_actividad'
+                nota.get('estado'), 
+                nota.get('avance'), 
+                user_id
+            ))
+            
+            id_registro = cursor.fetchone()[0]
 
-            # Guardar Fotos (fotos_registro_vihesa) usando el id_nota_item generado
-            for foto_b64 in nota.get('fotos', []):
+            # 2. Insertar las fotos asociadas a ESTA actividad específica
+            for foto_obj in nota.get('fotos_detalle', []):
                 cursor.execute("""
-                    INSERT INTO fotos_registro_vihesa (id_nota_item, imagen_base64, description) 
-                    VALUES (%s, %s, %s)
-                """, (id_nota_item, foto_b64, "Evidencia Fotográfica"))
-
-            # Guardar Videos (videos_registro_vihesa)
-            for video_b64 in nota.get('videos', []):
-                cursor.execute("""
-                    INSERT INTO videos_registro_vihesa (id_nota_item, video_base64) 
-                    VALUES (%s, %s)
-                """, (id_nota_item, video_b64))
+                    INSERT INTO fotos_registro_terranovus (
+                        id_registro, imagen_base64, description
+                    ) VALUES (%s, %s, %s)
+                """, (
+                    id_registro, 
+                    foto_obj.get('file_data'), 
+                    foto_obj.get('description')
+                ))
 
         conn.commit()
-        return jsonify({"status": "success", "message": "Reporte y fotos guardados"}), 201
+        return jsonify({"status": "success", "message": "Reporte Terranovus guardado correctamente"}), 201
+
     except Exception as e:
         if conn: conn.rollback()
+        print(f"Error al guardar en Terranovus: {e}")
         return jsonify({"status": "error", "error": str(e)}), 500
     finally:
         if conn: conn.close()

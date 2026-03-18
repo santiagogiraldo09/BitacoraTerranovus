@@ -273,49 +273,43 @@ async function saveFullReport() {
     try {
         const urlParams = new URLSearchParams(window.location.search);
         const projectId = urlParams.get('project_id');
-        const fechaActual = new Date().toISOString().split('T')[0];
-
-        // 1. Equipos
-        const equiposCapturados = [];
-        document.querySelectorAll('#equipment-list .equipment-item span').forEach(el => {
-            equiposCapturados.push(el.innerText.trim());
-        });
-
-        // 2. Notas y Multimedia (CORRECCIÓN AQUÍ)
         const notasCapturadas = [];
-        const itemBoxes = document.querySelectorAll('.dynamic-item-box');
         
-        itemBoxes.forEach((box) => {
+        // Recorrer todas las actividades en pantalla
+        document.querySelectorAll('.dynamic-item-box').forEach((box) => {
             const index = box.getAttribute('data-index');
-            const textoNota = box.querySelector('.field-nota').value.trim();
             
-            // Accedemos al objeto correcto: window.itemMediaData
-            const media = (window.itemMediaData && window.itemMediaData[index]) ? window.itemMediaData[index] : { fotos: [], videos: [] };
+            // Capturar datos de los nuevos campos
+            const titulo = box.querySelector('.field-titulo').value;
+            const descripcion = box.querySelector('.field-nota').value;
+            const estado = box.querySelector('.field-estado').value;
+            const avance = box.querySelector('.field-avance').value;
 
-            // Extraemos solo el base64 de cada foto/video para que Python lo procese
-            const listaFotos = media.fotos.map(f => f.file_data);
-            const listaVideos = media.videos.map(v => v.file_data);
+            // Obtener multimedia del objeto global (window.itemMediaData)
+            const media = (window.itemMediaData && window.itemMediaData[index]) 
+                          ? window.itemMediaData[index] : { fotos: [] };
 
-            if (textoNota || listaFotos.length > 0) {
+            if (titulo || descripcion || media.fotos.length > 0) {
                 notasCapturadas.push({
-                    texto: textoNota,
-                    fotos: listaFotos,
-                    videos: listaVideos
+                    titulo: titulo,
+                    texto: descripcion,
+                    estado: estado,
+                    avance: avance || 0,
+                    fotos_detalle: media.fotos // Enviamos el objeto con base64 y descripción
                 });
             }
         });
 
-        const reportData = {
+        const payload = {
             id_proyecto: projectId,
-            fecha: fechaActual,
-            equipos: equiposCapturados,
             notas: notasCapturadas
         };
 
-        const response = await fetch('/guardar_reporte_vihesa', {
+        // Cambiar la URL al nuevo endpoint de Terranovus
+        const response = await fetch('/guardar_reporte_terranovus', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(reportData)
+            body: JSON.stringify(payload)
         });
 
         const result = await response.json();

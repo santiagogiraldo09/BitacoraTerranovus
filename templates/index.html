@@ -126,42 +126,72 @@
     <template id="note-template">
         <div class="dynamic-item-box">
             <div class="item-header">
-                <h3 class="item-title">Nota #1</h3>
+                <h3 class="item-title">Actividad #1</h3>
                 <button type="button" class="remove-item-btn" style="background:none; border:none; color:red; cursor:pointer; display:none;">
                     <i class="fas fa-trash-alt"></i> Eliminar
                 </button>
             </div>
 
-            <div class="form-group">
-                <label>Descripción de la Actividad (Nota General):</label>
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label><strong><i class="fas fa-tasks"></i> Actividad:</strong></label>
                 <div class="input-with-icon">
-                    <textarea class="field-nota" rows="3" style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc;"></textarea>
+                    <input type="text" class="field-titulo" placeholder="Ej: Excavación inicial" 
+                        style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; height: 42px; box-sizing: border-box;">
+                    <button class="record-btn" type="button" title="Grabar título"><i class="fas fa-microphone"></i></button>
+                    <button class="stop-btn" type="button" title="Detener" style="display: none;"><i class="fas fa-stop"></i></button>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label><strong><i class="fas fa-align-left"></i> Descripción (Nota General):</strong></label>
+                <div class="input-with-icon">
+                    <textarea class="field-nota" rows="3" style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box;"></textarea>
                     <button class="record-btn" type="button" title="Grabar respuesta"><i class="fas fa-microphone"></i></button>
                     <button class="stop-btn" type="button" title="Detener grabación" style="display: none;"><i class="fas fa-stop"></i></button>
                 </div>
             </div>
 
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label><strong><i class="fas fa-info-circle"></i> Estado:</strong></label>
+                <div class="input-with-icon">
+                    <input type="text" class="field-estado" placeholder="Ej: Pendiente, En Proceso..." 
+                        style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; height: 42px; box-sizing: border-box;">
+                    <button class="record-btn" type="button" title="Grabar estado"><i class="fas fa-microphone"></i></button>
+                    <button class="stop-btn" type="button" title="Detener" style="display: none;"><i class="fas fa-stop"></i></button>
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 15px;">
+                <label><strong><i class="fas fa-percentage"></i> Avance:</strong></label>
+                <div class="input-with-icon">
+                    <input type="number" class="field-avance" placeholder="0" min="0" max="100" 
+                        style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc; height: 42px; box-sizing: border-box;">
+                    <button class="record-btn" type="button" title="Grabar avance"><i class="fas fa-microphone"></i></button>
+                    <button class="stop-btn" type="button" title="Detener" style="display: none;"><i class="fas fa-stop"></i></button>
+                </div>
+            </div>
+
             <div class="multimedia-item-section" style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
-                <div class="centrar" style="margin-bottom: 10px;">
+                <div class="centrar" style="margin-bottom: 15px;">
                     <button type="button" class="activate-camera-button btn-item-camera" style="width: auto; padding: 10px 20px;">
                         <i class="fas fa-camera"></i> Activar Cámara
                     </button>
                 </div>
 
-                <div class="attachment-controls">
-                    <label>Adjuntar Evidencia:</label>
-                    <div class="button-row">
-                        <button type="button" class="clip-button btn-item-photo-attach" title="Adjuntar imagen">📎</button>
+                <div class="attachment-controls" style="text-align: center;">
+                    <label style="display: block; margin-bottom: 10px;">Adjuntar Evidencia:</label>
+                    <div class="button-row" style="justify-content: center; display: flex; gap: 20px;">
+                        <button type="button" class="clip-button btn-item-photo-attach" title="Adjuntar imagen" 
+                                style="width: 50px; height: 50px; border-radius: 50%; border: 1px solid #ddd; background: #f9f9f9; display: flex; align-items: center; justify-content: center;">
+                            <i class="fas fa-paperclip" style="font-size: 20px; color: #555;"></i>
+                        </button>
                         <input type="file" class="item-file-input" accept="image/*" multiple style="display:none;">
                         
-                        <button type="button" class="clip-button btn-item-video-attach" title="Adjuntar video">🎥</button>
-                        <input type="file" class="item-video-input" accept="video/*" style="display:none;">
-                    </div>
+                        </div>
                 </div>
 
                 <div class="item-gallery-container">
                     <div class="item-photo-thumbnails photo-thumbnails"></div>
-                    <div class="item-video-thumbnails photo-thumbnails"></div>
                 </div>
             </div>
         </div>
@@ -219,43 +249,52 @@
             box.setAttribute('data-index', currentIdx);
             box.querySelector('.item-title').innerText = `Actividad #${itemCount}`;
             
-            const textarea = box.querySelector('.field-nota');
-            const uniqueId = `nota_${itemCount}`;
-            textarea.id = uniqueId;
-            box.querySelector('.record-btn').setAttribute('data-target-input', uniqueId);
-            box.querySelector('.stop-btn').setAttribute('data-target-input', uniqueId);
+            // --- ASIGNACIÓN DINÁMICA DE IDs ---
+            const idTitulo = `titulo_${itemCount}`;
+            const idDesc = `desc_${itemCount}`;
+            const idEstado = `estado_${itemCount}`;
+            const idAvance = `avance_${itemCount}`;
 
+            // 1. Configurar Actividad (Título)
+            const inputTitulo = box.querySelector('.field-titulo');
+            inputTitulo.id = idTitulo;
+            const groupTitulo = inputTitulo.closest('.input-with-icon');
+            groupTitulo.querySelector('.record-btn').setAttribute('data-target-input', idTitulo);
+            groupTitulo.querySelector('.stop-btn').setAttribute('data-target-input', idTitulo);
+
+            // 2. Configurar Descripción
+            const inputDesc = box.querySelector('.field-nota');
+            inputDesc.id = idDesc;
+            const groupDesc = inputDesc.closest('.input-with-icon');
+            groupDesc.querySelector('.record-btn').setAttribute('data-target-input', idDesc);
+            groupDesc.querySelector('.stop-btn').setAttribute('data-target-input', idDesc);
+
+            // 3. Configurar Estado
+            const inputEstado = box.querySelector('.field-estado');
+            inputEstado.id = idEstado;
+            const groupEstado = inputEstado.closest('.input-with-icon');
+            groupEstado.querySelector('.record-btn').setAttribute('data-target-input', idEstado);
+            groupEstado.querySelector('.stop-btn').setAttribute('data-target-input', idEstado);
+
+            // 4. Configurar Avance
+            const inputAvance = box.querySelector('.field-avance');
+            inputAvance.id = idAvance;
+            const groupAvance = inputAvance.closest('.input-with-icon');
+            groupAvance.querySelector('.record-btn').setAttribute('data-target-input', idAvance);
+            groupAvance.querySelector('.stop-btn').setAttribute('data-target-input', idAvance);
+
+            // --- CONFIGURACIÓN DE CÁMARA ---
             const itemCameraBtn = box.querySelector('.btn-item-camera');
-            const itemFileInput = box.querySelector('.item-file-input');
-            const itemVideoInput = box.querySelector('.item-video-input');
-
             itemCameraBtn.onclick = () => {
                 activeItemIdx = currentIdx;
-                // Usamos la función que abre la cámara y muestra los controles
-                if(typeof startCamera === 'function') {
-                    startCamera(); // Llama a la de tu script.js
-                } else {
-                    activarCamaraLocal();
-                }
+                if(typeof startCamera === 'function') startCamera();
                 document.getElementById('camera-container').style.display = 'block';
                 document.querySelector('.action-buttons-wrapper').style.display = 'block';
             };
 
-            box.querySelector('.btn-item-photo-attach').onclick = () => itemFileInput.click();
-            box.querySelector('.btn-item-video-attach').onclick = () => itemVideoInput.click();
-            
-            itemFileInput.onchange = (e) => handleLocalFiles(e, currentIdx, 'foto');
-            itemVideoInput.onchange = (e) => handleLocalFiles(e, currentIdx, 'video');
-
-            if (itemCount > 1) {
-                const removeBtn = box.querySelector('.remove-item-btn');
-                removeBtn.style.display = 'block';
-                removeBtn.onclick = () => { box.remove(); reindexItems(); };
-            }
-
             container.appendChild(clone);
             
-            // ESTA LÍNEA ES VITAL PARA EL MICRÓFONO
+            // IMPORTANTE: Reinicializar los botones para que reconozcan los nuevos IDs
             if (typeof setupVoiceButtons === "function") setupVoiceButtons();
         }
 
