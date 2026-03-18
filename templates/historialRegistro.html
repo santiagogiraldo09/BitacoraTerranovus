@@ -52,39 +52,31 @@
 
         <div class="records-container" style="padding: 0 20px;">
             {% if reportes %}
-                {% for reporte in reportes %}
+                {% for registro in reportes %}
                 <div class="record-details">
                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px;">
-                        <h3 style="margin: 0; color: #333;">Reporte #{{ reporte.id_reporte }}</h3>
-                        <span style="color: #000000; font-weight: bold;"><i class="far fa-calendar-alt"></i> {{ reporte.fecha }}</span>
+                        <h3 style="margin: 0; color: #FFAF33;">Actividad: {{ registro.actividad }}</h3>
+                        <span style="color: #666; font-weight: bold;"><i class="far fa-calendar-alt"></i> {{ registro.fecha }}</span>
                     </div>
 
-                    <div class="equipos-section">
-                        <strong><i class="fas fa-tools"></i> Equipos y Suministros:</strong><br>
-                        <span>{{ reporte.equipos|join(', ') if reporte.equipos else 'No se registraron equipos' }}</span>
-                    </div>
-
-                    {% for nota in reporte.notas %}
-                    <div class="nota-container" style="margin-top: 15px; border-top: 1px solid #f0f0f0; padding-top: 10px;">
-                        <p style="margin: 0 0 10px 0;"><strong>Actividad:</strong> {{ nota.texto }}</p>
-                        
-                        <div class="media-gallery">
-                            {% for foto in nota.fotos %}
-                            <div class="media-item">
-                                <img src="data:image/png;base64,{{ foto }}" onclick="window.open(this.src)" title="Ver imagen completa">
-                            </div>
-                            {% endfor %}
-
-                            {% for video in nota.videos %}
-                            <div class="media-item">
-                                <video controls>
-                                    <source src="data:video/mp4;base64,{{ video }}" type="video/mp4">
-                                </video>
-                            </div>
-                            {% endfor %}
+                    <div style="margin-top: 15px;">
+                        <p><strong>Descripción:</strong> {{ registro.descripcion }}</p>
+                        <div style="display: flex; gap: 20px; background: #f9f9f9; padding: 10px; border-radius: 5px; border: 1px solid #eee;">
+                            <span><strong>Estado:</strong> {{ registro.estado }}</span>
+                            <span><strong>Avance:</strong> {{ registro.avance }}%</span>
                         </div>
                     </div>
-                    {% endfor %}
+
+                    <div class="media-gallery" style="margin-top: 15px;">
+                        {% for foto in registro.fotos %}
+                        <div class="media-item" style="text-align: center;">
+                            <img src="data:image/png;base64,{{ foto.base64 }}" onclick="window.open(this.src)" title="{{ foto.desc }}">
+                            {% if foto.desc %}
+                                <p style="font-size: 10px; color: #888; margin-top: 5px;">{{ foto.desc }}</p>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
                 {% endfor %}
             {% else %}

@@ -249,7 +249,11 @@
             box.setAttribute('data-index', currentIdx);
             box.querySelector('.item-title').innerText = `Actividad #${itemCount}`;
             
-            // --- ASIGNACIÓN DINÁMICA DE IDs ---
+            // Inicializar el objeto de medios para este ítem si no existe
+            if (!window.itemMediaData) window.itemMediaData = {};
+            window.itemMediaData[currentIdx] = { fotos: [], videos: [] };
+
+            // --- ASIGNACIÓN DINÁMICA DE IDs PARA TRANSCRIPCIÓN ---
             const idTitulo = `titulo_${itemCount}`;
             const idDesc = `desc_${itemCount}`;
             const idEstado = `estado_${itemCount}`;
@@ -283,7 +287,9 @@
             groupAvance.querySelector('.record-btn').setAttribute('data-target-input', idAvance);
             groupAvance.querySelector('.stop-btn').setAttribute('data-target-input', idAvance);
 
-            // --- CONFIGURACIÓN DE CÁMARA ---
+            // --- CONFIGURACIÓN DE MULTIMEDIA (CÁMARA Y ADJUNTAR) ---
+            
+            // Botón de Cámara Local
             const itemCameraBtn = box.querySelector('.btn-item-camera');
             itemCameraBtn.onclick = () => {
                 activeItemIdx = currentIdx;
@@ -292,9 +298,28 @@
                 document.querySelector('.action-buttons-wrapper').style.display = 'block';
             };
 
+            // Botón Adjuntar Imagen (Clip)
+            const btnPhotoAttach = box.querySelector('.btn-item-photo-attach');
+            const fileInput = box.querySelector('.item-file-input');
+
+            if (btnPhotoAttach && fileInput) {
+                btnPhotoAttach.onclick = () => fileInput.click();
+                fileInput.onchange = (e) => handleLocalFiles(e, currentIdx, 'foto');
+            }
+
+            // Botón de eliminar nota (solo visible si hay más de una)
+            if (itemCount > 1) {
+                const removeBtn = box.querySelector('.remove-item-btn');
+                removeBtn.style.display = 'block';
+                removeBtn.onclick = () => { 
+                    box.remove(); 
+                    // Opcional: reindexItems() si necesitas mantener el orden de los títulos
+                };
+            }
+
             container.appendChild(clone);
             
-            // IMPORTANTE: Reinicializar los botones para que reconozcan los nuevos IDs
+            // Reinicializar los botones de voz para los nuevos elementos
             if (typeof setupVoiceButtons === "function") setupVoiceButtons();
         }
 

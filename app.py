@@ -927,68 +927,52 @@ def inventario():
 @app.route('/historialRegistro/<int:id_proyecto>')
 def historialregistro(id_proyecto):
     if 'user_id' not in session:
-        return redirect(url_for('login'))
+        return redirect(url_for('principalscreen'))
     
     conn = None
     try:
         conn = psycopg2.connect(**POSTGRES_CONFIG)
         cursor = conn.cursor()
 
-        # 1. Info del proyecto (Solo esta lleva comillas dobles según tu indicación)
-        cursor.execute('SELECT nombre_proyecto, cliente FROM "proyectosVihesa" WHERE id_proyecto = %s', (id_proyecto,))
+        # 1. Info del proyecto (Usar comillas dobles para la tabla)
+        cursor.execute('SELECT nombre_proyecto, cliente FROM proyectosTerranovus WHERE id_proyecto = %s', (id_proyecto,))
         proyecto_info = cursor.fetchone()
 
-        # 2. Reportes (Tablas sin comillas)
+        if not proyecto_info:
+            return redirect(url_for('history'))
+
+        # 2. Consultar registros de la nueva tabla Terranovus
         cursor.execute("""
-            SELECT id_reporte, fecha FROM reporteDeTrabajoVihesa 
-            WHERE id_proyecto = %s ORDER BY fecha DESC
+            SELECT id_registro, fecha, actividad, descripcion_actividad, estado, porcentaje_avance 
+            FROM registrosbitacoraterranovus 
+            WHERE id_proyecto = %s ORDER BY fecha DESC, id_registro DESC
         """, (id_proyecto,))
-        reportes_rows = cursor.fetchall()
-
+        
+        registros_rows = cursor.fetchall()
         reportes_completos = []
-        for r_row in reportes_rows:
-            id_rep, fecha_dt = r_row
+
+        for r_row in registros_rows:
+            id_reg, fecha_dt, act, desc, est, avan = r_row
             
-            # 3. Equipos (Sin comillas)
-            cursor.execute('SELECT nombre_equipo FROM reporteEquiposVihesa WHERE id_reporte = %s', (id_rep,))
-            equipos = [e[0] for e in cursor.fetchall()]
-
-            # 4. Notas (Sin comillas)
-            cursor.execute('SELECT id_nota_item, nota_texto FROM reporteNotasVihesa WHERE id_reporte = %s', (id_rep,))
-            notas_rows = cursor.fetchall()
+            # 3. Consultar fotos asociadas a este registro
+            cursor.execute('SELECT imagen_base64, description FROM fotos_registro_terranovus WHERE id_registro = %s', (id_reg,))
+            fotos_raw = cursor.fetchall()
             
-            notas_data = []
-            for n_row in notas_rows:
-                id_nota, texto = n_row
-                # 5 y 6. Multimedia (Sin comillas)
-                # 5. Fotos
-                cursor.execute('SELECT imagen_base64 FROM fotos_registro_vihesa WHERE id_nota_item = %s', (id_nota,))
-                fotos_raw = cursor.fetchall()
-                fotos = []
-                for f in fotos_raw:
-                    img_str = f[0]
-                    # Si el string contiene el encabezado, lo quitamos para enviarlo limpio
-                    if img_str and "," in img_str:
-                        img_str = img_str.split(",")[1]
-                    fotos.append(img_str)
-
-                # 6. Videos
-                cursor.execute('SELECT video_base64 FROM videos_registro_vihesa WHERE id_nota_item = %s', (id_nota,))
-                videos_raw = cursor.fetchall()
-                videos = []
-                for v in videos_raw:
-                    vid_str = v[0]
-                    if vid_str and "," in vid_str:
-                        vid_str = vid_str.split(",")[1]
-                    videos.append(vid_str)
-
-                notas_data.append({'texto': texto, 'fotos': fotos, 'videos': videos})
+            fotos = []
+            for f in fotos_raw:
+                img_str = f[0]
+                if img_str and "," in img_str:
+                    img_str = img_str.split(",")[1]
+                fotos.append({'base64': img_str, 'desc': f[1]})
 
             reportes_completos.append({
-                'id_reporte': id_rep,
-                'fecha': fecha_dt.strftime('%d/%m/%Y %H:%M:%S') if fecha_dt else "S/F",
-                'equipos': equipos,
-                'notas': notas_data
+                'id_registro': id_reg,
+                'fecha': fecha_dt.strftime('%d/%m/%Y') if fecha_dt else "S/F",
+                'actividad': act,
+                'descripcion': desc,
+                'estado': est,
+                'avance': avan,
+                'fotos': fotos
             })
 
         return render_template('historialRegistro.html', 
@@ -996,7 +980,7 @@ def historialregistro(id_proyecto):
                                reportes=reportes_completos, 
                                id_proyecto=id_proyecto)
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error en historialregistro: {e}")
         return redirect(url_for('history'))
     finally:
         if conn: conn.close()

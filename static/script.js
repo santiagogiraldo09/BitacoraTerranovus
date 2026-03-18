@@ -1238,12 +1238,12 @@ function handleLocalFiles(event, idx, type) {
             if (type === 'foto') {
                 window.itemMediaData[idx].fotos.push({
                     file_data: base64Data,
-                    description: file.name
+                    description: ""
                 });
             } else {
                 window.itemMediaData[idx].videos.push({
                     file_data: base64Data,
-                    description: file.name
+                    description: ""
                 });
             }
             // Llamamos al render para mostrar la miniatura inmediatamente

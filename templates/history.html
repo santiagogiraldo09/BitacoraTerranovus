@@ -44,26 +44,31 @@
             <p>Selecciona un proyecto para ver su historial</p>
         </div>
 
-        <form method="POST" action="/exportar-proyectos-excel">
-            <div class="centrar" style="text-align: center; margin-bottom: 15px;">
+        <form id="export-form" method="POST">
+            <div class="centrar" style="display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 20px;">
                 <label><input type="checkbox" id="select-all-projects"> Seleccionar todos</label>
-                <button type="submit" class="back-button" style="margin-left: 10px;">
-                    <i class="fas fa-file-excel"></i> Exportar proyectos seleccionados a Excel
+                
+                <button type="submit" formaction="/exportar-proyectos-excel" class="back-button" style="width: 320px; margin: 0;">
+                    <i class="fas fa-file-excel"></i> Exportar seleccionados a Excel
+                </button>
+
+                <button type="submit" formaction="/exportar-proyectos-pdf" class="back-button" style="width: 320px; margin: 0; background-color: #FFAF33;">
+                    <i class="fas fa-file-pdf"></i> Exportar seleccionados a PDF
                 </button>
             </div>
 
             <div class="records-container">
                 {% for project in db_projects %}
-                <label class="project-checkbox-container">
-                    <input type="checkbox" name="project_ids" value="{{ project.id_proyecto }}" class="project-checkbox">
-                    <div class="record-button" onclick="redirectToProjectDetails('{{ project.id_proyecto }}')">
-                        {{ project.name }}<br>
-                        <small>Cliente: {{ project.cliente }}</small>
-                        <small>Inicio: {{ project.fecha_inicio }}</small>
+                <label class="project-checkbox-container" style="display: flex; align-items: center; background: #fff; padding: 10px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #ddd;">
+                    <input type="checkbox" name="project_ids" value="{{ project.id_proyecto }}" class="project-checkbox" style="margin-right: 15px; transform: scale(1.2);">
+                    <div class="record-button" onclick="redirectToProjectDetails('{{ project.id_proyecto }}')" style="flex-grow: 1; cursor: pointer; border: none; background: none; text-align: left; padding: 0;">
+                        <strong style="font-size: 1.1em; color: #333;">{{ project.name }}</strong><br>
+                        <small style="color: #666;">Cliente: {{ project.cliente }}</small> 
+                        <small style="color: #888;">Inicio: {{ project.fecha_inicio }}</small>
                     </div>
                 </label>
                 {% else %}
-                <div class="no-projects">
+                <div class="no-projects" style="text-align: center; padding: 20px; color: #999;">
                     <p>No tienes proyectos registrados</p>
                 </div>
                 {% endfor %}
