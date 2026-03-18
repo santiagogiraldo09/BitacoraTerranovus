@@ -1440,20 +1440,20 @@ def exportar_proyectos_pdf():
             pdf.set_font("Arial", 'B', 9)
             pdf.cell(30, 8, "PROYECTO:", border=1)
             pdf.set_font("Arial", '', 9)
-            pdf.cell(65, 8, f"{nombre}", border=1)
+            pdf.cell(65, 8, f"{nombre or ''}", border=1)
             pdf.set_font("Arial", 'B', 9)
             pdf.cell(40, 8, "CLIENTE:", border=1)
             pdf.set_font("Arial", '', 9)
-            pdf.cell(55, 8, f"{cliente}", border=1, ln=True)
+            pdf.cell(55, 8, f"{cliente or ''}", border=1, ln=True)
 
             pdf.set_font("Arial", 'B', 9)
             pdf.cell(30, 8, "UBICACIÓN:", border=1)
             pdf.set_font("Arial", '', 9)
-            pdf.cell(65, 8, f"{ubicacion}", border=1)
+            pdf.cell(65, 8, f"{ubicacion or ''}", border=1)
             pdf.set_font("Arial", 'B', 9)
             pdf.cell(40, 8, "ORDEN DE TRABAJO:", border=1)
             pdf.set_font("Arial", '', 9)
-            pdf.cell(55, 8, f"{ot}", border=1, ln=True)
+            pdf.cell(55, 8, f"{ot or ''}", border=1, ln=True)
             
             pdf.ln(10)
 
@@ -1471,17 +1471,20 @@ def exportar_proyectos_pdf():
                 # Encabezado Actividad
                 pdf.set_fill_color(255, 240, 220)
                 pdf.set_font("Arial", 'B', 11)
-                pdf.cell(190, 8, f"FECHA: {fecha_reg} - ACTIVIDAD: {actividad}", ln=True, fill=True, border='T')
+                pdf.cell(190, 8, f"FECHA: {fecha_reg} - ACTIVIDAD: {actividad or 'Sin actividad'}", ln=True, fill=True, border='T')
                 
                 # Descripción
                 pdf.set_font("Arial", '', 10)
-                pdf.multi_cell(190, 6, f"Descripción: {desc}", border='LR')
+                pdf.multi_cell(190, 6, f"Descripción: {desc or 'Sin descripción'}", border='LR')
 
-                # ESTADO Y AVANCE (Corregidos a 95mm cada uno para sumar 190mm exactos)
+                # FIX: Forzar X al margen izquierdo después del multi_cell
+                pdf.set_x(10)
+
+                # ESTADO Y AVANCE (95mm + 95mm = 190mm)
                 pdf.set_font("Arial", 'B', 10)
                 pdf.set_fill_color(245, 245, 245)
-                pdf.cell(95, 8, f" ESTADO: {estado}", border=1, fill=True)
-                pdf.cell(95, 8, f" AVANCE: {avance}%", border=1, fill=True, ln=True)
+                pdf.cell(95, 8, f" ESTADO: {estado or 'N/A'}", border=1, fill=True)
+                pdf.cell(95, 8, f" AVANCE: {avance or 0}%", border=1, fill=True, ln=True)
                 
                 # --- SECCIÓN DE EVIDENCIA FOTOGRÁFICA ---
                 cursor.execute("SELECT imagen_base64, description FROM fotos_registro_terranovus WHERE id_registro = %s", (id_reg,))
@@ -1490,7 +1493,7 @@ def exportar_proyectos_pdf():
                 if fotos:
                     pdf.ln(2)
                     pdf.set_font("Arial", 'B', 10)
-                    pdf.cell(0, 8, "EVIDENCIA:", ln=True) # Texto de evidencia ENCIMA de las fotos
+                    pdf.cell(0, 8, "EVIDENCIA:", ln=True)
                     
                     img_w = 60
                     current_x = 10
@@ -1530,7 +1533,7 @@ def exportar_proyectos_pdf():
                         except Exception as e:
                             print(f"Error procesando imagen: {e}")
                     
-                    pdf.set_y(pdf.get_y() + 55) # Espacio tras bloque de fotos
+                    pdf.set_y(pdf.get_y() + 55)
                 else:
                     pdf.ln(5)
 
