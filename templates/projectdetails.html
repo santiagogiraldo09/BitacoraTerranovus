@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalles del Proyecto</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='projectdetails.css') }}">
+</head>
+<body>
+    <div class="details-container">
+        <!-- Título -->
+        <h1>Detalles del Proyecto</h1>
+
+        <!-- Información del proyecto -->
+        <div class="project-info">
+            <p><strong>Nombre del Proyecto:</strong> <span id="project-name"></span></p>
+            <p><strong>Fecha de Inicio:</strong> <span id="start-date"></span></p>
+            <p><strong>Fecha de Fin:</strong> <span id="end-date"></span></p>
+            <p><strong>Director:</strong> <span id="director"></span></p>
+        </div>
+
+        <!-- Lista de disciplinas -->
+        <div class="discipline-section">
+            <h2>Disciplinas</h2>
+            <ul id="discipline-list">
+                <li onclick="redirectToDiscipline('Civil')">HVAC</li>
+                <li onclick="redirectToDiscipline('Seguridad')">RCI</li>
+                <li onclick="redirectToDiscipline('Eléctrica')">MEP </li>
+                <li onclick="redirectToDiscipline('Mecánica')">Arquitectura</li>
+                <li onclick="redirectToDiscipline('Seguridad')">Estructura</li>
+            </ul>
+        </div>
+
+        <!-- Botón para volver -->
+        <button id="back-button" onclick="goBack()">Volver a la lista de proyectos</button>
+    </div>
+
+    <script>
+        // Obtener parámetros de la URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const projectName = urlParams.get('name');
+        const startDate = urlParams.get('startDate') || "01-12-2024";
+        const endDate = urlParams.get('endDate') || "31-12-2024";
+        const director = urlParams.get('director') || "Luisa Molina";
+
+        // Asignar valores a los elementos
+        document.getElementById("project-name").textContent = projectName || "Proyecto desconocido";
+        document.getElementById("start-date").textContent = startDate;
+        document.getElementById("end-date").textContent = endDate;
+        document.getElementById("director").textContent = director;
+
+        // Función para redirigir a los detalles de disciplina
+        function redirectToDiscipline(discipline) {
+            const project = encodeURIComponent(projectName);
+            window.location.href = `{{ url_for('disciplinerecords') }}?project=${project}&discipline=${encodeURIComponent(discipline)}`;
+        }
+
+        // Función para volver a la lista de proyectos
+        function goBack() {
+            window.location.href = "{{ url_for('registros') }}";
+        }
+    </script>
+</body>
+</html>

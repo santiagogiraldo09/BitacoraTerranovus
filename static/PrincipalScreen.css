@@ -1,0 +1,115 @@
+/* Configuración general de la pantalla */
+body, html {
+  margin: 0;
+  /*padding: 0;*/
+  font-family: Arial, sans-serif;
+  background-color: #f0f0f0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+}
+
+/* Contenedor principal, que se adapta al tamaño de la pantalla */
+.main-container {
+  width: 100%;
+  max-width: 400px; /* Ajusta el ancho máximo para pantallas pequeñas */
+  height: 100vh;
+  height: auto; /* Deja que la altura se ajuste automáticamente */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background-color: #ffffff;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 10px; /* Bordes redondeados */
+  padding: 20px; /* Espaciado interno */
+}
+
+/* Espacio del logo */
+.logo-container {
+  display: flex;
+  justify-content: center;
+  padding: 20px 0;
+}
+
+.logo {
+  max-width: 210px; /* Tamaño del logo más pequeño para móviles */
+  height: auto;
+}
+
+/* Títulos y texto de introducción */
+#heading {
+  text-align: center;
+  font-size: 24px;
+  margin-bottom: 20px;
+}
+
+/* Contenedor de los campos de entrada */
+.field {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px; /* Espaciado entre campos */
+}
+
+.input-icon {
+  margin-right: 10px; /* Espaciado entre el icono y el campo de texto */
+}
+
+/* Campo de entrada */
+.input-field {
+  flex: 1; /* El campo de entrada ocupa el espacio restante */
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 16px;
+}
+
+/* Estilo de los botones */
+.btn {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px; /* Espaciado inferior */
+}
+
+.button1, .button2 {
+  background-color: #FFAF33;
+  color: white;
+  padding: 10px 15px;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  text-align: center;
+  flex: 1; /* Los botones ocupan el mismo espacio */
+  margin: 0 5px; /* Espaciado entre los botones */
+}
+
+.button3 {
+  background-color: transparent;
+  color: #FFAF33;
+  border: none;
+  cursor: pointer;
+  text-align: center;
+}
+
+/* Ajustes responsivos */
+@media screen and (max-width: 480px) {
+  .main-container {
+      padding: 10px; /* Espaciado interno reducido para pantallas pequeñas */
+  }
+
+  .logo {
+      max-width: 80px; /* Tamaño más pequeño del logo en móviles */
+  }
+
+  #heading {
+      font-size: 20px; /* Tamaño de fuente más pequeño en móviles */
+  }
+
+  .input-field {
+      font-size: 14px; /* Tamaño de fuente de los campos más pequeño */
+  }
+
+  .button1, .button2, .button3 {
+      font-size: 14px; /* Tamaño de fuente más pequeño para botones */
+  }
+}

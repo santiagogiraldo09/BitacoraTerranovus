@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pantalla de Registros</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='history.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">  
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+        /* Restauración de tu estética original */
+        .record-details {
+            background-color: #f9f9f9;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .record-details h3 { margin-top: 0; color: #333; }
+        .record-field { margin-bottom: 8px; }
+        .record-field label { font-weight: bold; margin-right: 5px; }
+        .back-button {
+            background-color: #FFAF33; /* Tu color original */
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        .project-title { text-align: center; margin: 20px 0; color: #333; }
+        .centrar { text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="logo-container">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
+        </div>
+
+        <div class="intro-text">
+            <h2>Mis Proyectos</h2>
+            <p>Selecciona un proyecto para ver su historial</p>
+        </div>
+
+        <form method="POST" action="/exportar-proyectos-excel">
+            <div class="centrar" style="text-align: center; margin-bottom: 15px;">
+                <label><input type="checkbox" id="select-all-projects"> Seleccionar todos</label>
+                <button type="submit" class="back-button" style="margin-left: 10px;">
+                    <i class="fas fa-file-excel"></i> Exportar proyectos seleccionados a Excel
+                </button>
+            </div>
+
+            <div class="records-container">
+                {% for project in db_projects %}
+                <label class="project-checkbox-container">
+                    <input type="checkbox" name="project_ids" value="{{ project.id_proyecto }}" class="project-checkbox">
+                    <div class="record-button" onclick="redirectToProjectDetails('{{ project.id_proyecto }}')">
+                        {{ project.name }}<br>
+                        <small>Cliente: {{ project.cliente }}</small>
+                        <small>Inicio: {{ project.fecha_inicio }}</small>
+                    </div>
+                </label>
+                {% else %}
+                <div class="no-projects">
+                    <p>No tienes proyectos registrados</p>
+                </div>
+                {% endfor %}
+            </div>
+        </form>
+
+        <div class="bottom-menu">
+            <a href="{{ url_for('registros') }}" class="bottom-button"><i class="fas fa-arrow-left"></i></a>
+        </div>
+    </div>
+
+    <script>
+        // Redirección corregida para las 5 tablas sin perder estética
+        function redirectToProjectDetails(projectId) {
+            window.location.href = `/historialRegistro/${projectId}`;
+        }
+
+        document.getElementById('select-all-projects')?.addEventListener('change', function () {
+            document.querySelectorAll('.project-checkbox').forEach(cb => cb.checked = this.checked);
+        });
+    </script>
+</body>
+</html>

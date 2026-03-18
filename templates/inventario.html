@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventario</title>
+    <link rel="stylesheet" href="/static/inventario.css"> <!-- Aquí deberías incluir tu archivo de estilos CSS -->
+    <!-- Aquí deberías incluir tu archivo JavaScript para manejar los filtros -->
+</head>
+<body>
+    <div class="container">
+        <!-- Barra de Filtros -->
+        <div class="filters">
+            <h2>Filtrar Inventario</h2>
+            <form id="filter-form">
+                <label for="category">Categoría:</label>
+                <select id="category" name="category">
+                    <option value="">Selecciona una categoría</option>
+                    <option value="electronica">Electrónica</option>
+                    <option value="muebles">Muebles</option>
+                    <option value="herramientas">Herramientas</option>
+                    <option value="ropa">Ropa</option>
+                </select>
+
+                <label for="min-quantity">Cantidad mínima:</label>
+                <input type="number" id="min-quantity" name="min-quantity" placeholder="Ej. 5">
+
+                <label for="location">Ubicación:</label>
+                <select id="location" name="location">
+                    <option value="">Selecciona ubicación</option>
+                    <option value="almacen1">Almacén 1</option>
+                    <option value="almacen2">Almacén 2</option>
+                    <option value="oficina">Oficina</option>
+                </select>
+
+                <button type="button" onclick="applyFilters()">Aplicar Filtros</button>
+                <button type="button" onclick="clearFilters()">Limpiar Filtros</button>
+            </form>
+        </div>
+
+        <!-- Lista de Inventario -->
+        <div class="inventory-list">
+            <h2>Lista de Productos</h2>
+            <table id="inventory-table" class= "responsive-table">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Categoría</th>
+                        <th>Cantidad</th>
+                        <th>Ubicación</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Taladro</td>
+                        <td>Electrónica</td>
+                        <td>100</td>
+                        <td>Almacén 1</td>
+                    </tr>
+                    <tr>
+                        <td>Escalera</td>
+                        <td>Muebles</td>
+                        <td>50</td>
+                        <td>Oficina</td>
+                    </tr>
+                    <tr>
+                        <td>Destornillador</td>
+                        <td>Herramientas</td>
+                        <td>30</td>
+                        <td>Almacén 2</td>
+                    </tr>
+                    <tr>
+                        <td>Casco</td>
+                        <td>Dotación</td>
+                        <td>80</td>
+                        <td>Almacén 1</td>
+                    </tr>
+                    <!-- Agrega más productos aquí -->
+                </tbody>
+            </table>
+        </div>
+        <!-- Botón para abrir el pedido -->
+        <button id="realizar-pedido-btn">Realizar Pedido</button>
+
+        <!-- Ventana Emergente -->
+        <div id="pedido-modal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>Pedido material</h2>
+                <div id="carrito">
+                    <!-- Los productos seleccionados se agregarán aquí -->
+                </div>
+                <div id="mensaje-pedido" style="display:none;"></div>
+                <button id="enviar-pedido-btn">Enviar Pedido</button>
+            </div>
+            <!-- Lista de productos disponibles con stock -->
+            <div id="productosDisponibles">
+                <h3>Productos Disponibles</h3>
+                <div class="producto">
+                    <span>Destornillador</span>
+                    <span class="stock">Stock: 30</span>
+                    <input type="number" id="cantidadProducto1" value="1" min="1" max="100" />
+                    <button onclick="agregarAlCarrito('Producto 1', document.getElementById('cantidadProducto1').value, 100)">Agregar</button>
+                </div>
+                <div class="producto">
+                    <span>Casco</span>
+                    <span class="stock">Stock: 80</span>
+                    <input type="number" id="cantidadProducto2" value="1" min="1" max="50" />
+                    <button onclick="agregarAlCarrito('Producto 2', document.getElementById('cantidadProducto2').value, 50)">Agregar</button>
+                </div>
+                <div class="producto">
+                    <span>Escaleras</span>
+                    <span class="stock">Stock: 50</span>
+                    <input type="number" id="cantidadProducto3" value="1" min="1" max="30" />
+                    <button onclick="agregarAlCarrito('Producto 3', document.getElementById('cantidadProducto3').value, 30)">Agregar</button>
+                </div>
+                <div class="producto">
+                    <span>Taladro</span>
+                    <span class="stock">Stock: 100</span>
+                    <input type="number" id="cantidadProducto3" value="1" min="1" max="30" />
+                    <button onclick="agregarAlCarrito('Producto 3', document.getElementById('cantidadProducto3').value, 30)">Agregar</button>
+                </div>
+                <!-- añadir más productos aquí -->
+            </div>
+        </div>
+    </div>
+</body>
+    <script type="text/javascript" src="https://cdn.emailjs.com/dist/email.min.js"></script>
+    <script>
+        function applyFilters() {
+            // Obtener los valores de los filtros
+            const category = document.getElementById("category").value;
+            const minQuantity = document.getElementById("min-quantity").value;
+            const location = document.getElementById("location").value;
+        
+            // Obtener todas las filas de la tabla
+            const rows = document.querySelectorAll("#inventory-table tbody tr");
+        
+            rows.forEach(row => {
+                const productCategory = row.cells[1].textContent;
+                const productQuantity = parseInt(row.cells[2].textContent);
+                const productLocation = row.cells[3].textContent;
+        
+                let showRow = true;
+        
+                // Filtrar por categoría
+                if (category && productCategory !== category) {
+                    showRow = false;
+                }
+        
+                // Filtrar por cantidad mínima
+                if (minQuantity && productQuantity < minQuantity) {
+                    showRow = false;
+                }
+        
+                // Filtrar por ubicación
+                if (location && productLocation !== location) {
+                    showRow = false;
+                }
+        
+                // Mostrar u ocultar la fila según el resultado del filtro
+                if (showRow) {
+                    row.style.display = "";
+                } else {
+                    row.style.display = "none";
+                }
+            });
+        }
+        
+        function clearFilters() {
+            // Limpiar filtros
+            document.getElementById("category").value = "";
+            document.getElementById("min-quantity").value = "";
+            document.getElementById("location").value = "";
+        
+            // Mostrar todas las filas de la tabla
+            const rows = document.querySelectorAll("#inventory-table tbody tr");
+            rows.forEach(row => {
+                row.style.display = "";
+            });
+        }
+                
+
+            // Obtener el botón y el modal
+        const btnRealizarPedido = document.getElementById('realizar-pedido-btn');
+        const modal = document.getElementById('pedido-modal');
+        const closeModal = document.getElementsByClassName('close')[0];
+
+        // Mostrar el modal cuando se haga clic en el botón
+        btnRealizarPedido.onclick = function() {
+            modal.style.display = "block";
+        };
+
+        // Cerrar el modal
+        closeModal.onclick = function() {
+            modal.style.display = "none";
+        };
+
+        // Cerrar el modal si se hace clic fuera de la ventana emergente
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        };
+        
+            let productosDisponibles = [
+            { nombre: "Producto 1", cantidadDisponible: 100 },
+            { nombre: "Producto 2", cantidadDisponible: 50 },
+            { nombre: "Producto 3", cantidadDisponible: 30 },
+            { nombre: "Producto 4", cantidadDisponible: 80 }
+        ];
+        
+        let productosSeleccionados = [];  // Arreglo que almacenará los productos seleccionados
+        
+        // Función para agregar un producto al carrito
+        function agregarAlCarrito(nombre, cantidad) {
+            cantidad = parseInt(cantidad); // Convertir a entero
+        
+            if (cantidad <= 0) {
+                alert("La cantidad debe ser mayor que cero.");
+                return;
+            }
+        
+            // Verificar si el producto ya está en el carrito
+            let productoExistente = productosSeleccionados.find(producto => producto.nombre === nombre);
+        
+            if (productoExistente) {
+                // Si el producto ya está en el carrito, solo sumamos la cantidad
+                productoExistente.cantidad += cantidad;
+            } else {
+                // Si el producto no está en el carrito, lo agregamos
+                productosSeleccionados.push({ nombre: nombre, cantidad: cantidad });
+            }
+        
+            // Actualizar la vista del carrito
+            actualizarCarrito();
+        }
+        
+        // Función para actualizar la vista del carrito
+        function actualizarCarrito() {
+            let carritoContainer = document.getElementById("carrito");
+            carritoContainer.innerHTML = ""; // Limpiar el carrito antes de agregarlo de nuevo
+        
+            productosSeleccionados.forEach(producto => {
+                let itemHTML = `
+                    <div class="carrito-item">
+                        <div class="item-info">
+                            <span class="item-name">${producto.nombre}</span>
+                            <span class="item-quantity">Cantidad: ${producto.cantidad}</span>
+                        </div>
+                        <button onclick="eliminarDelCarrito('${producto.nombre}')">Eliminar</button>
+                    </div>
+                `;
+                carritoContainer.innerHTML += itemHTML;
+            });
+        }
+        
+        // Función para eliminar un producto del carrito
+        function eliminarDelCarrito(nombre) {
+            productosSeleccionados = productosSeleccionados.filter(producto => producto.nombre !== nombre);
+            actualizarCarrito();
+        }
+        
+        // Función para enviar el pedido (aún pendiente para el backend)
+        function enviarPedido() {
+            alert("Pedido enviado correctamente.");
+            cerrarCarrito();  // Cerrar el carrito después de enviar el pedido
+        }
+ // Inicializa EmailJS con tu USER ID
+ emailjs.init(""); // Reemplaza con tu propio USER ID de EmailJS
+
+    // Función para mostrar el carrito en la ventana emergente
+    function mostrarCarrito() {
+        const carritoVentana = document.getElementById('carritoVentana');
+        const productos = document.querySelectorAll('.producto');
+        const productosCarrito = document.getElementById('productosCarrito');
+
+        productosCarrito.innerHTML = ''; // Limpiar carrito anterior
+
+        productos.forEach(producto => {
+            const checkbox = producto.querySelector('.checkbox');
+            if (checkbox.checked) {
+                const nombre = producto.querySelector('.nombre').innerText;
+                const cantidad = producto.querySelector('.cantidad').value;
+
+                const itemCarrito = document.createElement('li');
+                itemCarrito.textContent = `${nombre} - Cantidad: ${cantidad}`;
+                productosCarrito.appendChild(itemCarrito);
+            }
+        });
+
+        carritoVentana.style.display = 'block'; // Mostrar el carrito
+    }
+
+    // Función para cerrar la ventana del carrito
+    function cerrarCarrito() {
+        const carritoVentana = document.getElementById('carritoVentana');
+        carritoVentana.style.display = 'none'; // Ocultar el carrito
+    }
+
+    // Función para enviar el pedido usando EmailJS
+    function enviarPedido() {
+        const productosSeleccionados = [];
+        const productos = document.querySelectorAll('.producto');
+        
+        productos.forEach(producto => {
+            const checkbox = producto.querySelector('.checkbox');
+            if (checkbox.checked) {
+                const nombre = producto.querySelector('.nombre').innerText;
+                const cantidad = producto.querySelector('.cantidad').value;
+                productosSeleccionados.push({ nombre, cantidad });
+            }
+        });
+
+        if (productosSeleccionados.length === 0) {
+            alert('No has agregado productos al carrito.');
+            return;
+        }
+
+        // Crear el contenido del mensaje con los productos seleccionados
+        let contenidoPedido = '<h3>Detalles del Pedido</h3><ul>';
+        productosSeleccionados.forEach(producto => {
+            contenidoPedido += `
+                <li>
+                    Producto: ${producto.nombre}<br>
+                    Cantidad: ${producto.cantidad}
+                </li>
+            `;
+        });
+        contenidoPedido += '</ul>';
+
+        // Datos del template de EmailJS
+        const templateParams = {
+            to_name: 'luisa.molina@iac.com.co',
+            message: contenidoPedido,
+            from_email: 'luisa.molina@iac.com.co', // Reemplaza con tu correo
+        };
+
+        // Enviar correo con EmailJS
+        emailjs.send('service_forkn5w', 'template_wol5rnc', templateParams)
+            .then((response) => {
+                alert('Pedido enviado correctamente');
+                console.log('Correo enviado: ', response);
+                cerrarCarrito(); // Cerrar el carrito después de enviar el pedido
+            })
+            .catch((error) => {
+                alert('Hubo un problema al enviar el pedido');
+                console.error('Error al enviar correo: ', error);
+            });
+    }
+    </script>
+
+        </html>

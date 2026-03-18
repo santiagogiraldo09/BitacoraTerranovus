@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registros de Disciplina</title>
+    <link rel="stylesheet" href="/static/discipline-records.css">
+</head>
+<body>
+    <div class="records-container">
+        <!-- Título con disciplina y proyecto -->
+        <h1 id="discipline-title">Registros de Disciplina</h1>
+
+        <!-- Lista de registros -->
+        <ul id="records-list">
+            <!-- Los registros se cargarán dinámicamente -->
+        </ul>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            // Obtener parámetros de la URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const projectName = urlParams.get('project');
+            const discipline = urlParams.get('discipline');
+        
+            if (projectName && discipline) {
+                // Actualizar título
+                document.getElementById("discipline-title").textContent = `Registros de ${discipline} (${projectName})`;
+        
+                // Simular registros (esto puede venir de un servidor)
+                const recordsData = {
+                    "Arquitectura": ["Registro 1", "Registro 2", "Registro 3"],
+                    "Ingeniería Civil": ["Registro A", "Registro B"],
+                    "Electricidad": ["Registro X", "Registro Y", "Registro Z"],
+                };
+        
+                // Cargar registros
+                const records = recordsData[discipline] || [];
+                const recordsList = document.getElementById("records-list");
+                records.forEach(record => {
+                    const li = document.createElement("li");
+                    li.textContent = record;
+                    recordsList.appendChild(li);
+                });
+            }
+        });
+        
+    </script>
+</body>
+</html>

@@ -1,0 +1,161 @@
+/* Configuración general de la pantalla */
+body, html {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    /*box-sizing: border-box;*/
+}
+
+/* Contenedor principal */
+.main-container {
+    width: 100vw;
+    max-width: 400px;
+    height: 100%;
+    background-color: #ffffff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    /*border-radius: 10px;*/
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Contenedor del contenido (todo excepto el menú inferior) */
+.content-container {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Lista de proyectos - AHORA CON SCROLL INTERNO */
+.form-container {
+    flex: 1;
+    overflow-y: auto;
+    list-style-type: none;
+    padding: 10px;
+    margin: 0;
+    margin-bottom: 10px;
+}
+
+
+/* Estilo del logo */
+.logo-container {
+    display: flex;
+    justify-content: center;
+    padding: 20px 0;
+}
+
+.logo {
+    max-width: 210px;
+    height: auto;
+}
+
+/* Estilo del formulario */
+.form-header {
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+h2 {
+    font-size: 16px;
+    color: #34495e;
+}
+
+form {
+    display: flex;
+    flex-direction: column;
+}
+
+label {
+    font-size: 14px;
+    color: #34495e;
+    margin: 8px 0 3px;
+}
+
+input {
+    padding: 10px;
+    margin-bottom: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+button[type="button"], button[type="submit"] {
+    padding: 8px;
+    background-color: #FFAF33;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+    width: 100%;
+}
+
+button[type="button"]:hover, button[type="submit"]:hover {
+    background-color: #DE992C;
+}
+
+#location-container {
+    display: flex;
+    justify-content: center;
+    padding: 4px;
+}
+
+#location {
+    width: 70%;
+    padding: 10px;
+    font-size: 12px;
+}
+
+button[type="button"] {
+    width: 45%;
+}
+
+/* Menú inferior */
+.bottom-menu {
+    /*display: flex;
+    justify-content: space-around;
+    padding: 10px;
+    background-color: #f3f3f3;*/
+    display: flex;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: #fff;
+    padding: 10px 0;
+    display: flex;
+    justify-content: space-around;
+    /*box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);*/
+    z-index: 100; /* Asegurar que esté por encima de otros elementos */
+}
+
+.bottom-button {
+    background-color: #FFAF33;
+    color: white;
+    padding: 10px 15px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+}
+
+/* Ajustes responsivos */
+@media screen and (max-width: 480px) {
+    .main-container {
+        max-width: 100%;
+    }
+
+    .logo {
+        max-width: 80px;
+    }
+
+    .bottom-button {
+        font-size: 12px;
+        padding: 8px 10px;
+    }
+}

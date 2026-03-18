@@ -1,0 +1,73 @@
+/* General reset */
+body, html {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: Arial, sans-serif;
+}
+
+/* Pantalla completa ajustada al móvil */
+body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 100vh;
+    background-color: #f5f5f5;
+    padding: 20px;
+}
+
+/* Contenedor principal, que se adapta al tamaño de la pantalla */
+.main-container {
+    width: 80vw;
+    max-width: 400px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background-color: #ffffff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;  /* Evitar que haya scroll innecesario */
+    padding: 15px;
+    box-sizing: border-box;
+}
+
+/* Contenedor principal */
+.records-container {
+    width: 100%;
+    max-width: 400px; /* Ajuste para dispositivos móviles */
+    background-color: #ffffff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0px 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Estilo del logo */
+.records-container img {
+    display: block;
+    margin: 0 auto 20px auto;
+    max-width: 100px; /* Tamaño del logo */
+}
+
+/* Título */
+h1 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #000000;
+}
+
+/* Lista de registros */
+#records-list {
+    list-style: none;
+    padding: 0;
+}
+
+#records-list li {
+    background-color: #e0e0e0;
+    margin: 8px 0;
+    padding: 10px;
+    border-radius: 4px;
+    text-align: center;
+    font-size: 14px;
+    color: #333;
+}

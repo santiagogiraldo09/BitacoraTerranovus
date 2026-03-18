@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control Calidad Materiales - Synchro</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styleFormulario.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+
+    <template id="template-control-calidad">
+        <div class="dynamic-item-box">
+            
+            <div class="form-group">
+                <label>ITEM</label>
+                <div class="input-with-icon">
+                    <input type="number" class="form-input" data-api-name="ITEM" placeholder="Número de ítem">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Material</label>
+                <div class="input-with-icon">
+                    <input type="text" class="form-input" data-api-name="Material" placeholder="Descripción del material">
+                    <button class="record-btn" type="button" title="Grabar respuesta">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="stop-btn" type="button" title="Detener grabación" style="display: none;">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Unidad</label>
+                <div class="input-with-icon">
+                    <input type="text" class="form-input" data-api-name="Unidad" placeholder="Unidad (ej: m3, kg)">
+                    <button class="record-btn" type="button" title="Grabar respuesta">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="stop-btn" type="button" title="Detener grabación" style="display: none;">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Fecha Arribo</label>
+                <div class="input-with-icon">
+                    <input type="date" class="form-input" data-api-name="Fecha__x0020__Arribo">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Proveedor</label>
+                <div class="input-with-icon">
+                    <input type="text" class="form-input" data-api-name="Proveedor" placeholder="Nombre del proveedor">
+                    <button class="record-btn" type="button" title="Grabar respuesta">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="stop-btn" type="button" title="Detener grabación" style="display: none;">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Cantidad</label>
+                <div class="input-with-icon">
+                    <input type="number" class="form-input" data-api-name="Cantidad" placeholder="0.00">
+                    <button class="record-btn" type="button" title="Grabar respuesta">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="stop-btn" type="button" title="Detener grabación" style="display: none;">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Cumplimiento Especificaciones</label>
+                <div class="input-with-icon">
+                    <select class="form-input" data-api-name="Cumplimiento__x0020__Especificacione">
+                        <option value="SI">SI</option>
+                        <option value="NO">NO</option>
+                        <option value="N/A">N/A</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Certificación de Calidad</label>
+                <div class="input-with-icon">
+                    <select class="form-input" data-api-name="Certificaci__x00f3__n__x0020__de__x0">
+                        <option value="SI">SI</option>
+                        <option value="NO">NO</option>
+                        <option value="N/A">N/A</option>
+                    </select>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Condiciones del Material</label>
+                <div class="input-with-icon">
+                    <select class="form-input" data-api-name="Condiciones__x0020__del__x0020__Mate">
+                        <option value="Bueno">Bueno</option>
+                        <option value="Regular">Regular</option>
+                        <option value="Malo">Malo</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Observaciones</label>
+                <div class="input-with-icon">
+                    <textarea class="form-input" data-api-name="Observaciones" placeholder="Observaciones..."></textarea>
+                    <button class="record-btn" type="button" title="Grabar respuesta">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="stop-btn" type="button" title="Detener grabación" style="display: none;">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                </div>
+            </div>
+
+            <button type="button" class="delete-item-btn"><i class="fas fa-trash"></i> Eliminar</button>
+        </div>
+    </template>
+
+    <div id="app">
+        <header>
+            <div id="logo-container">
+                <img src="{{ url_for('static', filename='logo.png') }}" id="logo" alt="Logo">
+            </div>
+            <h1>Control Calidad Materiales (Synchro)</h1>
+        </header>
+
+        <form id="synchro-form">
+            <details class="accordion-item" open>
+                <summary class="accordion-header">
+                    <span class="accordion-title">Datos del Proyecto</span>
+                </summary>
+                <div class="accordion-content">
+                    <div class="form-group">
+                        <label>Código Proyecto</label>
+                        <input type="text" id="form-codigo-proyecto" class="form-input-static" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Contratista</label>
+                        <input type="text" id="form-contratista" class="form-input-static" readonly>
+                    </div>
+                    <div class="form-group">
+                        <label>Contrato N°</label>
+                        <input type="text" id="form-contrato" class="form-input-static" readonly>
+                    </div>
+                </div>
+            </details>
+
+            <details class="accordion-item" open>
+                <summary class="accordion-header">
+                    <span class="accordion-title">Control Calidad Materiales</span>
+                </summary>
+                <div class="accordion-content" id="container-calidad-materiales" data-api-section="Cumplimientos">
+                    <button type="button" class="add-item-btn" data-template="template-control-calidad">+ Añadir fila</button>
+                    </div>
+            </details>
+
+            <div class="save-container">
+                <button type="button" id="save-form-button" class="save-button">
+                    <i class="fas fa-save"></i> Actualizar Formulario
+                </button>
+            </div>
+
+        </form>
+    </div>
+
+    <script src="{{ url_for('static', filename='scriptFormulario.js') }}"></script>
+</body>
+</html>

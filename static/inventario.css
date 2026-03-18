@@ -1,0 +1,322 @@
+/* Estilos generales */
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    width: 80%;
+    margin: 0 auto;
+}
+
+/* Estilos de la barra de filtros */
+.filters {
+    background-color: #ffffff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    margin-bottom: 30px;
+}
+
+.filters h2 {
+    margin-top: 0;
+}
+
+.filters form {
+    display: flex;
+    flex-direction: column;
+}
+
+.filters label {
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
+.filters select, .filters input {
+    padding: 8px;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+.filters button {
+    padding: 10px;
+    background-color: #f8b126;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.filters button:hover {
+    background-color: #f8b126;
+}
+
+.filters button[type="button"]:last-child {
+    background-color: #f4d698;
+}
+
+.filters button[type="button"]:last-child:hover {
+    background-color: #f4d698;
+}
+
+/* Estilos de la lista de inventario */
+.inventory-list table {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.inventory-list th, .inventory-list td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.inventory-list th {
+    background-color: #f2f2f2;
+}
+
+.inventory-list tr:hover {
+    background-color: #f1f1f1;
+}
+
+button {
+    font-size: 14px; /* Tamaño de texto reducido */
+}
+
+body {
+    font-size: 14px; /* Ajusta la fuente base */
+}
+
+/* Estilo para el modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgb(0,0,0); 
+    background-color: rgba(0,0,0,0.4); /* Fondo transparente */
+    padding-top: 60px;
+}
+
+.modal-content {
+    background-color: #fff;
+    margin: 5% auto;
+    padding: 20px;
+    border-radius: 10px;
+    width: 80%;
+    max-width: 600px;
+    box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.close {
+    color: #aaa;
+    font-size: 28px;
+    font-weight: bold;
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    cursor: pointer;
+}
+
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* Titulo del carrito */
+h2 {
+    text-align: center;
+    font-size: 24px;
+    margin-bottom: 20px;
+}
+
+/* Estilo para el carrito */
+#carrito {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.carrito-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+.carrito-item .item-info {
+    flex-grow: 1;
+}
+
+.carrito-item .item-info span {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 16px;
+}
+
+.carrito-item .item-info .item-name {
+    font-weight: bold;
+    color: #333;
+}
+
+.carrito-item .item-info .item-quantity {
+    color: #777;
+}
+
+.carrito-item button {
+    background-color: #f8b126;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    font-size: 14px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.carrito-item button:hover {
+    background-color: #f8b126;
+}
+
+/* Estilo para el botón de "Enviar Pedido" */
+#enviar-pedido-btn {
+    background-color: #f8b126;
+    color: white;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    width: 100%;
+    cursor: pointer;
+    margin-top: 20px;
+}
+
+#enviar-pedido-btn:hover {
+    background-color: #f8b126;
+}
+
+/* Mensaje de error o éxito */
+#mensaje-pedido {
+    text-align: center;
+    margin-top: 20px;
+}
+
+#mensaje-pedido span {
+    font-size: 18px;
+    padding: 10px;
+    border-radius: 5px;
+    display: block;
+}
+
+#mensaje-pedido span.success {
+    color: #f8b126;
+    background-color: #e6f9e6;
+}
+
+#mensaje-pedido span.error {
+    color: #be9f61;
+    background-color: #f8d7da;
+}
+
+
+#realizar-pedido-btn {
+    background-color: #f8b126;
+    color: white;
+    padding: 10px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+#realizar-pedido-btn:hover {
+    background-color: #f8b126;
+}
+
+/* Estilos para los productos disponibles */
+#productos {
+    margin-top: 20px;
+    padding: 40px;
+}
+
+.producto {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    background-color: #f8f8f8;
+    padding: 20px;
+    width: 90%;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.producto .stock {
+    margin-left: 10px;
+    font-size: 0.9em;
+    color: #555;
+}
+
+.producto input {
+    width: 40px;
+    text-align: center;
+    margin-left: 10px;
+}
+
+.producto button {
+    background-color: #f8b126;
+    color: white;
+    padding: 16px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.producto button:hover {
+    background-color: #f8b126;
+}
+
+
+@media (max-width: 600px) {
+    .container {
+        width: 95%; /* Reduce el ancho para ajustarlo a la pantalla del celular */
+        padding: 10px; /* Agrega un poco de espacio interno */
+    }
+
+    .filters {
+        padding: 10px; /* Reduce el padding de los filtros */
+    }
+
+    .filters form {
+        flex-direction: column; /* Asegura que los elementos se apilen */
+    }
+
+    .filters select, .filters input {
+        width: 100%; /* Haz que los inputs ocupen el ancho completo */
+        font-size: 14px; /* Ajusta el tamaño de la fuente */
+    }
+
+    .inventory-list table {
+        font-size: 12px; /* Reduce el tamaño del texto */
+        width: 100%; /* Asegura que la tabla ocupe el ancho completo */
+    }
+
+    .inventory-list th, .inventory-list td {
+        padding: 8px; /* Reduce el padding en celdas */
+    }
+}

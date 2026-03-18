@@ -1,0 +1,261 @@
+/* Configuración general */
+body, html {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+
+/* Contenedor principal */
+.main-container {
+    width: 80vw;
+    max-width: 400px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background-color: #ffffff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+/* Contenedor de contenido (todo excepto el menú inferior) */
+.content-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Evita que este contenedor genere scroll */
+}
+
+/* Lista de proyectos - AHORA CON SCROLL INTERNO */
+.records-container {
+    flex: 1;
+    
+    overflow-y: auto;
+    list-style-type: none;
+    padding: 10px;
+    margin: 0;
+    margin-bottom: 10px;
+}
+
+/* Espacio para el logo */
+.logo-container {
+    display: flex;
+    justify-content: center;
+    padding: 10px 0;
+}
+
+.logo {
+    max-width: 250px;
+    height: auto;
+}
+
+/* Botón de agregar proyecto */
+.add-project-container {
+    display: flex;
+    justify-content: center;
+    margin: 15px 0;
+}
+
+.add-project-button {
+    background-color: #28a745;
+    color: #ffffff;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.add-project-button:hover {
+    background-color: #218838;
+}
+
+/* Texto de introducción */
+.intro-text {
+    text-align: center;
+    margin-top: 10px;
+}
+
+.intro-text h2 {
+    font-size: 20px;
+    color: #000000;
+}
+
+/* Lista de proyectos */
+.records-container {
+    list-style-type: none;
+    flex: 1;
+    overflow-y: auto; /* Agregar scroll vertical */
+    padding: 10px;
+    margin-bottom: 70px; /* Espacio para el menú inferior */
+}
+
+.record-item {
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+}
+
+.record-item:hover {
+    background-color: #f2f2f2;
+}
+
+/* Menú inferior */
+.bottom-menu {
+    /*display: flex;
+    justify-content: space-around;
+    padding: 10px;
+    background-color: #f3f3f3;*/
+    display: flex;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: #fff;
+    padding: 10px 0;
+    display: flex;
+    justify-content: space-around;
+    /*box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);*/
+    z-index: 100; /* Asegurar que esté por encima de otros elementos */
+}
+
+.bottom-button {
+    background-color: #FFAF33;
+    color: white;
+    padding: 10px 15px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+}
+
+.bottom-button .icon {
+    max-width: 50px; /* Tamaño del logo de registros */
+    height: auto;
+}
+
+.bottom-button i {
+    font-size: 24px;  /* Tamaño del icono */
+}
+
+.bottom-button:hover {
+    background-color: #FF6600;
+}
+
+/* Botón de agregar nuevo proyecto */
+.add-project-container {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+.add-project-button {
+    background-color: #FFAF33;
+    color: white;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.add-project-button:hover {
+    background-color: #FF6600;
+}
+
+/* Ajustes responsivos para los botones */
+@media screen and (max-width: 480px) {
+    .bottom-button {
+        font-size: 18px;  /* Reducir tamaño de icono en pantallas pequeñas */
+        padding: 8px 10px;
+    }
+
+    .bottom-button i {
+        font-size: 20px;
+    }
+}
+
+/* Estilo del contenedor desplegable */
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+/* Estilo del menú desplegable */
+.dropdown-menu {
+    display: none; /* Oculto por defecto */
+    position: absolute;
+    bottom: 50px; /* Aparece encima del botón */
+    left: 0;
+    right: 0;
+    background-color: white;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    padding: 10px 0;
+    z-index: 1000;
+    min-width: 150px;
+    text-align: center;
+}
+
+/* Opciones del menú */
+.dropdown-item {
+    display: block;
+    padding: 10px 20px;
+    text-decoration: none;
+    color: #34495e;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+.dropdown-item:hover {
+    background-color: #FF6600;
+    color: #fff;
+}
+
+/* Mostrar menú cuando está activo */
+.dropdown-menu.show {
+    display: block;
+}
+
+/* Botones de proyectos */
+.records-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0 10px;
+}
+
+.record-button {
+    background-color: #ffffff;
+    color: #34495e;
+    text-align: left;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.record-button small {
+    display: block;
+    font-size: 14px;
+    color: #7f8c8d;
+    margin-top: 0px;
+}
+
+.record-button:hover {
+    background-color: #f9f9f9;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}

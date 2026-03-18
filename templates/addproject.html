@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrar Proyecto</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='addproject.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="main-container">
+        <div class="logo-container">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo Vihesa" class="logo">
+        </div>
+
+        <div class="form-header">
+            <h2>Registrar Proyecto</h2>
+        </div>
+
+        <div class="form-container">
+            <form id="project-form" class="project-form">
+                
+                <label for="cliente">Cliente:</label>
+                <input type="text" id="cliente" name="cliente" required placeholder="Nombre del cliente">
+
+                <label for="contratista">Contratista:</label>
+                <input type="text" id="contratista" name="contratista" required placeholder="Nombre del contratista">
+
+                <label for="orden-trabajo">Orden de Trabajo:</label>
+                <input type="text" id="orden-trabajo" name="orden-trabajo" required placeholder="Ej: OT-2026-001">
+
+                <label for="planta">Planta:</label>
+                <input type="text" id="planta" name="planta" required placeholder="Nombre de la planta / sede">
+
+                <label for="project-name">Nombre del Proyecto:</label>
+                <input type="text" id="project-name" name="project-name" required placeholder="Ingrese nombre del proyecto">
+
+                <label for="start-date">Fecha de Inicio:</label>
+                <input type="date" id="start-date" name="start-date" required>
+
+                <label for="end-date">Fecha de Fin:</label>
+                <input type="date" id="end-date" name="end-date" required>
+
+                <label for="location">Ubicación / Municipio:</label>
+                <input type="text" id="location" name="location" required placeholder="Ej: Medellín, Antioquia">
+
+                <div class="form-actions" style="margin-top: 30px;">
+                    <button type="button" onclick="saveProject(event)" class="save-button">
+                        <i class="fas fa-save"></i> Guardar Proyecto
+                    </button>
+                    <button type="button" onclick="window.location.href='/registros'" class="cancel-button">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        async function saveProject(event) {
+            if (event) event.preventDefault();
+            
+            const form = document.getElementById('project-form');
+            const formData = new FormData(form);
+            const data = {};
+            
+            formData.forEach((value, key) => { data[key] = value; });
+
+            // Validación mínima
+            if (!data['project-name'] || !data['cliente'] || !data['location']) {
+                alert("Por favor, complete los campos obligatorios (Nombre, Cliente y Ubicación).");
+                return;
+            }
+
+            try {
+                const response = await fetch('/add_project', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert("✅ " + result.message);
+                    window.location.href = '/registros';
+                } else {
+                    throw new Error(result.error || "Error al procesar la solicitud");
+                }
+            } catch (error) {
+                alert("❌ Error: " + error.message);
+                console.error("Error:", error);
+            }
+        }
+    </script>
+</body>
+</html>

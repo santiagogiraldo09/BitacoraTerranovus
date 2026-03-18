@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pantalla Principal</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='principalprincipal.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">  
+</head>
+<body>
+    <!-- Contenedor principal -->
+    <div class="main-container">
+        
+        <!-- Espacio para el logo -->
+        <div class="logo-container">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo de la empresa" class="logo">
+        </div>
+
+        <!-- Texto de introducción -->
+        <div class="intro-text">
+            <h2>¿Qué registro quieres realizar hoy?</h2>
+        </div>
+
+        <div id="current-project-name"></div>
+
+        <!-- Lista de botones de opciones -->
+        <div class="buttons-container">
+            <a href="{{ url_for('index') }}" class="a" id="bitacora-btn">
+                <i class="fas fa-file-alt"></i> <!-- Ícono de hoja -->
+                <span>Reporte de <br> bitácora</span>
+            </a>
+            <a href="{{ url_for('indexFormulario') }}" class="a" id="bitacora-btn">
+                <i class="fas fa-file-alt"></i> <!-- Ícono de hoja -->
+                <span>Formulario <br> Synchro Control</span>
+            </a>
+            <button class="menu-button" id="mantenimiento-btn">
+                <i class="fas fa-map-marker-alt"></i> <!-- Ícono de mapa -->
+                <span>Reporte de recorrido</span>
+            </button>
+            <button class="menu-button" id="pedido-btn">
+                <i class="fas fa-check-square"></i> <!-- Ícono de checklist -->
+                <span>Reporte de pedido</span>
+            </button> 
+        </div>
+        <!-- Botón para eliminar proyecto -->
+        <button id="delete-project-btn" class="delete-project-button">
+            <i class="fas fa-trash"></i> <!-- Ícono de papelera -->
+            <span>Eliminar proyecto</span>
+        </button>
+        
+        
+        
+        <div class="bottom-menu">
+            <a href="{{ url_for('registros') }}" class="bottom-button">
+                <i class="fas fa-home"></i>
+            </a>
+            <button id="share-btn" class="bottom-button">
+                <i class="fas fa-user-plus"></i>
+            </button>
+            <!-- Modal de compartir proyecto -->
+            <div id = "shareModal" class="confirm-modal">
+                <div class="confirm-modal-content">
+                    <h2>Compartir proyecto</h2>
+                    <p>Ingresa el correo electrónico del usuario con el que deseas compartir este proyecto:</p>
+                    <input type="email" id="share-email" placeholder="correo@ejemplo.com" required />
+                    <div class="confirm-modal-buttons">
+                        <button id="share-confirm" class="confirm-yes">Compartir</button>
+                        <button id="share-cancel" class="confirm-no">Cancelar</button>
+                    </div>
+                    <p id="share-success-message" style="display: none; color: green; margin-top: 10px;">
+                        ¡Proyecto compartido exitosamente!
+                    </p>
+                </div>
+            </div>
+                <!--
+                <div id="dropdown-menu" class="dropdown-menu">
+                    <a href="{{ url_for('registros') }}" class="dropdown-item">
+                        <i class="fas fa-clock"></i> Proyectos</a>
+                    <a href="{{ url_for('inventario') }}" class="dropdown-item">
+                        <i class="fas fa-clipboard-check"></i> Inventario</a>
+                </div>-->
+            
+            <a href="{{ url_for('usuario') }}" class="bottom-button">
+                <i class="fas fa-user"></i>
+            </a>
+        </div>
+    <!-- Modal para adjuntar archivos -->
+    <div id="fileModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Adjuntar Plano</h2>
+            <form>
+                <label for="fileInput">Selecciona un archivo o plano:</label>
+                <input type="file" id="fileInput" name="fileInput" />
+                <button type="submit" class="submit-btn">Subir</button>
+            </form>
+        </div>
+    </div>
+    <!-- Modal de confirmación para eliminar proyecto -->
+    <div id="confirmModal" class="confirm-modal">
+        <div class="confirm-modal-content">
+            <h3>¿Estás seguro de eliminar este proyecto?</h3>
+            <p>Esta acción no se puede deshacer.</p>
+            <div class="confirm-modal-buttons">
+                <button id="confirm-yes" class="confirm-yes">Sí, eliminar</button>
+                <button id="confirm-no" class="confirm-no">Cancelar</button>
+            </div>
+        </div>
+    </div>
+        
+    </div>
+</body>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const dropdownBtn = document.getElementById('dropdown-btn');
+        const dropdownMenu = document.getElementById('dropdown-menu');
+        const deleteProjectBtn = document.getElementById('delete-project-btn');
+        const confirmModal = document.getElementById('confirmModal');
+        const confirmYesBtn = document.getElementById('confirm-yes');
+        const confirmNoBtn = document.getElementById('confirm-no');
+        const currentProjectName = document.getElementById('current-project-name');
+
+        const shareBtn = document.getElementById('share-btn');
+        const shareModal = document.getElementById('shareModal');
+        const shareCancel = document.getElementById('share-cancel');
+        const shareConfirm = document.getElementById('share-confirm');
+        const shareSuccessMsg = document.getElementById('share-success-message');
+        const shareEmail = document.getElementById('share-email');
+
+        if (shareBtn) {
+            shareBtn.addEventListener('click', () => {
+                shareModal.style.display = 'flex';
+                shareSuccessMsg.style.display = 'none';
+                shareEmail.value = '';
+            });
+        }
+
+        if (shareCancel) {
+            shareCancel.addEventListener('click', () => {
+                shareModal.style.display = 'none';
+            });
+        }
+
+        if (shareConfirm) {
+            shareConfirm.addEventListener('click', () => {
+                const email = shareEmail.value.trim();
+                if (!email) {
+                    alert("Por favor ingresa un correo válido.");
+                    return;
+                }
+                shareSuccessMsg.style.display = 'block';
+                shareEmail.value = '';
+            });
+        }
+
+        // Obtener el parámetro del proyecto de la URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const projectName = urlParams.get('project');
+        
+        
+        // Mostrar el nombre del proyecto actual
+        /*
+        if (projectName) {
+            currentProjectName.textContent = "Proyecto: " + decodeURIComponent(projectName);
+        } else {
+            currentProjectName.textContent = "No hay proyecto seleccionado";
+            // Ocultar el botón de eliminar si no hay proyecto
+            deleteProjectBtn.style.display = 'none';
+        }*/
+
+        if (dropdownBtn && dropdownMenu) {
+            // Alternar el menú desplegable al hacer clic en el botón
+            dropdownBtn.addEventListener('click', function (event) {
+                event.stopPropagation(); // Evitar que el clic cierre el menú
+                dropdownMenu.classList.toggle('show');
+            });
+        }
+        // Alternar el menú desplegable al hacer clic en el botón
+        //dropdownBtn.addEventListener('click', function (event) {
+            //event.stopPropagation(); // Evitar que el clic cierre el menú
+            //dropdownMenu.classList.toggle('show');
+        //});
+
+        if (dropdownBtn && dropdownMenu) {
+            // Cerrar el menú al hacer clic fuera de él
+            document.addEventListener('click', function (event) {
+                if (!dropdownMenu.contains(event.target)) {
+                    dropdownMenu.classList.remove('show');
+                }
+            });
+        }
+    });
+
+    // Obtener elementos
+    const fileModal = document.getElementById("fileModal");
+    const attachBtn = document.querySelector(".menu-option[data-action='adjuntar']");
+    const closeModal = document.querySelector(".close");
+
+    // Abrir modal al presionar "Adjuntar plano"
+    //attachBtn.addEventListener("click", () => {
+        //fileModal.style.display = "block";
+    //});
+
+    // Cerrar modal al presionar la "X"
+    closeModal.addEventListener("click", () => {
+        fileModal.style.display = "none";
+    });
+
+    // Cerrar modal al hacer clic fuera de él
+    window.addEventListener("click", (event) => {
+        if (event.target === fileModal) {
+            fileModal.style.display = "none";
+    }
+
+    // Obtener el parámetro del proyecto de la URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const projectName = urlParams.get('project');
+    const projectId = urlParams.get('project_id');
+    
+    // Modificar el enlace al formulario de bitácora para incluir el proyecto
+    const bitacoraBtn = document.getElementById('bitacora-btn');
+    if (bitacoraBtn && projectName && projectId) {
+        bitacoraBtn.href = `/index?project_id=${projectId}&project=${encodeURIComponent(projectName)}`;
+        
+    }
+
+    });
+
+    // Mostrar el modal al hacer clic en el botón de eliminar
+    const deleteProjectBtn = document.getElementById('delete-project-btn');
+    if (deleteProjectBtn) {
+        deleteProjectBtn.addEventListener('click', () => {
+            const confirmModal = document.getElementById('confirmModal');
+            confirmModal.style.display = 'block';
+        });
+    }
+
+    // Confirmar eliminación
+    const confirmYesBtn = document.getElementById('confirm-yes');
+    confirmYesBtn.addEventListener('click', () => {
+        const projectId = new URLSearchParams(window.location.search).get('project_id');
+        fetch('/eliminar-proyecto', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id_proyecto: projectId })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                alert("Proyecto eliminado correctamente.");
+                window.location.href = '/registros';  // redirigir a lista
+            } else {
+                alert("Error al eliminar: " + data.error);
+            }
+        })
+        .catch(err => {
+            console.error("Error en solicitud:", err);
+            alert("Ocurrió un error inesperado.");
+        });
+
+        document.getElementById('confirmModal').style.display = 'none';
+    });
+
+    // Cancelar eliminación
+    const confirmNoBtn = document.getElementById('confirm-no');
+    confirmNoBtn.addEventListener('click', () => {
+        document.getElementById('confirmModal').style.display = 'none';
+    });
+
+
+</script>
+</html>

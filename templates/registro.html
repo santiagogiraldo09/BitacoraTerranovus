@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login/Sign Up</title>
+    <link rel="icon" href="/static/logo.png" type="image/x-icon">
+    <link rel="stylesheet" href="/static/registro.css">
+    <!-- Agregamos SweetAlert para mensajes -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div id="logo-container">
+                <img id="logo" src="/static/logo.png" alt="Logo">
+            </div>
+        </header>
+        <div class="screen">
+            <form class="form" method="POST" action="{{ url_for('registro') }}" id="registerForm">
+                <p class="title">Registro</p>
+                <div class="flex">
+                    <label>
+                        <input required name="nombre" placeholder="" type="text" class="input">
+                        <span>Nombre</span>
+                    </label>
+
+                    <label>
+                        <input required name="apellido" placeholder="" type="text" class="input">
+                        <span>Apellido</span>
+                    </label>
+                </div>  
+                        
+                <label>
+                    <input required name="email" placeholder="" type="email" class="input">
+                    <span>Correo electrónico</span>
+                </label> 
+                    
+                <label>
+                    <input required name="password" placeholder="" type="password" class="input" id="password">
+                    <span>Contraseña</span>
+                </label>
+                <label>
+                    <input required name="confirm_password" placeholder="" type="password" class="input" id="confirmPassword">
+                    <span>Confirmar Contraseña</span>
+                </label>
+                <label>
+                    <input required name="empresa" placeholder="" type="text" class="input">
+                    <span>Empresa</span>
+                </label>
+                <label>
+                    <input required name="cargo" placeholder="" type="text" class="input">
+                    <span>Cargo</span>
+                </label>
+                <label>
+                    <select required name="rol" class="input">
+                        <option value="" disabled selected></option>
+                        <option value="admin">Administrador</option>
+                        <option value="editor">Director de obra</option>
+                        <option value="viewer">Agente de obra</option>
+                        <option value="guest">Gerencia</option>
+                    </select>
+                    <span>Rol</span>
+                </label>
+                <!-- Cambiamos el <a> por un botón de submit -->
+                <button type="submit" class="submit">REGISTRARSE</button>
+                <p class="signin">¿Ya tienes una cuenta? <a href="{{ url_for('principalscreen') }}">Iniciar Sesión</a></p>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

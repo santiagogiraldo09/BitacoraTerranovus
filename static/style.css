@@ -1,0 +1,414 @@
+/* General styles */
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    margin: 0;
+    padding: 30px 15px;
+    font-family: Arial, sans-serif;
+    background-color: #f5f5f5;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;  /* ← Inicia desde arriba */
+    min-height: 100vh;         /* ← Mínimo altura de ventana */
+    overflow-y: auto;          /* ← Permite scroll */
+}
+
+#app {
+    width: 100%;
+    max-width: 600px;
+    padding: 20px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    background-color: white;
+    margin-top: 20px;     /* ← Espacio superior */
+    margin-bottom: 20px;  /* ← Espacio inferior */
+}
+
+header {
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+#logo-container {
+    margin-bottom: 10px;
+}
+
+#logo {
+    max-width: 180px;
+    height: auto;
+    display: block;
+    margin: 20px auto 10px auto;
+}
+
+#form-container {
+    width: 100%;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+    color: black;
+}
+
+input {
+    width: 95%;
+    background-color: #e0e0e0;
+    border: 1px solid #555;
+    color: black;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+#start-register-button {
+    width: 100%;
+    padding: 10px;
+    margin: 15px 0;
+    display: block;
+    background-color: #FF6600;  /* Fondo azul */
+    color: white;               /* Texto blanco */
+    border: none;
+    border-radius: 5px;
+    font-size: 15px;
+    font-weight: bold;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    cursor: pointer;
+}
+
+#start-register-button:hover {
+    background-color: #FF6600;
+}
+
+#camera-container {
+    display: none;
+    text-align: center;
+    margin-top: 20px;
+}
+
+#videoElement {
+    width: 100%;  /* Ajustar video al tamaño del contenedor */
+    max-width: 100%;  /* Asegura que el video no exceda el tamaño del contenedor */
+    border-radius: 10px;  /* Bordes redondeados */
+}
+
+canvas {
+    display: none; /* Mantener el canvas oculto */
+}
+
+#photoThumbnails {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+}
+
+.thumbnail {
+    width: 100px;  /* Tamaño ajustado de la miniatura */
+    height: auto;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+button {
+    padding: 10px 20px;
+    margin: 10px;
+    font-size: 16px;
+    border-radius: 5px;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    text-align: center;
+    width: 100%;  /* Los botones ocupan todo el ancho */
+}
+
+#start-camera, #take-photo, #save-record {
+    background-color: #FFAF33;
+    color: black;
+}
+
+#save-record-form, #start-camera-form{
+    background-color: #FFAF33;
+    color: black;
+}
+
+
+#start-camera:hover, #take-photo:hover, #save-record:hover {
+    background-color: #FF6600;
+}
+
+.centrar {
+    /*text-align: center; -- Ya no es necesario */
+    display: flex;
+    flex-direction: column; /* Apila los elementos (las filas) verticalmente */
+    align-items: center; /* Centra las filas horizontalmente */
+    gap: 10px; /* Añade un espacio entre las dos filas de botones */
+}
+
+.button-row {
+    display: flex;
+    justify-content: center; /* Centra los botones en la fila */
+    align-items: center;
+    gap: 20px; /* Espacio entre los botones de la misma fila */
+}
+
+#successMessage {
+    display: none;
+    color: green;
+    font-weight: bold;
+    margin-top: 20px;
+}
+
+.photo-container {
+    position: relative;
+    display: inline-block;
+    margin: 10px;
+}
+
+.thumbnail {
+    width: 100px;
+    height: 100px;
+    object-fit: cover;
+    border: 1px solid #ccc;
+}
+
+.delete-photo {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background-color: red;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 50%;
+    z-index: 10;
+}
+
+.delete-photo:hover {
+    background-color: darkred;
+}
+
+/* Menú inferior */
+.bottom-menu {
+    display: flex;
+    justify-content: space-around;
+    padding: 10px;
+    background-color: #f3f3f3;
+}
+.bottom-button {
+    background-color: #FF6600;
+    color: white;
+    padding: 10px 15px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;  /* Ajuste del tamaño del ícono */
+}
+
+.bottom-button .icon {
+    max-width: 50px; /* Tamaño del logo de registros */
+    height: auto;
+}
+
+.bottom-button i {
+    font-size: 24px;  /* Tamaño del icono */
+}
+
+.bottom-button:hover {
+    background-color: #FF6600
+}
+
+.dropdown-item {
+    display: block;
+    padding: 10px 20px;
+    text-decoration: none;
+    color: #34495e;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+.action-buttons-wrapper {
+    display: contents; /* Aseguramos que sea flex */
+    justify-content: center; /* ESTO ES LO CLAVE: Centra los elementos horizontalmente */
+    align-items: center; /* Opcional: Centra verticalmente si los botones tuvieran diferente altura */
+    width: 100%; /* Asegura que ocupe todo el ancho para que el centrado funcione */
+    margin-top: 10px;
+    gap: 15px; /* Agrega espacio entre los botones (opcional, pero mejora la estética) */
+    /* ... mantén cualquier otro estilo importante que tuvieras aquí ... */
+}
+
+#gallery-container {
+    display: flex; /* Convertimos el contenedor principal de la galería en flex */
+    flex-wrap: wrap; /* Permite que las miniaturas salten a la siguiente línea si no caben */
+    justify-content: center; /* ESTO ES LO CLAVE: Centra las miniaturas como grupo */
+    gap: 20px; /* Espacio entre cada miniatura */
+    margin-top: 20px;
+    padding: 10px;
+}
+
+/* Botón redondo para "Tomar foto" */
+.round-button {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: #FF6600;
+    color: white;
+    font-size: 24px;
+    border: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin: 0; /* <-- CAMBIO IMPORTANTE: Quita el margen automático */
+}
+
+.round-button:hover {
+    background-color: #FF6600;
+}
+
+/* Botón redondo para "Tomar foto" */
+.round-button {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: #FF6600;
+    color: white;
+    font-size: 24px;
+    border: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    margin: 0; /* <-- CAMBIO IMPORTANTE: Quita el margen automático */
+}
+
+.round-button:hover {
+    background-color: #FF6600;
+}
+
+/* Botón de clip para adjuntar archivos */
+.clip-button {
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 24px;
+    color: #666;
+    cursor: pointer;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    margin: 0; /* <-- Añade esto para consistencia */
+}
+
+.clip-button:hover {
+    background-color: #e9e9e9;
+    color: #444;
+}
+
+/* Ocultar el input de archivo */
+.file-input {
+    display: none;
+}
+
+.input-with-icon {
+    display: flex;         /* Activa la alineación horizontal */
+    align-items: center;   /* Centra verticalmente el botón con el input */
+    gap: 10px;             /* Espacio entre el input y el botón */
+}
+
+/* Hacemos que el input ocupe el espacio sobrante */
+.input-with-icon input {
+    flex-grow: 1; /* El input se estira */
+    /* Anulamos cualquier ancho fijo que pueda tener para que flexbox lo controle */
+    width: auto;  
+}
+
+/* Esta regla es más específica que 'button' y por eso ganará. */
+.record-btn, .stop-btn {
+    flex-shrink: 0;       /* Evita que el botón se encoja */
+    width: 44px;          /* <-- Anula el width: 100% y le da un tamaño fijo */
+    height: 44px;         /* <-- Le da un tamaño fijo */
+    margin: 0;            /* Quitamos márgenes que puedan interferir */
+    padding: 0;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background-color 0.2s ease;
+}
+
+/* 4. Estilos específicos que ya tenías (y están bien) */
+.record-btn {
+    background-color: transparent;
+    color: #FF6600; /* Verde */
+    font-size: 24px;
+}
+.record-btn:hover {
+    background-color: #f0f0f0;
+}
+.stop-btn {
+    background-color: #e74c3c; /* Rojo */
+    color: white;
+    font-size: 20px;
+}
+.stop-btn:hover {
+    background-color: #c0392b;
+}
+
+/* Contenedor para la descripción dentro de la miniatura */
+.thumbnail-description-box {
+    display: flex;
+    align-items: center;
+    gap: 5px; /* Espacio pequeño entre el input y el micrófono */
+    width: 100%;
+    margin-top: 8px; /* Espacio entre la imagen/video y el campo de texto */
+    padding: 0 5px;
+    box-sizing: border-box;
+}
+
+/* El campo de texto de la descripción */
+.thumbnail-input {
+    flex-grow: 1; /* Ocupa el espacio disponible */
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    padding: 6px;
+    font-size: 12px;
+}
+
+/* Ajustamos los botones de micrófono y stop para que sean más pequeños dentro de la miniatura */
+.thumbnail-description-box .record-btn,
+.thumbnail-description-box .stop-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 16px; /* Hacemos el ícono un poco más pequeño */
+}
+
+/* Responsive para pantallas pequeñas */
+@media (max-width: 768px) {
+    body {
+        padding: 15px 10px;
+    }
+    
+    #app {
+        max-width: 100%;
+        padding: 15px;
+        margin-top: 10px;
+        margin-bottom: 10px;
+    }
+    
+    #logo {
+        max-width: 120px;
+    }
+}

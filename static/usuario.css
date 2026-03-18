@@ -1,0 +1,164 @@
+/* Configuración general */
+body, html {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    overflow: hidden; /* Previene scroll en toda la página */
+}
+
+
+/* Estilos generales para el formulario y la página */
+.main-container {
+    width: 100%;
+    max-width: 400px; /* Mantener el tamaño para simular un celular */
+    height: 100vh;
+    /*margin: 0 auto;*/ /* Centrar el contenedor */
+    padding: 20px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+    background-color: white;
+    font-family: Arial, sans-serif;
+    overflow: hidden;  /* Evitar que haya scroll innecesario */
+    box-sizing: border-box;
+    /* Estructura flexible para permitir scroll en la sección del formulario */
+    display: flex;
+    flex-direction: column;
+}
+
+/* Contenedor de contenido (todo excepto el menú inferior) */
+.content-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    
+}
+
+
+
+/* Contenedor de cabecera (logo y título) */
+.header {
+    padding: 10px 20px;
+    background-color: white;
+    z-index: 10;
+}
+
+.logo-container {
+    display: flex;
+    justify-content: center;
+    padding: 10px 0;
+}
+
+.logo {
+    max-width: 210px; /* Tamaño del logo más pequeño para móviles */
+    height: auto;
+}
+
+.intro-text {
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.intro-text h2 {
+    font-size: 20px;
+    margin: 5px 0;
+}
+
+/* Lista de proyectos - AHORA CON SCROLL INTERNO */
+.form-container {
+    flex: 1;
+    overflow-y: auto;
+    list-style-type: none;
+    padding: 10px;
+    
+}
+
+/* Estilos para el formulario */
+form {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+label {
+    font-size: 14px;
+    margin-bottom: 5px;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="file"] {
+    width: 100%;
+    max-width: 100%; /* Asegura que los inputs ocupen el 100% del ancho */
+    padding: 6px;
+    font-size: 14px;
+    border-radius: 5px;
+    border: 1px solid #ddd;
+    box-sizing: border-box; /* Asegura que el padding no afecte el tamaño total */
+}
+
+.submit-button {
+    background-color: #FF6600;
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.submit-button:hover {
+    background-color: #FF6600;
+}
+
+/* Menú inferior */
+.bottom-menu {
+    display: flex;
+    justify-content: space-around;
+    padding: 15px;
+    background-color: #ffffff;
+}
+.bottom-button {
+    background-color: #FFAF33;
+    color: white;
+    padding: 10px 15px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;  /* Ajuste del tamaño del ícono */
+    z-index: 100; /* Asegurar que esté por encima de otros elementos */
+}
+
+.bottom-button .icon {
+    max-width: 50px; /* Tamaño del logo de registros */
+    height: auto;
+}
+
+.bottom-button i {
+    font-size: 24px;  /* Tamaño del icono */
+}
+
+.bottom-button:hover {
+    background-color: #FF6600
+}
+
+/* Ajustes responsivos para los botones */
+@media screen and (max-width: 480px) {
+    .bottom-button {
+        font-size: 18px;  /* Reducir tamaño de icono en pantallas pequeñas */
+        padding: 8px 10px;
+    }
+
+    .bottom-button i {
+        font-size: 20px;
+    }
+}
+

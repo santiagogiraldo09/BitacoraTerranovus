@@ -1,0 +1,21 @@
+version: 1
+applications:
+  - appRoot: .
+    backend:
+      phases:
+        build:
+          commands:
+            - echo "Instalando dependencias..."
+            - pip install --upgrade pip
+            - pip install -r requirements.txt
+    frontend:
+      phases:
+        preBuild:
+          commands:
+            - echo "No hay frontend, omitiendo fase..."
+      artifacts:
+        baseDirectory: .
+        files:
+          - '**/*'
+    run: 
+      command: "python app.py"

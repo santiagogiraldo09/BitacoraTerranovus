@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pantalla de Registros</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='registros.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">  
+</head>
+<body>
+    <!-- Contenedor principal -->
+    <div class="main-container">
+        
+        <!-- Espacio para el logo -->
+        <div class="logo-container">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo de la empresa" class="logo">
+        </div>
+
+        <!-- Texto de introducción -->
+        <div class="intro-text">
+            <h2>Lista de Proyectos</h2>
+        </div>
+
+        <!-- Botón para agregar nuevo proyecto -->
+        <div class="add-project-container">
+            <button class="add-project-button" onclick="redirectToAddProject()">Agregar Nuevo Proyecto</button>
+        </div>
+
+        <!-- Lista de proyectos como botones con scroll-->
+        <div class="records-container">
+            {% if db_projects %}
+                {% for proyecto in db_projects %}
+                <button class="record-button" onclick="redirectToProjectDetails('{{ proyecto.name }}', '{{ proyecto.id_proyecto }}')">
+                    <div class="project-info" style="display: flex; flex-direction: column; text-align: left; flex-grow: 1;">
+                        <span class="project-name" style="font-weight: bold; font-size: 1.1em; margin-bottom: 2px;">
+                            {{ proyecto.name }}
+                        </span>
+                        <span class="project-client" style="color: #555; font-size: 0.9em; margin-bottom: 2px;">
+                            Cliente: {{ proyecto.cliente }}
+                        </span>
+                        <span class="project-date" style="color: #888; font-size: 0.85em;">
+                            Inicio: {{ proyecto.fecha_inicio }}
+                        </span>
+                    </div>
+                    
+                </button>
+                {% endfor %}
+            {% else %}
+                <p>No se encontraron proyectos.</p>
+            {% endif %}
+        </div>
+
+        <!-- Menú inferior (ahora fijo)-->
+        <div class="bottom-menu">
+            <a href="{{ url_for('history') }}" class="bottom-button"><i class="fas fa-history"></i></a>
+            <!--<a href="{{ url_for('registros') }}" class="bottom-button"><i class="fas fa-home"></i></a>-->
+            <!--<button class="bottom-button"><i class="fas fa-user"></i></button>-->
+            <div class="dropdown">
+                <button id="dropdown-btn" class="bottom-button">
+                    <i class="fas fa-plus"></i>
+                </button>
+                <div id="dropdown-menu" class="dropdown-menu">
+                    <a href="{{ url_for('history') }}" class="dropdown-item">
+                        <i class="fas fa-clipboard-list"></i> Historial</a>
+                    <a href="{{ url_for('inventario') }}" class="dropdown-item">
+                        <i class="fas fa-clipboard-check"></i> Inventario</a>
+                </div>
+            </div>
+            <a href="{{ url_for('usuario') }}" class="bottom-button"><i class="fas fa-user"></i></a>
+        </div>
+        
+    </div>
+
+    <script>
+               
+        function redirectToAddProject() {
+            // Redirigir a la página para agregar un nuevo proyecto
+            window.location.href = "{{ url_for('add_project') }}";
+        }
+
+        function redirectToProjectDetails(projectName, projectId) {
+            // Redirigir a la página de detalles del proyecto con el nombre como parámetro
+            //window.location.href = `{{ url_for('projectdetails') }}?name=${encodeURIComponent(projectName)}`;
+            window.location.href = `/paginaprincipal?project_id=${projectId}&project=${encodeURIComponent(projectName)}?id=${encodeURIComponent(projectId)}`;
+            //window.location.href = `/index?project_id=${projectId}&project=${encodeURIComponent(projectName)}`;
+        }
+        document.addEventListener('DOMContentLoaded', function () {
+            const dropdownBtn = document.getElementById('dropdown-btn');
+            const dropdownMenu = document.getElementById('dropdown-menu');
+
+            // Alternar el menú desplegable al hacer clic en el botón
+            dropdownBtn.addEventListener('click', function (event) {
+                event.stopPropagation(); // Evitar que el clic cierre el menú
+                dropdownMenu.classList.toggle('show');
+            });
+
+            // Cerrar el menú al hacer clic fuera de él
+            document.addEventListener('click', function (event) {
+                if (!dropdownMenu.contains(event.target)) {
+                    dropdownMenu.classList.remove('show');
+                }
+            });
+        });
+
+    </script>
+</body>
+</html>

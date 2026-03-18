@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte Diario de Trabajo</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Estilos originales preservados */
+        .dynamic-item-box {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 10px;
+            background-color: #fcfcfc;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #FFAF33; 
+            margin-bottom: 15px;
+            padding-bottom: 5px;
+        }
+        .item-header h3 {
+            margin: 0;
+            color: #FFAF33;
+        }
+        .section-card { 
+            background: #fff0e6; 
+            border-radius: 8px; 
+            padding: 15px; 
+            margin-bottom: 25px; 
+            border-left: 5px solid #FFAF33; 
+        }
+        .equipment-item { 
+            display: flex; 
+            justify-content: space-between; 
+            background: white; 
+            padding: 8px 12px; 
+            border-radius: 8px; 
+            margin-bottom: 5px; 
+            border: 1px solid #ddd; 
+        }
+        .thumbnail-image {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 4px;
+            margin-bottom: 5px;
+        }
+        /* Estilo para el nuevo botón de cierre */
+        .btn-cerrar-video {
+            background-color: #ff4d4d;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div id="logo-container">
+                <img src="{{ url_for('static', filename='logo.png') }}" id="logo" alt="Logo">
+            </div>
+            <h1>Reporte Diario de Trabajo</h1>
+        </header>
+
+        <div id="form-container">
+            <div class="project-header-info" style="background: #f0f0f0; padding: 15px; border-radius: 8px; margin-bottom: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 0.9em; border-left: 5px solid #FFAF33;">
+                <div><strong>FECHA:</strong> <span id="current-date-display" style="font-weight: bold; color: #000000;"></span></div>
+                <div><strong>ORDEN DE TRABAJO:</strong> <span>{{ project.orden_de_trabajo if project else 'N/A' }}</span></div>
+                <div><strong>CLIENTE:</strong> <span>{{ project.cliente if project else 'N/A' }}</span></div>
+                <div><strong>PLANTA:</strong> <span>{{ project.planta if project else 'N/A' }}</span></div>
+                <div><strong>CONTRATISTA:</strong> <span>{{ project.contratista if project else 'N/A' }}</span></div>
+                <div><strong>UBICACIÓN:</strong> <span>{{ project.ubicacion if project else 'N/A' }}</span></div>
+            </div>
+
+            <div class="section-card">
+                <label><strong><i class="fas fa-tools"></i> EQUIPOS Y SUMINISTROS:</strong></label>
+                
+                <div class="input-with-icon" style="margin-top: 10px; display: flex; align-items: center; gap: 5px;">
+                    <input type="text" id="input-equipo" placeholder="Ej: Taladro Milwaukee, Extensiones..." style="flex: 1; margin: 0;">
+                    
+                    <button class="record-btn" type="button" data-target-input="input-equipo" title="Grabar voz">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="stop-btn" type="button" data-target-input="input-equipo" style="display: none;" title="Detener">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                </div>
+
+                <div style="margin-top: 10px; text-align: right;">
+                    <button type="button" onclick="addEquipment()" class="activate-camera-button" style="width: auto; padding: 5px 15px; font-size: 0.85em; background-color: #FFAF33;">
+                        <i class="fas fa-plus"></i> Añadir Equipo
+                    </button>
+                </div>
+
+                <div id="equipment-list" style="margin-top: 10px;"></div>
+            </div>
+
+            <h3 style="color: #000000; margin-bottom: 15px;"><i class="fas fa-clipboard-list"></i> Actividades (Notas Generales)</h3>
+            
+            <div id="items-container"></div>
+
+            <div class="centrar" style="margin-bottom: 20px;">
+                <button type="button" id="add-item-btn" class="activate-camera-button" style="background-color: #FFAF33;" onclick="addItem()">
+                    <i class="fas fa-plus"></i> Añadir Nueva Nota
+                </button>
+            </div>
+
+            <div id="camera-container" style="display: none; text-align: center;">
+                <video id="videoElement" autoplay playsinline muted style="width: 100%; border-radius: 10px;"></video>
+                <canvas id="photoCanvas" style="display:none;"></canvas>
+                <button type="button" class="btn-cerrar-video" onclick="detenerCamara()">
+                    <i class="fas fa-times"></i> Cerrar Cámara
+                </button>
+            </div>
+
+            <div class="action-buttons-wrapper" style="display: none;">
+                <div class="button-row">
+                    <button id="take-photo" class="round-button" onclick="takePhoto()" title="Tomar Foto"><i class="fas fa-camera"></i></button>
+                    <button id="start-record-btn" class="round-button" title="Grabar Video" onclick="startVideoRecording()"><i class="fas fa-video"></i></button>
+                    <button id="stop-record-btn" class="round-button" title="Detener Grabación" style="display:none;" onclick="stopVideoRecording()"><i class="fas fa-stop"></i></button>
+                </div>
+            </div>
+
+            <div class="centrar">
+                <button id="save-record" onclick="saveFullReport()">Guardar Reporte Diario</button>
+            </div>
+
+            <div id="loading-overlay" class="loading-overlay"><div class="spinner"></div></div>
+        </div>
+    </div>
+
+    <template id="note-template">
+        <div class="dynamic-item-box">
+            <div class="item-header">
+                <h3 class="item-title">Nota #1</h3>
+                <button type="button" class="remove-item-btn" style="background:none; border:none; color:red; cursor:pointer; display:none;">
+                    <i class="fas fa-trash-alt"></i> Eliminar
+                </button>
+            </div>
+
+            <div class="form-group">
+                <label>Descripción de la Actividad (Nota General):</label>
+                <div class="input-with-icon">
+                    <textarea class="field-nota" rows="3" style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #ccc;"></textarea>
+                    <button class="record-btn" type="button" title="Grabar respuesta"><i class="fas fa-microphone"></i></button>
+                    <button class="stop-btn" type="button" title="Detener grabación" style="display: none;"><i class="fas fa-stop"></i></button>
+                </div>
+            </div>
+
+            <div class="multimedia-item-section" style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
+                <div class="centrar" style="margin-bottom: 10px;">
+                    <button type="button" class="activate-camera-button btn-item-camera" style="width: auto; padding: 10px 20px;">
+                        <i class="fas fa-camera"></i> Activar Cámara
+                    </button>
+                </div>
+
+                <div class="attachment-controls">
+                    <label>Adjuntar Evidencia:</label>
+                    <div class="button-row">
+                        <button type="button" class="clip-button btn-item-photo-attach" title="Adjuntar imagen">📎</button>
+                        <input type="file" class="item-file-input" accept="image/*" multiple style="display:none;">
+                        
+                        <button type="button" class="clip-button btn-item-video-attach" title="Adjuntar video">🎥</button>
+                        <input type="file" class="item-video-input" accept="video/*" style="display:none;">
+                    </div>
+                </div>
+
+                <div class="item-gallery-container">
+                    <div class="item-photo-thumbnails photo-thumbnails"></div>
+                    <div class="item-video-thumbnails photo-thumbnails"></div>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        let itemCount = 0;
+        let activeItemIdx = null;
+        let videoStream = null;
+
+        // Función original startCamera que usa tu script.js (asegúrate de que startCamera() esté definida en tu script.js o usa esta)
+        async function activarCamaraLocal() {
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                document.getElementById('videoElement').srcObject = videoStream;
+                document.getElementById('camera-container').style.display = 'block';
+                document.querySelector('.action-buttons-wrapper').style.display = 'block';
+            } catch (err) {
+                console.error("Error al abrir cámara: ", err);
+            }
+        }
+
+        function detenerCamara() {
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => track.stop());
+                videoStream = null;
+            }
+            document.getElementById('camera-container').style.display = 'none';
+            document.querySelector('.action-buttons-wrapper').style.display = 'none';
+            document.getElementById('videoElement').srcObject = null;
+        }
+
+        function addEquipment() {
+            const input = document.getElementById('input-equipo');
+            const val = input.value.trim();
+            if (val) {
+                const list = document.getElementById('equipment-list');
+                const div = document.createElement('div');
+                div.className = 'equipment-item';
+                div.innerHTML = `<span>${val}</span><i class="fas fa-times" onclick="this.parentElement.remove()" style="color:red; cursor:pointer;"></i>`;
+                list.appendChild(div);
+                input.value = '';
+            }
+        }
+
+        function addItem() {
+            itemCount++;
+            const container = document.getElementById('items-container');
+            const template = document.getElementById('note-template');
+            const clone = template.content.cloneNode(true);
+            const box = clone.querySelector('.dynamic-item-box');
+            
+            const currentIdx = itemCount - 1;
+            box.setAttribute('data-index', currentIdx);
+            box.querySelector('.item-title').innerText = `Actividad #${itemCount}`;
+            
+            const textarea = box.querySelector('.field-nota');
+            const uniqueId = `nota_${itemCount}`;
+            textarea.id = uniqueId;
+            box.querySelector('.record-btn').setAttribute('data-target-input', uniqueId);
+            box.querySelector('.stop-btn').setAttribute('data-target-input', uniqueId);
+
+            const itemCameraBtn = box.querySelector('.btn-item-camera');
+            const itemFileInput = box.querySelector('.item-file-input');
+            const itemVideoInput = box.querySelector('.item-video-input');
+
+            itemCameraBtn.onclick = () => {
+                activeItemIdx = currentIdx;
+                // Usamos la función que abre la cámara y muestra los controles
+                if(typeof startCamera === 'function') {
+                    startCamera(); // Llama a la de tu script.js
+                } else {
+                    activarCamaraLocal();
+                }
+                document.getElementById('camera-container').style.display = 'block';
+                document.querySelector('.action-buttons-wrapper').style.display = 'block';
+            };
+
+            box.querySelector('.btn-item-photo-attach').onclick = () => itemFileInput.click();
+            box.querySelector('.btn-item-video-attach').onclick = () => itemVideoInput.click();
+            
+            itemFileInput.onchange = (e) => handleLocalFiles(e, currentIdx, 'foto');
+            itemVideoInput.onchange = (e) => handleLocalFiles(e, currentIdx, 'video');
+
+            if (itemCount > 1) {
+                const removeBtn = box.querySelector('.remove-item-btn');
+                removeBtn.style.display = 'block';
+                removeBtn.onclick = () => { box.remove(); reindexItems(); };
+            }
+
+            container.appendChild(clone);
+            
+            // ESTA LÍNEA ES VITAL PARA EL MICRÓFONO
+            if (typeof setupVoiceButtons === "function") setupVoiceButtons();
+        }
+
+        function reindexItems() {
+            const boxes = document.querySelectorAll('.dynamic-item-box');
+            itemCount = 0;
+            boxes.forEach((box) => {
+                itemCount++;
+                box.setAttribute('data-index', itemCount - 1);
+                box.querySelector('.item-title').innerText = `Actividad #${itemCount}`;
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const hoy = new Date();
+            const dateDisplay = document.getElementById('current-date-display');
+            if (dateDisplay) {
+                dateDisplay.innerText = hoy.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            }
+            addItem();
+            // Inicializar micrófonos de los elementos estáticos (como el de equipos)
+            if (typeof setupVoiceButtons === "function") setupVoiceButtons();
+        });
+    </script>
+</body>
+</html>

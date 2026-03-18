@@ -1,0 +1,353 @@
+/* Configuración general de la pantalla */
+body, html {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: #f0f0f0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+}
+
+/* Contenedor principal, que se adapta al tamaño de la pantalla */
+.main-container {
+    width: 80vw;
+    max-width: 400px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background-color: #ffffff;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;  /* Evitar que haya scroll innecesario */
+    padding: 15px;
+    box-sizing: border-box;
+}
+
+/* Contenedor de contenido (todo excepto el menú inferior) */
+.content-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; /* Evita que este contenedor genere scroll */
+}
+
+/* Lista de proyectos - AHORA CON SCROLL INTERNO */
+.records-container {
+    flex: 1;
+    overflow-y: auto;
+    list-style-type: none;
+    padding: 10px;
+    margin: 0;
+    margin-bottom: 10px;
+}
+
+/* Espacio del logo */
+.logo-container {
+    display: flex;
+    justify-content: center;
+    padding: 20px 0;
+}
+
+.logo {
+    max-width: 210px; /* Tamaño del logo más pequeño para móviles */
+    height: auto;
+}
+
+/* Texto de introducción */
+.intro-text {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.intro-text h2 {
+    font-size: 19px;
+    color: black;
+    margin-bottom: 20px;
+}
+
+/* Contenedor de los botones principales */
+.buttons-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 30px;
+    padding: 20px;
+    justify-items: center;
+}
+
+/* Estilos para los enlaces que actúan como botones */
+.menu-button {
+    display: flex;                /* Usar flex para centrar el contenido */
+    flex-direction: column;       /* Colocar icono encima del texto */
+    align-items: center;          /* Centrar el contenido */
+    background-color: #ffffff;   /* Color de fondo */
+    color: rgb(0, 0, 0);                 /* Color del texto */
+    padding: 15px;                /* Espaciado interno */
+    width: 90%;                   /* Ancho del botón */
+    border-radius: 10px; 
+    border-color: #FFAF33;         /* Bordes redondeados */
+    text-align: center;           /* Centrar texto */
+    text-decoration: none;        /* Quitar subrayado */
+    font-size: 16px;              /* Tamaño de fuente */
+    margin: 0 auto;              /* Centrar horizontalmente */
+}
+
+.a {
+    display: flex;                /* Usar flex para centrar el contenido */
+    flex-direction: column;       /* Colocar icono encima del texto */
+    align-items: center;          /* Centrar el contenido */
+    background-color: #ffffff;   /* Color de fondo */
+    color: rgb(0, 0, 0);                 /* Color del texto */
+    padding: 15px;                /* Espaciado interno */
+    width: 65%; 
+    border: 2px solid #FFAF33;                  /* Ancho del botón */
+    border-radius: 10px; 
+    border-color: #FFAF33;         /* Bordes redondeados */
+    text-align: center;           /* Centrar texto */
+    text-decoration: none;        /* Quitar subrayado */
+    font-size: 16px;              /* Tamaño de fuente */
+    margin: 0 auto;              /* Centrar horizontalmente */
+    box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2); /* Sombra debajo del botón */
+}
+
+.a i {
+    font-size: 24px;              /* Ajustar el tamaño del icono */
+    margin-bottom: 5px;           /* Espacio entre el icono y el texto */
+}
+
+.a:hover {
+    background-color: #DE992C;    /* Color de fondo al pasar el mouse */
+}
+
+/* Asegúrate de que el icono se vea bien */
+.menu-button i {
+    font-size: 24px;              /* Ajustar el tamaño del icono */
+    margin-bottom: 5px;           /* Espacio entre el icono y el texto */
+}
+.menu-button:hover {
+    background-color: #DE992C;    /* Color de fondo al pasar el mouse */
+}
+
+/* Menú inferior */
+.bottom-menu {
+    display: flex;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    justify-content: space-around;
+    padding: 10px 0;
+    background-color: #fff;
+    z-index: 100;
+}
+.bottom-button {
+    background-color: #FFAF33;
+    color: white;
+    padding: 10px 15px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;  /* Ajuste del tamaño del ícono */
+}
+
+.bottom-button .icon {
+    max-width: 50px; /* Tamaño del logo de registros */
+    height: auto;
+}
+
+.bottom-button i {
+    font-size: 24px;  /* Tamaño del icono */
+}
+
+.bottom-button:hover {
+    background-color: #DE992C;
+}
+
+/* Ajustes responsivos para los botones */
+@media screen and (max-width: 480px) {
+    .bottom-button {
+        font-size: 18px;  /* Reducir tamaño de icono en pantallas pequeñas */
+        padding: 8px 10px;
+    }
+
+    .bottom-button i {
+        font-size: 20px;
+    }
+}
+
+/* Estilos para el botón de eliminar proyecto */
+.delete-project-container {
+    
+    justify-content: center;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.delete-project-button {
+    background-color: #ff4d4d;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 10px;
+    font-size: 14px;
+    cursor: pointer;
+    
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.delete-project-button:hover {
+    background-color: #e60000;
+}
+
+.delete-project-button i {
+    margin-right: 4px;
+}
+
+/* Estilo del contenedor desplegable */
+.dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+/* Estilo del menú desplegable */
+.dropdown-menu {
+    display: none; /* Oculto por defecto */
+    position: absolute;
+    bottom: 50px; /* Aparece encima del botón */
+    left: 0;
+    right: 0;
+    background-color: white;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    padding: 10px 0;
+    z-index: 1000;
+    min-width: 150px;
+    text-align: center;
+}
+
+/* Opciones del menú */
+.dropdown-item {
+    display: block;
+    padding: 10px 20px;
+    text-decoration: none;
+    color: #34495e;
+    font-size: 14px;
+    transition: background-color 0.3s;
+}
+
+.dropdown-item:hover {
+    background-color: #DE992C;
+    color: #fff;
+}
+
+/* Mostrar menú cuando está activo */
+.dropdown-menu.show {
+    display: block;
+}
+
+/* Estilos del modal */
+.modal {
+    display: none; /* Oculto por defecto */
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.5); /* Fondo semitransparente */
+}
+
+  /* Contenido del modal */
+.modal-content {
+    background-color: #fff;
+    margin: 15% auto;
+    padding: 40px;
+    border-radius: 10px;
+    width: 30%;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    text-align: center;
+}
+
+  /* Botón de cerrar */
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close:hover,
+.close:focus {
+    color: #000;
+    text-decoration: none;
+}
+
+.submit-btn {
+    margin-top: 15px;
+    padding: 10px 20px;
+    background-color: #f8b126;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.submit-btn:hover {
+    background-color: #d86111;
+}
+/* Estilos para el modal de confirmación */
+.confirm-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.confirm-modal-content {
+    background-color: white;
+    margin: 20% auto;
+    padding: 20px;
+    border-radius: 10px;
+    width: 80%;
+    max-width: 400px;
+    text-align: center;
+}
+
+.confirm-modal-buttons {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 20px;
+}
+
+.confirm-yes {
+    background-color: #d9534f;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 20px;
+    cursor: pointer;
+}
+
+.confirm-no {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 20px;
+    cursor: pointer;
+}
+
+/* Ajustes para pantallas pequeñas */
+@media screen and (max-width: 480px) {
+    /* Contenedor principal para pantallas pequeñas (teléfonos móviles) */
+    .main-container {
+        max-width: 100%;
+    }
+}
+
