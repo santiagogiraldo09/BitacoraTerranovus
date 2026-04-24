@@ -1043,11 +1043,11 @@ def guardar_reporte_terranovus():
                 ))
 
         conn.commit()
-        return jsonify({"status": "success", "message": "Reporte Terranovus guardado correctamente"}), 201
+        return jsonify({"status": "success", "message": "Reporte guardado correctamente"}), 201
 
     except Exception as e:
         if conn: conn.rollback()
-        print(f"Error al guardar en Terranovus: {e}")
+        print(f"Error al guardar: {e}")
         return jsonify({"status": "error", "error": str(e)}), 500
     finally:
         if conn: conn.close()
