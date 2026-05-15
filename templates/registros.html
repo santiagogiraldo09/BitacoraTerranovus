@@ -56,51 +56,176 @@
             <a href="{{ url_for('history') }}" class="bottom-button"><i class="fas fa-history"></i></a>
             <!--<a href="{{ url_for('registros') }}" class="bottom-button"><i class="fas fa-home"></i></a>-->
             <!--<button class="bottom-button"><i class="fas fa-user"></i></button>-->
-            <div class="dropdown">
-                <button id="dropdown-btn" class="bottom-button">
-                    <i class="fas fa-plus"></i>
-                </button>
-                <div id="dropdown-menu" class="dropdown-menu">
-                    <a href="{{ url_for('history') }}" class="dropdown-item">
-                        <i class="fas fa-clipboard-list"></i> Historial</a>
-                    <a href="{{ url_for('inventario') }}" class="dropdown-item">
-                        <i class="fas fa-clipboard-check"></i> Inventario</a>
-                </div>
-            </div>
-            <a href="{{ url_for('usuario') }}" class="bottom-button"><i class="fas fa-user"></i></a>
+            <button class="bottom-button" onclick="abrirInviteModal()">
+                <i class="fas fa-plus"></i>
+            </button>
+
+            {% if session.get('user_rol') == 'admin' %}
+            <a href="{{ url_for('usuario') }}" class="bottom-button">
+                <i class="fas fa-user"></i>
+            </a>
+            {% endif %}
         </div>
         
     </div>
 
+    <!-- ===== MODAL: INVITAR USUARIOS ===== -->
+    <div class="invite-overlay" id="invite-overlay">
+        <div class="invite-modal">
+
+            <div class="invite-header">
+                <h3><i class="fas fa-user-plus"></i> Invitar Usuarios</h3>
+                <button class="invite-close" onclick="cerrarInviteModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <p class="invite-subtitle">
+                Agrega los correos de las personas que deseas invitar a tu espacio de trabajo.
+            </p>
+
+            <div id="email-list">
+                <div class="email-row" id="email-row-1">
+                    <input type="email" class="email-input" 
+                        placeholder="correo@ejemplo.com" id="email-1">
+                    <button class="remove-email-btn" id="remove-btn-1" 
+                            onclick="eliminarCorreo(1)" style="display:none">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+
+            <button class="add-email-btn" onclick="agregarCorreo()">
+                <i class="fas fa-plus"></i> Agregar otro correo
+            </button>
+
+            <button class="send-invite-btn" id="send-invite-btn" onclick="enviarInvitaciones()">
+                <i class="fas fa-paper-plane"></i> Enviar invitación
+            </button>
+
+            <div class="invite-feedback" id="invite-feedback"></div>
+        </div>
+    </div>
+
+
     <script>
-               
+
+        // ===== NAVEGACIÓN =====
         function redirectToAddProject() {
-            // Redirigir a la página para agregar un nuevo proyecto
             window.location.href = "{{ url_for('add_project') }}";
         }
 
         function redirectToProjectDetails(projectName, projectId) {
-            // Redirigir a la página de detalles del proyecto con el nombre como parámetro
-            //window.location.href = `{{ url_for('projectdetails') }}?name=${encodeURIComponent(projectName)}`;
             window.location.href = `/paginaprincipal?project_id=${projectId}&project=${encodeURIComponent(projectName)}?id=${encodeURIComponent(projectId)}`;
-            //window.location.href = `/index?project_id=${projectId}&project=${encodeURIComponent(projectName)}`;
         }
-        document.addEventListener('DOMContentLoaded', function () {
-            const dropdownBtn = document.getElementById('dropdown-btn');
-            const dropdownMenu = document.getElementById('dropdown-menu');
 
-            // Alternar el menú desplegable al hacer clic en el botón
-            dropdownBtn.addEventListener('click', function (event) {
-                event.stopPropagation(); // Evitar que el clic cierre el menú
-                dropdownMenu.classList.toggle('show');
-            });
+        // ===== MODAL INVITACIÓN =====
+        let emailCounter = 1;
 
-            // Cerrar el menú al hacer clic fuera de él
-            document.addEventListener('click', function (event) {
-                if (!dropdownMenu.contains(event.target)) {
-                    dropdownMenu.classList.remove('show');
+        function abrirInviteModal() {
+            document.getElementById('invite-overlay').classList.add('active');
+        }
+
+        function cerrarInviteModal() {
+            document.getElementById('invite-overlay').classList.remove('active');
+            limpiarModal();
+        }
+
+        function limpiarModal() {
+            document.getElementById('email-list').innerHTML = `
+                <div class="email-row" id="email-row-1">
+                    <input type="email" class="email-input" 
+                        placeholder="correo@ejemplo.com" id="email-1">
+                    <button class="remove-email-btn" onclick="eliminarCorreo(1)" style="display:none">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>`;
+            emailCounter = 1;
+            const fb = document.getElementById('invite-feedback');
+            fb.textContent = '';
+            fb.className = 'invite-feedback';
+        }
+
+        function agregarCorreo() {
+            emailCounter++;
+            const lista = document.getElementById('email-list');
+            const row = document.createElement('div');
+            row.className = 'email-row';
+            row.id = `email-row-${emailCounter}`;
+            row.innerHTML = `
+                <input type="email" class="email-input" 
+                    placeholder="correo@ejemplo.com" id="email-${emailCounter}">
+                <button class="remove-email-btn" onclick="eliminarCorreo(${emailCounter})">
+                    <i class="fas fa-times"></i>
+                </button>`;
+            lista.appendChild(row);
+            // Mostrar X en la primera fila cuando hay más de una
+            document.querySelector('#email-row-1 .remove-email-btn').style.display = 'flex';
+            // Focus en el nuevo campo
+            document.getElementById(`email-${emailCounter}`).focus();
+        }
+
+        function eliminarCorreo(id) {
+            document.getElementById(`email-row-${id}`)?.remove();
+            // Ocultar X del primero si solo queda uno
+            const rows = document.querySelectorAll('.email-row');
+            if (rows.length === 1) {
+                rows[0].querySelector('.remove-email-btn').style.display = 'none';
+            }
+        }
+
+        async function enviarInvitaciones() {
+            const inputs  = document.querySelectorAll('.email-input');
+            const correos = [...inputs].map(i => i.value.trim()).filter(v => v !== '');
+            const fb      = document.getElementById('invite-feedback');
+            const btn     = document.getElementById('send-invite-btn');
+
+            if (correos.length === 0) {
+                fb.textContent  = 'Por favor ingresa al menos un correo.';
+                fb.className    = 'invite-feedback error';
+                return;
+            }
+
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const invalido   = correos.find(c => !emailRegex.test(c));
+            if (invalido) {
+                fb.textContent = `Correo inválido: ${invalido}`;
+                fb.className   = 'invite-feedback error';
+                return;
+            }
+
+            btn.disabled   = true;
+            btn.innerHTML  = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+            fb.textContent = '';
+
+            try {
+                const res  = await fetch('/invitar-usuarios', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ correos })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    fb.textContent = `✅ Invitación enviada a ${correos.length} usuario(s).`;
+                    fb.className   = 'invite-feedback success';
+                    setTimeout(() => cerrarInviteModal(), 2200);
+                } else {
+                    fb.textContent = data.error || 'Error al enviar las invitaciones.';
+                    fb.className   = 'invite-feedback error';
                 }
-            });
+            } catch (err) {
+                fb.textContent = 'Error de conexión. Intenta de nuevo.';
+                fb.className   = 'invite-feedback error';
+            } finally {
+                btn.disabled  = false;
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar invitación';
+            }
+        }
+
+        // Cerrar modal al tocar el fondo oscuro
+        document.getElementById('invite-overlay').addEventListener('click', function(e) {
+            if (e.target === this) cerrarInviteModal();
         });
 
     </script>

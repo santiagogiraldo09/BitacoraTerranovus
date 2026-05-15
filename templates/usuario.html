@@ -3,75 +3,421 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Perfil de Usuario</title>
+    <title>Configuración</title>
     <link rel="icon" href="/static/logo.png" type="image/x-icon">
     <link rel="stylesheet" href="/static/usuario.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
-    <!-- Contenedor principal con los estilos proporcionados -->
     <div class="main-container">
-        <!-- Header fijo con logo y título -->
-        <div class="header">
-            <!-- Espacio para el logo -->
-            <div class="logo-container">
-                <img src="/static/logo.png" alt="Logo de la empresa" class="logo">
+
+        <!-- HEADER -->
+        <div class="cfg-header">
+            <div class="cfg-header-logo">
+                <img src="/static/logo.png" alt="Logo" id="header-logo-img">
             </div>
-            <!-- Título de la sección -->
-            <div class="intro-text">
-                <h2>Actualizar Perfil de Usuario</h2>
+            <h1 class="cfg-title">Configuración</h1>
+        </div>
+        <div class="cfg-divider"></div>
+
+        <!-- CONTENIDO CON SCROLL -->
+        <div class="cfg-scroll-area">
+
+            <!-- ── TARJETA IDENTIDAD VISUAL ── -->
+            <div class="cfg-card">
+                <div class="cfg-card-title">
+                    <i class="fas fa-palette cfg-icon-orange"></i>
+                    <span>Identidad Visual</span>
+                </div>
+                <p class="cfg-card-subtitle">Configura el logo y colores de tu marca</p>
+
+                <!-- Preview logo -->
+                <div class="logo-preview-wrapper">
+                    <div class="logo-preview-circle">
+                        <img id="logo-preview-img" src="/static/logo.png" alt="Logo actual">
+                        <label for="logo_empresa" class="logo-camera-btn" title="Cambiar logo">
+                            <i class="fas fa-camera"></i>
+                        </label>
+                    </div>
+                    <input type="file" id="logo_empresa" name="logo_empresa"
+                           accept="image/*" style="display:none">
+                    <p class="logo-label">Logo de la Empresa</p>
+                    <span class="update-link" onclick="document.getElementById('logo_empresa').click()">
+                        Actualizar imagen
+                    </span>
+                </div>
+
+                <div class="cfg-inner-divider"></div>
+
+                <!-- Paleta de colores -->
+                <p class="palette-title">Paleta de Colores</p>
+                <div class="color-row">
+                    <label class="color-card" for="color_primario">
+                        <input type="color" id="color_primario" value="#FBAF33" class="color-input-hidden">
+                        <span class="color-swatch" id="swatch-primario" style="background:#FBAF33"></span>
+                        <div class="color-info">
+                            <span class="color-hex" id="hex-primario">#FBAF33</span>
+                            <span class="color-role">Primario</span>
+                        </div>
+                    </label>
+                    <label class="color-card" for="color_secundario">
+                        <input type="color" id="color_secundario" value="#E3E3E3" class="color-input-hidden">
+                        <span class="color-swatch" id="swatch-secundario" style="background:#E3E3E3"></span>
+                        <div class="color-info">
+                            <span class="color-hex" id="hex-secundario">#E3E3E3</span>
+                            <span class="color-role">Secundario</span>
+                        </div>
+                    </label>
+                </div>
             </div>
+
+            <!-- ── SECCIÓN USUARIOS ── -->
+            <div class="usuarios-section">
+                <div class="usuarios-header">
+                    <div>
+                        <h2 class="usuarios-title">Usuarios</h2>
+                        <p class="usuarios-count" id="usuarios-count">
+                            {{ miembros|length }} miembro{{ 's' if miembros|length != 1 else '' }} activo{{ 's' if miembros|length != 1 else '' }}
+                        </p>
+                    </div>
+                    <button class="crear-usuario-btn" onclick="abrirInviteModal()">
+                        <i class="fas fa-user-plus"></i> Crear usuario
+                    </button>
+                </div>
+
+                <!-- Lista de usuarios -->
+                <div class="user-list" id="user-list">
+                    {% if miembros %}
+                        {% for m in miembros %}
+                        <div class="user-card">
+                            <div class="user-avatar">
+                                {% if m.foto %}
+                                    <img src="{{ m.foto }}" alt="{{ m.nombre }}">
+                                {% else %}
+                                    <div class="avatar-placeholder">
+                                        {{ m.nombre[0]|upper }}{{ m.apellido[0]|upper if m.apellido else '' }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <div class="user-info">
+                                <span class="user-name">{{ m.nombre }} {{ m.apellido }}</span>
+                                <span class="user-email">{{ m.email }}</span>
+                                <div class="user-meta">
+                                    <span class="user-role-badge">{{ m.rol }}</span>
+                                    <span class="user-status-badge {{ 'status-activo' if m.estado == 'activo' else 'status-pendiente' }}">
+                                        {{ 'Activo' if m.estado == 'activo' else 'Invitación pendiente' }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="user-actions">
+                                <button class="asignar-btn" onclick="asignarUsuario({{ m.user_id }})">
+                                    <i class="fas fa-user-check"></i> Asignar
+                                </button>
+                                <div class="user-actions-row">
+                                    <button class="icon-btn" onclick="verOpciones({{ m.user_id }})">
+                                        <i class="fas fa-ellipsis-h"></i>
+                                    </button>
+                                    <button class="icon-btn danger" onclick="eliminarUsuario({{ m.user_id }}, '{{ m.nombre }}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-users">
+                            <i class="fas fa-users empty-icon"></i>
+                            <p>Aún no hay usuarios en tu organización.</p>
+                            <span>Usa "Crear usuario" para invitar personas.</span>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- BOTONES FINALES -->
+            <div class="cfg-actions">
+                <button class="btn-guardar" onclick="guardarCambios()">Guardar cambios</button>
+                <button class="btn-restablecer" onclick="restablecerColores()">
+                    <i class="fas fa-rotate-left"></i> Restablecer colores
+                </button>
+            </div>
+
+        </div><!-- fin scroll area -->
+
+        <!-- MENÚ INFERIOR -->
+        <div class="bottom-nav">
+            <a href="{{ url_for('registros') }}" class="nav-item">
+                <i class="fas fa-folder"></i>
+                <span>Proyectos</span>
+            </a>
+            <a href="{{ url_for('usuario') }}" class="nav-item active">
+                <i class="fas fa-user"></i>
+                <span>Perfil</span>
+            </a>
         </div>
 
-        <!-- Contenedor con scroll para el formulario -->
-        <div class="form-container">
-            <!-- Formulario para llenar los datos del perfil -->
-            <form id="profile-form" action="/path-to-handle-form" method="POST" enctype="multipart/form-data">
-                <div class="form-group">
-                    <label for="nombre">Nombre Completo:</label>
-                    <input type="text" id="nombre" name="nombre" required>
+    </div><!-- fin main-container -->
+
+    <!-- ===== MODAL: INVITAR / CREAR USUARIO ===== -->
+    <div class="invite-overlay" id="invite-overlay">
+        <div class="invite-modal">
+            <div class="invite-header">
+                <h3><i class="fas fa-user-plus"></i> Invitar Usuarios</h3>
+                <button class="invite-close" onclick="cerrarInviteModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <p class="invite-subtitle">
+                Agrega los correos de las personas que deseas invitar a tu organización.
+            </p>
+
+            <!-- ← AGREGAR ESTO -->
+            <div class="invite-field">
+                <label class="invite-label">Rol asignado</label>
+                <select id="invite-rol" class="invite-select">
+                    <option value="director">Director de Obra</option>
+                    <option value="residente">Residente de Obra</option>
+                    <option value="inspector">Inspector</option>
+                    <option value="gerencia">Gerencia</option>
+                    <option value="admin">Administrador</option>
+                </select>
+            </div>
+
+            <div id="email-list">
+                <div class="email-row" id="email-row-1">
+                    <input type="email" class="email-input"
+                           placeholder="correo@ejemplo.com" id="email-1">
+                    <button class="remove-email-btn" onclick="eliminarCorreo(1)" style="display:none">
+                        <i class="fas fa-times"></i>
+                    </button>
                 </div>
+            </div>
 
-                <div class="form-group">
-                    <label for="celular">Número de Celular:</label>
-                    <input type="tel" id="celular" name="celular" required>
-                </div>
+            <button class="add-email-btn" onclick="agregarCorreo()">
+                <i class="fas fa-plus"></i> Agregar otro correo
+            </button>
 
-                <div class="form-group">
-                    <label for="correo">Correo Electrónico:</label>
-                    <input type="email" id="correo" name="correo" required>
-                </div>
+            <button class="send-invite-btn" id="send-invite-btn" onclick="enviarInvitaciones()">
+                <i class="fas fa-paper-plane"></i> Enviar invitación
+            </button>
 
-                <div class="form-group">
-                    <label for="empresa">Empresa:</label>
-                    <input type="text" id="empresa" name="empresa" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="cargo">Cargo:</label>
-                    <input type="text" id="cargo" name="cargo" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="rol">Rol:</label>
-                    <input type="text" id="rol" name="rol" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="foto">Foto de Perfil:</label>
-                    <input type="file" id="foto" name="foto" accept="image/*">
-                </div>
-
-                <button type="submit" class="submit-button">Actualizar Perfil</button>
-            </form>
-        </div>
-
-        <!-- Menú inferior -->
-        <div class="bottom-menu">
-            <!--<a href="{{ url_for('paginaprincipal') }}" class="bottom-button"><i class="fas fa-home"></i></a>--> <!-- Icono de casa -->
-            <a href="{{ url_for('registros') }}" class="bottom-button"><i class="fa fa-arrow-left"></i></a>
-            <!--<button class="bottom-button"><i class="fas fa-user"></i></button> --> <!-- Icono de usuario -->
+            <div class="invite-feedback" id="invite-feedback"></div>
         </div>
     </div>
+
+    <script src="/static/script.js"></script>
+    <script>
+
+        // ── IDENTIDAD VISUAL ──────────────────────────────────────
+        document.addEventListener('DOMContentLoaded', function () {
+            aplicarIdentidadVisual();
+
+            // Preview logo al seleccionar
+            document.getElementById('logo_empresa').addEventListener('change', function (e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = function (ev) {
+                    const dataUrl = ev.target.result;
+                    document.getElementById('logo-preview-img').src = dataUrl;
+                    document.getElementById('header-logo-img').src = dataUrl;
+                    localStorage.setItem('app_logo', dataUrl);
+                };
+                reader.readAsDataURL(file);
+            });
+
+            // Color primario
+            document.getElementById('color_primario').addEventListener('input', function (e) {
+                const c = e.target.value;
+                document.getElementById('swatch-primario').style.background = c;
+                document.getElementById('hex-primario').textContent = c.toUpperCase();
+                localStorage.setItem('color_primario', c);
+                aplicarColoresDinamicos();
+            });
+
+            // Color secundario
+            document.getElementById('color_secundario').addEventListener('input', function (e) {
+                const c = e.target.value;
+                document.getElementById('swatch-secundario').style.background = c;
+                document.getElementById('hex-secundario').textContent = c.toUpperCase();
+                localStorage.setItem('color_secundario', c);
+            });
+        });
+
+        function aplicarColoresDinamicos() {
+            const p = localStorage.getItem('color_primario') || '#FBAF33';
+            document.querySelectorAll('.btn-guardar, .send-invite-btn, .crear-usuario-btn .badge')
+                .forEach(el => el.style.backgroundColor = p);
+            document.documentElement.style.setProperty('--color-primario', p);
+        }
+
+        function guardarCambios() {
+            const logo     = localStorage.getItem('app_logo');
+            const primario = localStorage.getItem('color_primario') || '#FBAF33';
+            const secundario = localStorage.getItem('color_secundario') || '#E3E3E3';
+
+            fetch('/guardar-configuracion', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ logo, color_primario: primario, color_secundario: secundario })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) mostrarToast('✅ Configuración guardada');
+                else mostrarToast('❌ Error al guardar', true);
+            })
+            .catch(() => mostrarToast('❌ Error de conexión', true));
+        }
+
+        function restablecerColores() {
+            localStorage.removeItem('color_primario');
+            localStorage.removeItem('color_secundario');
+            localStorage.removeItem('app_logo');
+            document.getElementById('color_primario').value = '#FBAF33';
+            document.getElementById('color_secundario').value = '#E3E3E3';
+            document.getElementById('swatch-primario').style.background = '#FBAF33';
+            document.getElementById('swatch-secundario').style.background = '#E3E3E3';
+            document.getElementById('hex-primario').textContent = '#FBAF33';
+            document.getElementById('hex-secundario').textContent = '#E3E3E3';
+            document.documentElement.style.setProperty('--color-primario', '#FBAF33');
+            mostrarToast('🔄 Colores restablecidos');
+        }
+
+        // ── MODAL INVITACIÓN ──────────────────────────────────────
+        let emailCounter = 1;
+
+        function abrirInviteModal() {
+            document.getElementById('invite-overlay').classList.add('active');
+        }
+
+        function cerrarInviteModal() {
+            document.getElementById('invite-overlay').classList.remove('active');
+            limpiarModal();
+        }
+
+        function limpiarModal() {
+            document.getElementById('email-list').innerHTML = `
+                <div class="email-row" id="email-row-1">
+                    <input type="email" class="email-input"
+                           placeholder="correo@ejemplo.com" id="email-1">
+                    <button class="remove-email-btn" onclick="eliminarCorreo(1)" style="display:none">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>`;
+            emailCounter = 1;
+            const fb = document.getElementById('invite-feedback');
+            fb.textContent = '';
+            fb.className = 'invite-feedback';
+        }
+
+        function agregarCorreo() {
+            emailCounter++;
+            const lista = document.getElementById('email-list');
+            const row = document.createElement('div');
+            row.className = 'email-row';
+            row.id = `email-row-${emailCounter}`;
+            row.innerHTML = `
+                <input type="email" class="email-input"
+                       placeholder="correo@ejemplo.com" id="email-${emailCounter}">
+                <button class="remove-email-btn" onclick="eliminarCorreo(${emailCounter})">
+                    <i class="fas fa-times"></i>
+                </button>`;
+            lista.appendChild(row);
+            document.querySelector('#email-row-1 .remove-email-btn').style.display = 'flex';
+            document.getElementById(`email-${emailCounter}`).focus();
+        }
+
+        function eliminarCorreo(id) {
+            document.getElementById(`email-row-${id}`)?.remove();
+            const rows = document.querySelectorAll('.email-row');
+            if (rows.length === 1) rows[0].querySelector('.remove-email-btn').style.display = 'none';
+        }
+
+        async function enviarInvitaciones() {
+            const correos = [...document.querySelectorAll('.email-input')]
+                .map(i => i.value.trim()).filter(v => v !== '');
+            const fb  = document.getElementById('invite-feedback');
+            const btn = document.getElementById('send-invite-btn');
+
+            if (!correos.length) {
+                fb.textContent = 'Por favor ingresa al menos un correo.';
+                fb.className = 'invite-feedback error';
+                return;
+            }
+            const regex   = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const invalido = correos.find(c => !regex.test(c));
+            if (invalido) {
+                fb.textContent = `Correo inválido: ${invalido}`;
+                fb.className = 'invite-feedback error';
+                return;
+            }
+
+            btn.disabled  = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+            fb.textContent = '';
+
+            try {
+                const res  = await fetch('/invitar-usuarios', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ correos })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    fb.textContent = `✅ Invitación enviada a ${correos.length} usuario(s).`;
+                    fb.className = 'invite-feedback success';
+                    setTimeout(() => { cerrarInviteModal(); location.reload(); }, 2000);
+                } else {
+                    fb.textContent = data.error || 'Error al enviar las invitaciones.';
+                    fb.className = 'invite-feedback error';
+                }
+            } catch {
+                fb.textContent = 'Error de conexión. Intenta de nuevo.';
+                fb.className = 'invite-feedback error';
+            } finally {
+                btn.disabled  = false;
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar invitación';
+            }
+        }
+
+        document.getElementById('invite-overlay').addEventListener('click', function (e) {
+            if (e.target === this) cerrarInviteModal();
+        });
+
+        // ── ACCIONES DE USUARIO ───────────────────────────────────
+        function asignarUsuario(userId) {
+            // Por implementar: abrir modal de asignación a proyecto
+            mostrarToast('Función de asignación próximamente');
+        }
+
+        function verOpciones(userId) {
+            // Por implementar: menú contextual de opciones
+            mostrarToast('Opciones próximamente');
+        }
+
+        function eliminarUsuario(userId, nombre) {
+            if (!confirm(`¿Seguro que deseas eliminar a ${nombre} de la organización?`)) return;
+            fetch(`/eliminar-usuario/${userId}`, { method: 'DELETE' })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) { mostrarToast('Usuario eliminado'); location.reload(); }
+                    else mostrarToast('Error al eliminar', true);
+                });
+        }
+
+        // ── TOAST GENÉRICO ────────────────────────────────────────
+        function mostrarToast(msg, esError = false) {
+            let t = document.getElementById('cfg-toast');
+            if (!t) {
+                t = document.createElement('div');
+                t.id = 'cfg-toast';
+                document.body.appendChild(t);
+            }
+            t.textContent = msg;
+            t.className = 'cfg-toast ' + (esError ? 'toast-error' : 'toast-ok');
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+    </script>
 </body>
 </html>

@@ -38,12 +38,15 @@ import io
 import base64
 from tempfile import NamedTemporaryFile
 
+
 # Configurar zona horaria
 tijuana_tz = pytz.timezone('America/Tijuana')
 fecha_hora_tijuana = datetime.now(tijuana_tz)
 
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+SYNCHRO_FORM_DEFINITION_ID = 'e4bQKVghekuuA8Y6dmHKWHlOJyH5vilDm9vLfuTg2mg'
 
 # Configuración PostgreSQL
 POSTGRES_CONFIG = {
@@ -79,6 +82,19 @@ app.secret_key = secrets.token_hex(16)  # Clave secreta para sesiones
 #app.secret_key = '78787878tyg8987652vgdfdf3445'
 CORS(app)
 
+from flask_mail import Mail, Message
+import random, string
+
+# Configuración de correo (ajusta con tu cuenta SMTP)
+app.config['MAIL_SERVER']   = 'smtp.gmail.com'
+app.config['MAIL_PORT']     = 587
+app.config['MAIL_USE_TLS']  = True
+app.config['MAIL_USERNAME'] = 'muneragacias@gmail.com'      # ← tu correo
+app.config['MAIL_PASSWORD'] = 'rxghrdeqoupdkaex'         # ← contraseña de app Gmail
+app.config['MAIL_DEFAULT_SENDER'] = 'muneragacias@gmail.com'
+
+mail = Mail(app)
+
 projects = []
 
 # Conecta con el servicio de Blob Storage de Azure
@@ -88,6 +104,126 @@ container_name = "registros"
 
 # Inicializa el cliente de BlobServiceClient
 blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+
+def generar_password_temporal(longitud=10):
+    caracteres = string.ascii_letters + string.digits
+    return ''.join(random.choices(caracteres, k=longitud))
+
+@app.route('/invitar-usuarios', methods=['POST'])
+def invitar_usuarios():
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'No autenticado'}), 401
+
+    data    = request.get_json()
+    correos = data.get('correos', [])
+    rol = data.get('rol', 'residente')
+
+    if not correos:
+        return jsonify({'success': False, 'error': 'No se recibieron correos'})
+
+    conn = None
+    try:
+        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        cursor = conn.cursor()
+
+        # Obtener datos del administrador y su empresa
+        cursor.execute("""
+            SELECT name, empresa FROM usuario WHERE user_id = %s
+        """, (session['user_id'],))
+        admin = cursor.fetchone()
+        admin_nombre  = admin[0] if admin else 'El administrador'
+        empresa       = admin[1] if admin else 'tu organización'
+
+        enviados  = []
+        omitidos  = []
+
+        for correo in correos:
+            # Verificar si el correo ya existe
+            cursor.execute("SELECT user_id FROM usuario WHERE email = %s", (correo,))
+            if cursor.fetchone():
+                omitidos.append(correo)
+                continue
+
+            # Generar contraseña temporal
+            password_temp = generar_password_temporal()
+            hashed        = generate_password_hash(password_temp)
+
+            # Crear usuario en BD con estado 'pendiente'
+            # Usar la parte antes del @ como nombre provisional
+            nombre_provisional = correo.split('@')[0]
+
+            cursor.execute("""
+                INSERT INTO usuario (name, apellido, email, password, cargo, rol, empresa, estado)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, 'pendiente')
+                RETURNING user_id
+            """, (nombre_provisional, 'Invitado', correo, hashed, 'Sin asignar', rol, empresa))
+
+            # Enviar correo de invitación
+            try:
+                msg = Message(
+                    subject=f'Invitación a {empresa} — Bitácora App',
+                    recipients=[correo]
+                )
+                msg.html = f"""
+                <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:32px;
+                            background:#fff;border-radius:12px;border:1px solid #eee;">
+                    <img src="cid:logo" style="height:48px;margin-bottom:24px;">
+                    <h2 style="color:#1A1A2E;margin:0 0 8px;">Has sido invitado</h2>
+                    <p style="color:#555;font-size:15px;margin:0 0 24px;">
+                        <strong>{admin_nombre}</strong> te ha invitado a unirte a 
+                        <strong>{empresa}</strong> en Bitácora App.
+                    </p>
+                    <div style="background:#F5F6FA;border-radius:10px;padding:20px;margin-bottom:24px;">
+                        <p style="margin:0 0 8px;color:#888;font-size:13px;">TUS CREDENCIALES DE ACCESO</p>
+                        <p style="margin:0 0 4px;font-size:15px;">
+                            <strong>Correo:</strong> {correo}
+                        </p>
+                        <p style="margin:0;font-size:15px;">
+                            <strong>Contraseña temporal:</strong> 
+                            <span style="font-family:monospace;background:#fff;padding:2px 8px;
+                                         border-radius:4px;border:1px solid #ddd;">
+                                {password_temp}
+                            </span>
+                        </p>
+                    </div>
+                    <p style="color:#e09a1f;font-size:13px;margin:0 0 24px;">
+                        ⚠️ Por seguridad, cambia tu contraseña después de ingresar por primera vez.
+                    </p>
+                    <a href="https://shrimp-ethical-sheep.ngrok-free.app" 
+                       style="display:block;text-align:center;background:#FBAF33;color:#fff;
+                              padding:14px;border-radius:8px;text-decoration:none;
+                              font-weight:bold;font-size:16px;">
+                        Ingresar a la app
+                    </a>
+                </div>
+                """
+                mail.send(msg)
+                enviados.append(correo)
+
+            except Exception as mail_err:
+                print(f"Error enviando correo a {correo}: {mail_err}")
+                # El usuario se creó en BD aunque falle el correo
+                enviados.append(correo)
+
+        conn.commit()
+
+        mensaje = f'Invitación enviada a {len(enviados)} usuario(s).'
+        if omitidos:
+            mensaje += f' {len(omitidos)} correo(s) ya existían y fueron omitidos.'
+
+        return jsonify({
+            'success': True,
+            'enviados': len(enviados),
+            'omitidos': omitidos,
+            'mensaje':  mensaje
+        })
+
+    except Exception as e:
+        print(f"Error en invitar_usuarios: {e}")
+        if conn: conn.rollback()
+        return jsonify({'success': False, 'error': str(e)})
+    finally:
+        if conn: conn.close()
 
 # ========================================
 # OBTENER TOKEN DE BENTLEY
@@ -647,7 +783,7 @@ def registro():
             flash('Las contraseñas no coinciden', 'error')
             return redirect(url_for('registro'))
         
-        user_id = create_user(nombre, apellido, email, password, empresa, cargo, rol)
+        user_id = create_user(nombre, apellido, email, password, cargo, rol, empresa)
         if user_id:
             flash('Registro exitoso. Por favor inicie sesión.', 'success')
             return redirect(url_for('principalscreen'))
@@ -670,6 +806,23 @@ def login():
     if user_id:
         # Aquí puedes implementar sesiones o JWT
         session['user_id'] = user_id #Establecer sesión
+        conn_rol = psycopg2.connect(**POSTGRES_CONFIG)
+        cursor_rol = conn_rol.cursor()
+        cursor_rol.execute("SELECT rol FROM usuario WHERE user_id = %s", (user_id,))
+        fila = cursor_rol.fetchone()
+        session['user_rol'] = fila[0] if fila else 'viewer'
+        conn_rol.close()
+        try:
+            conn = psycopg2.connect(**POSTGRES_CONFIG)
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE usuario SET estado = 'activo' 
+                WHERE user_id = %s AND estado = 'pendiente'
+            """, (user_id,))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            print(f"Error actualizando estado: {e}")
         flash('Inicio de sesión exitoso', 'success')
         return redirect(url_for('registros'))
     else:
@@ -879,6 +1032,95 @@ def update_synchro_data():
         traceback.print_exc()
         return jsonify({'error': f'Error interno del servidor: {str(e)}'}), 500
 
+
+@app.route('/get-synchro-project-data')
+def get_synchro_project_data():
+    return jsonify({
+        'codigo_proyecto':    'CO-CARR',
+        'contrato':           '4500042183',
+        'contratista':        'J.E. JAIMES INGENIEROS S.A.',
+        'form_definition_id': SYNCHRO_FORM_DEFINITION_ID
+    })
+
+@app.route('/get-form-definitions')
+def get_form_definitions():
+    token = obtener_token()
+    if not token:
+        return jsonify({'error': 'No se pudo obtener token'}), 500
+    
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/vnd.bentley.itwin-platform.v2+json'
+    }
+    
+    response = requests.get(
+        'https://api.bentley.com/forms',
+        headers=headers,
+        params={
+            'iTwinId': SYNCHRO_CONFIG['itwin_id'],
+            '$top': 50
+        }
+    )
+    
+    return jsonify({
+        'status': response.status_code,
+        'body': response.json()
+    })
+
+@app.route('/get-form-detail')
+def get_form_detail():
+    token = obtener_token()
+    headers = {
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/vnd.bentley.itwin-platform.v2+json'
+    }
+    response = requests.get(
+        f"https://api.bentley.com/forms/e4bQKVghekuuA8Y6dmHKWFDXLUqEPIpFt_QjKefA5yk",
+        headers=headers
+    )
+    forms = response.json().get('forms', {}).get('formDataInstances', [])
+    
+    # Buscar uno que sea del tipo 2.02
+    for form in forms:
+        if '2.02' in form.get('number', '') or 'Calidad' in form.get('type', ''):
+            # Obtener detalle completo de ese formulario
+            detail = requests.get(
+                f"https://api.bentley.com/forms/{form['id']}",
+                headers=headers
+            )
+            return jsonify({'status': detail.status_code, 'body': detail.json()})
+    
+    return jsonify(response.json())
+
+@app.route('/create-synchro-form', methods=['POST'])
+def create_synchro_form():
+    try:
+        data               = request.json
+        form_definition_id = data.get('form_definition_id') or SYNCHRO_FORM_DEFINITION_ID
+        new_properties     = data.get('properties', {})
+        token = obtener_token()   # reutiliza la función que ya existe
+        if not token:
+            return jsonify({'error': 'No se pudo obtener token'}), 500
+        headers = {
+            'Authorization': f'Bearer {token}',
+            'Accept':        'application/vnd.bentley.itwin-platform.v2+json',
+            'Content-Type':  'application/json',
+            'Prefer':        'return=representation'
+        }
+        body = {
+            'formId': form_definition_id,
+            'properties': new_properties
+        }
+        response = requests.post(SYNCHRO_CONFIG['forms_url'], headers=headers, json=body, timeout=15)
+        if response.status_code in (200, 201):
+            created = response.json().get('form', response.json())
+            return jsonify({'success': True, 'form_id': created.get('id'), 'number': created.get('number')}), 201
+        return jsonify({'error': response.text}), response.status_code
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/formulario')
 def indexFormulario():
     """Muestra el formulario con datos pre-cargados"""
@@ -919,7 +1161,37 @@ def history():
 
 @app.route('/usuario')
 def usuario():
-    return render_template('usuario.html')
+    if 'user_id' not in session:
+        return redirect(url_for('principalscreen'))
+    if session.get('user_rol') != 'admin':
+        return redirect(url_for('registros'))
+    conn = None
+    try:
+        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        cursor = conn.cursor()
+        
+        # Usuarios del mismo tenant/organización
+        cursor.execute("""
+            SELECT user_id, name, apellido, email, rol, estado
+            FROM usuario
+            WHERE empresa = (SELECT empresa FROM usuario WHERE user_id = %s)
+            ORDER BY name ASC
+        """, (session['user_id'],))
+        
+        miembros = []
+        for row in cursor.fetchall():
+            miembros.append({
+                'user_id': row[0], 'nombre': row[1], 'apellido': row[2] or '',
+                'email': row[3], 'rol': row[4] or 'Sin rol',
+                'estado': row[5] or 'pendiente', 'foto': None
+            })
+        
+        return render_template('usuario.html', miembros=miembros)
+    except Exception as e:
+        print(f"Error en usuario: {e}")
+        return render_template('usuario.html', miembros=[])
+    finally:
+        if conn: conn.close()
 
 @app.route('/inventario')
 def inventario():
@@ -1209,6 +1481,40 @@ def guardar_registro():
         if conn: conn.rollback()
         print(f"Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
+    finally:
+        if conn: conn.close()
+
+@app.route('/eliminar-usuario/<int:user_id>', methods=['DELETE'])
+def eliminar_usuario(user_id):
+    if 'user_id' not in session:
+        return jsonify({'success': False, 'error': 'No autenticado'}), 401
+
+    # Evitar que el admin se elimine a sí mismo
+    if user_id == session['user_id']:
+        return jsonify({'success': False, 'error': 'No puedes eliminarte a ti mismo'})
+
+    conn = None
+    try:
+        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        cursor = conn.cursor()
+
+        # Verificar que el usuario pertenece a la misma empresa
+        cursor.execute("""
+            SELECT u.user_id FROM usuario u
+            WHERE u.user_id = %s
+            AND u.empresa = (SELECT empresa FROM usuario WHERE user_id = %s)
+        """, (user_id, session['user_id']))
+
+        if not cursor.fetchone():
+            return jsonify({'success': False, 'error': 'Usuario no encontrado en tu organización'})
+
+        cursor.execute("DELETE FROM usuario WHERE user_id = %s", (user_id,))
+        conn.commit()
+        return jsonify({'success': True})
+
+    except Exception as e:
+        print(f"Error eliminando usuario: {e}")
+        return jsonify({'success': False, 'error': str(e)})
     finally:
         if conn: conn.close()
 

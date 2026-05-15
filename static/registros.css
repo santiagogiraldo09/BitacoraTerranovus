@@ -258,3 +258,125 @@ body, html {
     background-color: #f9f9f9;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
+
+/*ESTO ES LO NUEVO PARA EL MODAL*/
+/* ===== MODAL INVITACIÓN ===== */
+.invite-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 999;
+    justify-content: center;
+    align-items: flex-end;
+}
+.invite-overlay.active {
+    display: flex;
+}
+.invite-modal {
+    background: white;
+    width: 100%;
+    max-width: 400px;
+    border-radius: 20px 20px 0 0;
+    padding: 24px 20px 36px;
+    animation: slideUp 0.28s ease;
+}
+@keyframes slideUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+}
+.invite-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+.invite-header h3 {
+    font-size: 17px;
+    font-weight: bold;
+    margin: 0;
+    color: #222;
+}
+.invite-close {
+    background: #f0f0f0;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #555;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.invite-subtitle {
+    font-size: 13px;
+    color: #888;
+    margin: 0 0 16px;
+}
+.email-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+.email-input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 14px;
+    outline: none;
+    transition: border 0.2s;
+    box-sizing: border-box;
+}
+.email-input:focus { border-color: #FBAF33; }
+.remove-email-btn {
+    background: #fee;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    color: #e55;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.add-email-btn {
+    width: 100%;
+    background: transparent;
+    border: 1.5px dashed #FBAF33;
+    color: #FBAF33;
+    border-radius: 8px;
+    padding: 9px;
+    font-size: 13px;
+    cursor: pointer;
+    margin-bottom: 14px;
+    font-weight: 600;
+}
+.send-invite-btn {
+    width: 100%;
+    background: #FBAF33;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 12px;
+    font-size: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+.send-invite-btn:hover    { background: #e09a1f; }
+.send-invite-btn:disabled { background: #ccc; cursor: not-allowed; }
+.invite-feedback {
+    margin-top: 12px;
+    font-size: 13px;
+    text-align: center;
+    min-height: 20px;
+}
+.invite-feedback.success { color: #2e7d32; }
+.invite-feedback.error   { color: #c62828; }

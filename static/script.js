@@ -58,6 +58,87 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+// ===== IDENTIDAD VISUAL - PREVIEW INMEDIATO ESTO ES LO NUEVO=====
+
+// 1. Preview del logo al seleccionarlo
+document.getElementById('logo_empresa')?.addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(ev) {
+        const dataUrl = ev.target.result;
+
+        // Actualizar preview en la página de usuario
+        document.getElementById('logo-preview-img').src = dataUrl;
+
+        // Guardar en localStorage para que otros templates lo usen
+        localStorage.setItem('app_logo', dataUrl);
+
+        // Actualizar el logo del header inmediatamente (si existe en la misma página)
+        const headerLogo = document.querySelector('.header .logo');
+        if (headerLogo) headerLogo.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+});
+
+// 2. Cambio de color primario
+document.getElementById('color_primario')?.addEventListener('input', function(e) {
+    const color = e.target.value;
+    document.getElementById('swatch-primario').style.background = color;
+    document.getElementById('hex-primario').textContent = color.toUpperCase();
+    document.documentElement.style.setProperty('--color-primario', color);
+    localStorage.setItem('color_primario', color);
+    aplicarColores(); // aplicar a elementos en vivo
+});
+
+// 3. Cambio de color secundario
+document.getElementById('color_secundario')?.addEventListener('input', function(e) {
+    const color = e.target.value;
+    document.getElementById('swatch-secundario').style.background = color;
+    document.getElementById('hex-secundario').textContent = color.toUpperCase();
+    document.documentElement.style.setProperty('--color-secundario', color);
+    localStorage.setItem('color_secundario', color);
+});
+
+// 4. Función para aplicar colores guardados (llamar en TODOS los templates al cargar)
+function aplicarIdentidadVisual() {
+    const logo = localStorage.getItem('app_logo');
+    const primario = localStorage.getItem('color_primario') || '#FBAF33';
+    const secundario = localStorage.getItem('color_secundario') || '#E3E3E3';
+
+    // Logo
+    if (logo) {
+        document.querySelectorAll('.logo, #logo-preview-img').forEach(el => el.src = logo);
+    }
+
+    // Colores como variables CSS globales
+    document.documentElement.style.setProperty('--color-primario', primario);
+    document.documentElement.style.setProperty('--color-secundario', secundario);
+
+    // Actualizar swatches si estamos en la página usuario
+    const swatchP = document.getElementById('swatch-primario');
+    if (swatchP) {
+        swatchP.style.background = primario;
+        document.getElementById('hex-primario').textContent = primario.toUpperCase();
+        document.getElementById('color_primario').value = primario;
+    }
+}
+
+// Inicializar al cargar la página
+document.addEventListener('DOMContentLoaded', aplicarIdentidadVisual);
+
+function aplicarColores() {
+    const primario = localStorage.getItem('color_primario') || '#FBAF33';
+    // Reemplazar clases que usan el color en vivo (botones submit, bottom-buttons, etc.)
+    document.querySelectorAll('.submit-button, .bottom-button').forEach(el => {
+        el.style.backgroundColor = primario;
+    });
+}
+/* HASTA ACÁ ES LO NUEVO */
+
+
+
 // =================================================================
 //          FUNCIONES DE CÁMARA (FOTO Y VIDEO)
 // =================================================================

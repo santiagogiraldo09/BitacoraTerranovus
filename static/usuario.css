@@ -1,164 +1,726 @@
-/* Configuración general */
-body, html {
-    margin: 0;
-    padding: 0;
-    font-family: Arial, sans-serif;
-    background-color: #f0f0f0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100%;
-    overflow: hidden; /* Previene scroll en toda la página */
+/* ========================================
+   CONFIGURACIÓN — usuario.css
+   ======================================== */
+
+:root {
+    --color-primario:   #FBAF33;
+    --color-secundario: #E3E3E3;
+    --bg:        #F5F6FA;
+    --card-bg:   #FFFFFF;
+    --text-dark: #1A1A2E;
+    --text-mid:  #555;
+    --text-soft: #999;
+    --border:    #EBEBEB;
+    --danger:    #E53935;
+    --success:   #2E7D32;
+    --radius-lg: 16px;
+    --radius-md: 10px;
+    --radius-sm: 8px;
+    --shadow:    0 2px 12px rgba(0,0,0,0.07);
 }
 
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Estilos generales para el formulario y la página */
+body, html {
+    height: 100%;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text-dark);
+}
+
+/* ── CONTENEDOR PRINCIPAL ── */
 .main-container {
     width: 100%;
-    max-width: 400px; /* Mantener el tamaño para simular un celular */
+    max-width: 430px;
     height: 100vh;
-    /*margin: 0 auto;*/ /* Centrar el contenedor */
-    padding: 20px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin: 0 auto;
+    background: #ffffff;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+}
+
+/* ── HEADER ── */
+.cfg-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 18px 20px 14px;
+    background: var(--card-bg);
+}
+
+.cfg-header-logo {
+    width: 52px;
+    height: 52px;
     border-radius: 10px;
-    background-color: white;
-    font-family: Arial, sans-serif;
-    overflow: hidden;  /* Evitar que haya scroll innecesario */
-    box-sizing: border-box;
-    /* Estructura flexible para permitir scroll en la sección del formulario */
+    overflow: hidden;
+    background: var(--text-dark);
     display: flex;
-    flex-direction: column;
-}
-
-/* Contenedor de contenido (todo excepto el menú inferior) */
-.content-container {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    
-}
-
-
-
-/* Contenedor de cabecera (logo y título) */
-.header {
-    padding: 10px 20px;
-    background-color: white;
-    z-index: 10;
-}
-
-.logo-container {
-    display: flex;
+    align-items: center;
     justify-content: center;
-    padding: 10px 0;
+    flex-shrink: 0;
 }
 
-.logo {
-    max-width: 210px; /* Tamaño del logo más pequeño para móviles */
-    height: auto;
+.cfg-header-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
 }
 
-.intro-text {
-    text-align: center;
-    margin-bottom: 10px;
+.cfg-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-dark);
+    letter-spacing: -0.3px;
 }
 
-.intro-text h2 {
-    font-size: 20px;
-    margin: 5px 0;
+.cfg-divider {
+    height: 1px;
+    background: var(--border);
 }
 
-/* Lista de proyectos - AHORA CON SCROLL INTERNO */
-.form-container {
+/* ── ÁREA CON SCROLL ── */
+.cfg-scroll-area {
     flex: 1;
     overflow-y: auto;
-    list-style-type: none;
-    padding: 10px;
-    
-}
-
-/* Estilos para el formulario */
-form {
+    padding: 16px 16px 24px;
     display: flex;
     flex-direction: column;
+    gap: 16px;
 }
 
-.form-group {
-    margin-bottom: 15px;
+.cfg-scroll-area::-webkit-scrollbar { width: 4px; }
+.cfg-scroll-area::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 2px;
 }
 
-label {
-    font-size: 14px;
-    margin-bottom: 5px;
+/* ── TARJETA IDENTIDAD VISUAL ── */
+.cfg-card {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    box-shadow: var(--shadow);
 }
 
-input[type="text"],
-input[type="email"],
-input[type="tel"],
-input[type="file"] {
-    width: 100%;
-    max-width: 100%; /* Asegura que los inputs ocupen el 100% del ancho */
-    padding: 6px;
-    font-size: 14px;
-    border-radius: 5px;
-    border: 1px solid #ddd;
-    box-sizing: border-box; /* Asegura que el padding no afecte el tamaño total */
-}
-
-.submit-button {
-    background-color: #FF6600;
-    color: white;
-    padding: 10px;
-    border: none;
-    border-radius: 5px;
-    font-size: 16px;
-    cursor: pointer;
-}
-
-.submit-button:hover {
-    background-color: #FF6600;
-}
-
-/* Menú inferior */
-.bottom-menu {
+.cfg-card-title {
     display: flex;
-    justify-content: space-around;
-    padding: 15px;
-    background-color: #ffffff;
+    align-items: center;
+    gap: 8px;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 4px;
 }
-.bottom-button {
-    background-color: #FFAF33;
+
+.cfg-icon-orange { color: var(--color-primario); font-size: 18px; }
+
+.cfg-card-subtitle {
+    font-size: 13px;
+    color: var(--text-soft);
+    margin-bottom: 20px;
+}
+
+/* Preview logo */
+.logo-preview-wrapper {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.logo-preview-circle {
+    position: relative;
+    width: 96px;
+    height: 96px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid var(--border);
+    background: #f5f5f5;
+}
+
+.logo-preview-circle img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.logo-camera-btn {
+    position: absolute;
+    bottom: 4px;
+    right: 4px;
+    background: var(--color-primario);
     color: white;
-    padding: 10px 15px;
-    border-radius: 10px;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+.logo-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin: 10px 0 4px;
+}
+
+.update-link {
+    font-size: 13px;
+    color: var(--color-primario);
+    cursor: pointer;
+    font-weight: 500;
+}
+
+.update-link:hover { text-decoration: underline; }
+
+/* Divisor interno */
+.cfg-inner-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 16px 0;
+}
+
+/* Paleta */
+.palette-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 12px;
+}
+
+.color-row {
+    display: flex;
+    gap: 12px;
+}
+
+.color-card {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 10px 12px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+
+.color-card:hover { border-color: var(--color-primario); }
+
+.color-input-hidden { display: none; }
+
+.color-swatch {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    border: 1px solid rgba(0,0,0,0.08);
+    flex-shrink: 0;
+    transition: transform 0.2s;
+}
+
+.color-card:hover .color-swatch { transform: scale(1.08); }
+
+.color-info { display: flex; flex-direction: column; gap: 2px; }
+
+.color-hex {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-dark);
+    font-family: 'Courier New', monospace;
+}
+
+.color-role {
+    font-size: 11px;
+    color: var(--text-soft);
+}
+
+/* ── SECCIÓN USUARIOS ── */
+.usuarios-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.usuarios-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.usuarios-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-dark);
+}
+
+.usuarios-count {
+    font-size: 13px;
+    color: var(--text-soft);
+    margin-top: 2px;
+}
+
+.crear-usuario-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-dark);
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    white-space: nowrap;
+}
+
+.crear-usuario-btn:hover {
+    background: #ffe8c2;
+    border-color: var(--color-primario);
+    color: var(--color-primario);
+}
+
+/* Cards de usuario */
+.user-list { display: flex; flex-direction: column; gap: 12px; }
+
+.user-card {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    box-shadow: var(--shadow);
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+/* Avatar */
+.user-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.user-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    background: var(--color-primario);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    font-weight: 700;
+}
+
+/* Info del usuario */
+.user-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.user-name {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-dark);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.user-email {
+    font-size: 12px;
+    color: var(--text-soft);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.user-meta {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+}
+
+.user-role-badge {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-mid);
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+    text-transform: capitalize;
+}
+
+.user-status-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+}
+
+.status-activo {
+    background: #E8F5E9;
+    color: var(--success);
+}
+
+.status-pendiente {
+    background: #FFF8E1;
+    color: #F57F17;
+}
+
+/* Acciones del usuario */
+.user-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.asignar-btn {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--bg);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dark);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.asignar-btn:hover {
+    border-color: var(--color-primario);
+    color: var(--color-primario);
+}
+
+.user-actions-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.icon-btn {
+    background: none;
     border: none;
     cursor: pointer;
-    font-size: 20px;  /* Ajuste del tamaño del ícono */
-    z-index: 100; /* Asegurar que esté por encima de otros elementos */
+    color: var(--text-soft);
+    font-size: 15px;
+    padding: 4px;
+    border-radius: 6px;
+    transition: color 0.2s, background 0.2s;
 }
 
-.bottom-button .icon {
-    max-width: 50px; /* Tamaño del logo de registros */
-    height: auto;
+.icon-btn:hover { background: var(--bg); color: var(--text-dark); }
+.icon-btn.danger:hover { background: #FFEBEE; color: var(--danger); }
+.icon-btn.danger { color: var(--danger); }
+
+/* Estado vacío */
+.empty-users {
+    text-align: center;
+    padding: 36px 20px;
+    color: var(--text-soft);
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
 }
 
-.bottom-button i {
-    font-size: 24px;  /* Tamaño del icono */
+.empty-icon { font-size: 36px; margin-bottom: 12px; opacity: 0.35; }
+.empty-users p { font-size: 15px; font-weight: 600; margin-bottom: 4px; color: var(--text-mid); }
+.empty-users span { font-size: 13px; }
+
+/* ── BOTONES FINALES ── */
+.cfg-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding-top: 4px;
 }
 
-.bottom-button:hover {
-    background-color: #FF6600
+.btn-guardar {
+    width: 100%;
+    background: var(--color-primario);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 15px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+    box-shadow: 0 4px 14px rgba(251,175,51,0.35);
 }
 
-/* Ajustes responsivos para los botones */
-@media screen and (max-width: 480px) {
-    .bottom-button {
-        font-size: 18px;  /* Reducir tamaño de icono en pantallas pequeñas */
-        padding: 8px 10px;
-    }
+.btn-guardar:hover  { background: #e09a1f; }
+.btn-guardar:active { transform: scale(0.98); }
 
-    .bottom-button i {
-        font-size: 20px;
-    }
+.btn-restablecer {
+    width: 100%;
+    background: white;
+    color: var(--text-dark);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: background 0.2s, border-color 0.2s;
 }
 
+.btn-restablecer:hover {
+    background: var(--bg);
+    border-color: var(--text-mid);
+}
+
+/* ── MENÚ INFERIOR ── */
+.bottom-nav {
+    display: flex;
+    background: white;
+    border-top: 1px solid var(--border);
+    padding: 10px 0 14px;
+}
+
+.nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    text-decoration: none;
+    color: var(--text-soft);
+    font-size: 11px;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.nav-item i { font-size: 22px; }
+.nav-item.active { color: var(--color-primario); }
+.nav-item:not(.active):hover { color: var(--text-mid); }
+
+/* ── MODAL INVITACIÓN ── */
+.invite-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 999;
+    justify-content: center;
+    align-items: flex-end;
+}
+
+.invite-overlay.active { display: flex; }
+
+.invite-modal {
+    background: white;
+    width: 100%;
+    max-width: 430px;
+    border-radius: 20px 20px 0 0;
+    padding: 24px 20px 36px;
+    animation: slideUp 0.28s ease;
+}
+
+@keyframes slideUp {
+    from { transform: translateY(100%); }
+    to   { transform: translateY(0); }
+}
+
+.invite-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.invite-header h3 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--text-dark);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.invite-close {
+    background: var(--bg);
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--text-mid);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.invite-subtitle {
+    font-size: 13px;
+    color: var(--text-soft);
+    margin: 0 0 16px;
+}
+
+.email-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    align-items: center;
+}
+
+.email-input {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.email-input:focus { border-color: var(--color-primario); }
+
+.remove-email-btn {
+    background: #fee;
+    border: none;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    color: var(--danger);
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.add-email-btn {
+    width: 100%;
+    background: transparent;
+    border: 1.5px dashed var(--color-primario);
+    color: var(--color-primario);
+    border-radius: var(--radius-sm);
+    padding: 9px;
+    font-size: 13px;
+    cursor: pointer;
+    margin-bottom: 14px;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.add-email-btn:hover { background: #FFF8E1; }
+
+.send-invite-btn {
+    width: 100%;
+    background: var(--color-primario);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    padding: 13px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.send-invite-btn:hover    { background: #e09a1f; }
+.send-invite-btn:disabled { background: #ccc; cursor: not-allowed; }
+
+.invite-feedback {
+    margin-top: 12px;
+    font-size: 13px;
+    text-align: center;
+    min-height: 20px;
+}
+
+.invite-feedback.success { color: var(--success); }
+.invite-feedback.error   { color: var(--danger); }
+
+/* ── TOAST ── */
+.cfg-toast {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--text-dark);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+    opacity: 0;
+    transition: opacity 0.3s, transform 0.3s;
+    pointer-events: none;
+    z-index: 1000;
+    white-space: nowrap;
+}
+
+.cfg-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.cfg-toast.toast-error { background: var(--danger); }
+.cfg-toast.toast-ok    { background: #2E7D32; }
+
+.invite-field {
+    margin-bottom: 14px;
+}
+
+.invite-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-soft);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.invite-select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    color: var(--text-dark);
+    background: white;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23999' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+}
+
+.invite-select:focus { border-color: var(--color-primario); }
