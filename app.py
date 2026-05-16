@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, render_template, send_file, redirect,url_for, flash, jsonify
 import azure.cognitiveservices.speech as speechsdk
-from azure.storage.blob import BlobServiceClient,BlobClient,ContainerClient
+#from azure.storage.blob import BlobServiceClient,BlobClient,ContainerClient
 from werkzeug.utils import secure_filename
 import base64
 import io
@@ -11,7 +11,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from flask_cors import CORS
 from datetime import datetime
-from azure.storage.blob import ContentSettings
+#from azure.storage.blob import ContentSettings
 from dotenv import load_dotenv
 from office365.sharepoint.client_context import ClientContext
 from office365.runtime.auth.authentication_context import AuthenticationContext
