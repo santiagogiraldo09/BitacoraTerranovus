@@ -48,14 +48,18 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 SYNCHRO_FORM_DEFINITION_ID = 'e4bQKVghekuuA8Y6dmHKWHlOJyH5vilDm9vLfuTg2mg'
 
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+POSTGRES_CONFIG = DATABASE_URL
+
 # Configuración PostgreSQL
-POSTGRES_CONFIG = {
-    "host": "localhost",
-    "database": "Bitacora",
-    "user": "postgres",  # Normalmente 'postgres' por defecto
-    "password": "Daniel2030#",
-    "port": "5432"  # Puerto predeterminado de PostgreSQL
-}
+#POSTGRES_CONFIG = {
+    #"host": "localhost",
+    #"database": "Bitacora",
+    #"user": "postgres",  # Normalmente 'postgres' por defecto
+    #"password": "Daniel2030#",
+    #"port": "5432"  # Puerto predeterminado de PostgreSQL
+#}
 
 SYNCHRO_CONFIG = {
     'client_id': 'service-o5fkAjNrOy3DBriRDwK4aA3Ud',
@@ -123,7 +127,7 @@ def invitar_usuarios():
 
     conn = None
     try:
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        conn = psycopg2.connect(POSTGRES_CONFIG)
         cursor = conn.cursor()
 
         # Obtener datos del administrador y su empresa
@@ -487,7 +491,7 @@ def guardar_formulario():
 
 def create_user(nombre, apellido, email, password, cargo, rol, empresa):
     try:
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        conn = psycopg2.connect(POSTGRES_CONFIG)
         cursor = conn.cursor()
         
         hashed_password = generate_password_hash(password)
@@ -510,7 +514,7 @@ def create_user(nombre, apellido, email, password, cargo, rol, empresa):
 
 def verify_user(email, password):
     try:
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        conn = psycopg2.connect(POSTGRES_CONFIG)
         cursor = conn.cursor()
         
         cursor.execute(
@@ -537,7 +541,7 @@ def insert_registro_bitacora(respuestas, id_proyecto, fotos=None, videos=None):
     """
     conn = None  # Definimos conn aquí para asegurarnos de que exista en el bloque finally
     try:
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        conn = psycopg2.connect(POSTGRES_CONFIG)
         cursor = conn.cursor()
 
         # CAMBIO 1: Simplificamos el INSERT principal.
@@ -601,7 +605,7 @@ def insert_registro_bitacora(respuestas, id_proyecto, fotos=None, videos=None):
 
 def create_project(user_id, nombre, fecha_inicio, fecha_fin, director, ubicacion, coordenadas, cliente, numero_proyecto):
     try:
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        conn = psycopg2.connect(POSTGRES_CONFIG)
         #conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -624,7 +628,7 @@ def create_project(user_id, nombre, fecha_inicio, fecha_fin, director, ubicacion
 def get_user_projects(user_id):
     conn = None
     try:
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        conn = psycopg2.connect(POSTGRES_CONFIG)
         #conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -751,7 +755,7 @@ def paginaprincipal():
         return redirect(url_for('history')) # <--- AQUÍ ES DONDE TE ESTÁ MANDANDO
 
     try:
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        conn = psycopg2.connect(POSTGRES_CONFIG)
         cursor = conn.cursor()
         
         # ASEGÚRATE DE QUE ESTE QUERY USE LA TABLA NUEVA
@@ -806,14 +810,14 @@ def login():
     if user_id:
         # Aquí puedes implementar sesiones o JWT
         session['user_id'] = user_id #Establecer sesión
-        conn_rol = psycopg2.connect(**POSTGRES_CONFIG)
+        conn_rol = psycopg2.connect(POSTGRES_CONFIG)
         cursor_rol = conn_rol.cursor()
         cursor_rol.execute("SELECT rol FROM usuario WHERE user_id = %s", (user_id,))
         fila = cursor_rol.fetchone()
         session['user_rol'] = fila[0] if fila else 'viewer'
         conn_rol.close()
         try:
-            conn = psycopg2.connect(**POSTGRES_CONFIG)
+            conn = psycopg2.connect(POSTGRES_CONFIG)
             cursor = conn.cursor()
             cursor.execute("""
                 UPDATE usuario SET estado = 'activo' 
@@ -844,7 +848,7 @@ def index():
     
     if project_id:
         try:
-            conn = psycopg2.connect(**POSTGRES_CONFIG)
+            conn = psycopg2.connect(POSTGRES_CONFIG)
             cursor = conn.cursor()
             # Consultamos las columnas exactas de tu tabla según las imágenes
             cursor.execute("""
@@ -1167,7 +1171,7 @@ def usuario():
         return redirect(url_for('registros'))
     conn = None
     try:
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        conn = psycopg2.connect(POSTGRES_CONFIG)
         cursor = conn.cursor()
         
         # Usuarios del mismo tenant/organización
@@ -1206,7 +1210,7 @@ def historialregistro(id_proyecto):
     
     conn = None
     try:
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        conn = psycopg2.connect(POSTGRES_CONFIG)
         cursor = conn.cursor()
 
         # 1. Info del proyecto (Usar comillas dobles para la tabla)
@@ -1275,7 +1279,7 @@ def guardar_reporte_terranovus():
     data = request.json
     conn = None
     try:
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        conn = psycopg2.connect(POSTGRES_CONFIG)
         cursor = conn.cursor()
 
         # Extraer el ID del proyecto y del usuario
@@ -1332,7 +1336,7 @@ def add_project():
     if request.method == 'POST':
         try:
             data = request.json
-            conn = psycopg2.connect(**POSTGRES_CONFIG)
+            conn = psycopg2.connect(POSTGRES_CONFIG)
             cursor = conn.cursor()
             
             # Query ajustado a la tabla "proyectosVihesa" con sus 10 columnas
@@ -1386,7 +1390,7 @@ def guardar_inspeccion():
         if not project_id or not items:
             return jsonify({'success': False, 'error': 'Datos incompletos'}), 400
 
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        conn = psycopg2.connect(POSTGRES_CONFIG)
         cursor = conn.cursor()
 
         for item in items:
@@ -1435,7 +1439,7 @@ def guardar_registro():
         if not project_id or not items:
             return jsonify({"error": "Faltan datos requeridos."}), 400
 
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        conn = psycopg2.connect(POSTGRES_CONFIG)
         cursor = conn.cursor()
 
         # 1. Bucle principal para guardar cada ítem
@@ -1495,7 +1499,7 @@ def eliminar_usuario(user_id):
 
     conn = None
     try:
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        conn = psycopg2.connect(POSTGRES_CONFIG)
         cursor = conn.cursor()
 
         # Verificar que el usuario pertenece a la misma empresa
@@ -1530,7 +1534,7 @@ def eliminar_proyecto():
         return jsonify({'error': 'Falta el ID del proyecto'}), 400
 
     try:
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        conn = psycopg2.connect(POSTGRES_CONFIG)
         cursor = conn.cursor()
 
         # Asegurarse de que el proyecto pertenece al usuario
@@ -1624,7 +1628,7 @@ def exportar_registros_excel():
         return "No se seleccionaron registros ni proyecto", 400
 
     try:
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        conn = psycopg2.connect(POSTGRES_CONFIG)
         cursor = conn.cursor()
 
         if not registro_ids:
@@ -1713,7 +1717,7 @@ def exportar_proyectos_pdf():
     pdf.set_auto_page_break(auto=True, margin=15)
 
     try:
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        conn = psycopg2.connect(POSTGRES_CONFIG)
         cursor = conn.cursor()
 
         for pid in project_ids:
@@ -1865,7 +1869,7 @@ def tablero_bi():
     
     conn = None
     try:
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        conn = psycopg2.connect(POSTGRES_CONFIG)
         cursor = conn.cursor()
 
         # 1. Estadísticas Generales de Proyectos
@@ -1919,7 +1923,7 @@ def exportar_proyectos_excel():
         return "No se seleccionaron proyectos", 400
 
     try:
-        conn = psycopg2.connect(**POSTGRES_CONFIG)
+        conn = psycopg2.connect(POSTGRES_CONFIG)
         cursor = conn.cursor()
         wb = Workbook()
         wb.remove(wb.active)  # Eliminar hoja por defecto
