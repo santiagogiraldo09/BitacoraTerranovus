@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalle de Registro — Bitácora IAC</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='detalleRegistro.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="page-wrapper">
+
+    <!-- Header fijo -->
+    <header class="page-header">
+        <button class="btn-back" onclick="history.back()">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <span class="header-title">Detalle de Registro</span>
+    </header>
+
+    <!-- Contenido con scroll -->
+    <div class="content-scroll">
+
+        <!-- ID y fecha de actualización -->
+        <div class="meta-top">
+            <span class="registro-id">REG-{{ '%04d' | format(registro.id_registro) }}</span>
+            <span class="updated-at">
+                <i class="fas fa-clock"></i> {{ registro.created_at_texto | default('Sin fecha') }}
+            </span>
+        </div>
+
+        <!-- Título principal -->
+        <h1 class="actividad-title">{{ registro.actividad }}</h1>
+
+        <!-- Fecha y hora -->
+        <div class="fecha-hora">
+            <i class="fas fa-calendar-alt"></i>
+            <span>{{ registro.fecha }} {% if registro.hora %}· {{ registro.hora }}{% endif %}</span>
+        </div>
+
+        <!-- Datos clave -->
+        <div class="datos-row">
+            <div class="dato-item">
+                <span class="dato-label"><i class="fas fa-chart-line"></i> AVANCE</span>
+                <span class="dato-value">{{ registro.avance }}%</span>
+            </div>
+            <div class="dato-item">
+                <span class="dato-label"><i class="fas fa-user"></i> AUTOR</span>
+                <span class="dato-value">{{ registro.usuario_nombre | default('Sin asignar') }}</span>
+            </div>
+        </div>
+
+        <!-- Estado -->
+        <div class="estado-row">
+            <span class="estado-badge {{ registro.estado | lower | replace(' ', '-') }}">
+                {{ registro.estado }}
+            </span>
+        </div>
+
+        <!-- Descripción -->
+        {% if registro.descripcion %}
+        <div class="seccion">
+            <div class="seccion-header">
+                <i class="fas fa-file-alt seccion-icon"></i>
+                <h2 class="seccion-title">Descripción del Trabajo</h2>
+            </div>
+            <div class="descripcion-box">
+                <p>"{{ registro.descripcion }}"</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Galería -->
+        {% if registro.fotos %}
+        <div class="seccion">
+            <div class="seccion-header">
+                <i class="fas fa-images seccion-icon"></i>
+                <h2 class="seccion-title">Galería de Evidencia</h2>
+                <span class="fotos-count">{{ registro.fotos | length }} foto{% if registro.fotos | length != 1 %}s{% endif %}</span>
+            </div>
+            <div class="galeria-grid">
+                {% for foto in registro.fotos %}
+                <div class="foto-item" onclick="abrirFoto(this)">
+                    <img src="data:image/jpeg;base64,{{ foto.base64 }}"
+                         alt="{{ foto.desc | default('Foto de registro') }}"
+                         class="foto-img">
+                    {% if foto.desc %}
+                    <p class="foto-caption">{{ foto.desc }}</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Botones de acción -->
+        <div class="acciones">
+            <a href="/exportar-registro-pdf/{{ registro.id_registro }}" class="btn-descargar">
+                <i class="fas fa-download"></i> Descargar Registro (PDF)
+            </a>
+            <button class="btn-compartir" onclick="compartir()">
+                <i class="fas fa-share-alt"></i> Compartir con el Equipo
+            </button>
+        </div>
+
+    </div>
+
+    <!-- Nav inferior -->
+    <nav class="bottom-nav">
+        <a href="{{ url_for('registros') }}" class="bottom-nav-item">
+            <i class="fas fa-folder-open"></i>
+            <span>Proyectos</span>
+        </a>
+        <a href="{{ url_for('history') }}" class="bottom-nav-item active">
+            <i class="fas fa-history"></i>
+            <span>Informes</span>
+        </a>
+        <a href="#" class="bottom-nav-item">
+            <i class="fas fa-user"></i>
+            <span>Perfil</span>
+        </a>
+    </nav>
+
+</div>
+
+<!-- Lightbox para fotos -->
+<div class="lightbox" id="lightbox" onclick="cerrarFoto()">
+    <img id="lightbox-img" src="" alt="">
+</div>
+
+<script>
+    function abrirFoto(el) {
+        const img = el.querySelector('img');
+        document.getElementById('lightbox-img').src = img.src;
+        document.getElementById('lightbox').classList.add('active');
+    }
+
+    function cerrarFoto() {
+        document.getElementById('lightbox').classList.remove('active');
+    }
+
+    function compartir() {
+        if (navigator.share) {
+            navigator.share({
+                title: '{{ registro.actividad }}',
+                text: 'Registro de bitácora: {{ registro.actividad }}',
+                url: window.location.href
+            });
+        } else {
+            navigator.clipboard.writeText(window.location.href);
+            alert('Enlace copiado al portapapeles');
+        }
+    }
+</script>
+</body>
+</html>

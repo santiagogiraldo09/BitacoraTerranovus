@@ -57,7 +57,7 @@
                      data-fecha="{{ registro.fecha }}"
                      data-autor="{{ registro.usuario_id | default('') }}">
 
-                    <div class="card-top">
+                    <div class="card-top" onclick="window.location.href='/detalleRegistro/{{ registro.id_registro }}'" style="cursor:pointer;">
                         <h3 class="card-activity">{{ registro.actividad }}</h3>
                         <i class="fas fa-chevron-right card-arrow"></i>
                     </div>

@@ -1277,6 +1277,91 @@ def historialregistro(id_proyecto):
     finally:
         if conn: conn.close()
 
+@app.route('/detalleRegistro/<int:id_registro>')
+def detalleRegistro(id_registro):
+    if 'user_id' not in session:
+        return redirect(url_for('principalscreen'))
+ 
+    conn = None
+    try:
+        conn = psycopg2.connect(POSTGRES_CONFIG)
+        cursor = conn.cursor()
+ 
+        # Traer el registro con datos del usuario
+        cursor.execute("""
+            SELECT 
+                r.id_registro,
+                r.actividad,
+                r.descripcion_actividad,
+                r.estado,
+                r.porcentaje_avance,
+                r.fecha,
+                r.created_at,
+                u.name,
+                u.apellido,
+                u.cargo
+            FROM registrosbitacoraterranovus r
+            LEFT JOIN usuario u ON u.user_id = r.user_id
+            WHERE r.id_registro = %s
+        """, (id_registro,))
+ 
+        row = cursor.fetchone()
+ 
+        if not row:
+            return redirect(url_for('registros'))
+ 
+        # Extraer hora de created_at
+        created_at = row[6]
+        hora = created_at.strftime('%I:%M %p') if created_at else None
+        created_at_texto = created_at.strftime('%d %b %Y - %H:%M') if created_at else None
+ 
+        # Iniciales del usuario
+        nombre  = row[7] or ''
+        apellido = row[8] or ''
+        iniciales = (nombre[0] + apellido[0]).upper() if nombre and apellido else '??'
+ 
+        registro = {
+            'id_registro':      row[0],
+            'actividad':        row[1],
+            'descripcion':      row[2],
+            'estado':           row[3] or 'Sin estado',
+            'avance':           row[4] or 0,
+            'fecha':            row[5].strftime('%d %b %Y') if row[5] else '',
+            'hora':             hora,
+            'created_at_texto': created_at_texto,
+            'usuario_nombre':   f"{nombre} {apellido}".strip() or 'Sin asignar',
+            'usuario_cargo':    row[9] or '',
+            'usuario_iniciales': iniciales,
+            'fotos':            []
+        }
+ 
+        # Traer fotos del registro
+        cursor.execute("""
+            SELECT imagen_base64, description
+            FROM fotos_registro_terranovus
+            WHERE id_registro = %s
+        """, (id_registro,))
+ 
+        for foto_row in cursor.fetchall():
+            if foto_row[0]:
+                # Limpiar el prefijo si viene con data:image/...;base64,
+                base64_data = foto_row[0]
+                if ',' in base64_data:
+                    base64_data = base64_data.split(',')[1]
+                registro['fotos'].append({
+                    'base64': base64_data,
+                    'desc':   foto_row[1] or ''
+                })
+ 
+        return render_template('detalleRegistro.html', registro=registro)
+ 
+    except Exception as e:
+        print(f"Error en detalleRegistro: {e}")
+        return redirect(url_for('registros'))
+    finally:
+        if conn:
+            conn.close()
+
 @app.route('/disciplinerecords')
 def disciplinerecords():
     return render_template('disciplinerecords.html')
