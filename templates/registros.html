@@ -3,113 +3,204 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pantalla de Registros</title>
+    <title>Proyectos — Bitácora IAC</title>
     <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
     <link rel="stylesheet" href="{{ url_for('static', filename='registros.css') }}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">  
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!-- Contenedor principal -->
-    <div class="main-container">
-        
-        <!-- Espacio para el logo -->
-        <div class="logo-container">
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo de la empresa" class="logo">
-        </div>
 
-        <!-- Texto de introducción -->
-        <div class="intro-text">
-            <h2>Lista de Proyectos</h2>
-        </div>
+    <!-- ===== LAYOUT PRINCIPAL ===== -->
+    <div class="app-layout">
 
-        <!-- Botón para agregar nuevo proyecto -->
-        <div class="add-project-container">
-            <button class="add-project-button" onclick="redirectToAddProject()">Agregar Nuevo Proyecto</button>
-        </div>
+        <!-- SIDEBAR (solo desktop) -->
+        <aside class="sidebar">
+            <div class="sidebar-logo">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="IAC Logo" class="sidebar-logo-img">
+            </div>
 
-        <!-- Lista de proyectos como botones con scroll-->
-        <div class="records-container">
-            {% if db_projects %}
-                {% for proyecto in db_projects %}
-                <button class="record-button" onclick="redirectToProjectDetails('{{ proyecto.name }}', '{{ proyecto.id_proyecto }}')">
-                    <div class="project-info" style="display: flex; flex-direction: column; text-align: left; flex-grow: 1;">
-                        <span class="project-name" style="font-weight: bold; font-size: 1.1em; margin-bottom: 2px;">
-                            {{ proyecto.name }}
-                        </span>
-                        <span class="project-client" style="color: #555; font-size: 0.9em; margin-bottom: 2px;">
-                            Cliente: {{ proyecto.cliente }}
-                        </span>
-                        <span class="project-date" style="color: #888; font-size: 0.85em;">
-                            Inicio: {{ proyecto.fecha_inicio }}
-                        </span>
+            <nav class="sidebar-nav">
+                <a href="{{ url_for('registros') }}" class="nav-item active">
+                    <i class="fas fa-folder-open"></i>
+                    <span>Proyectos</span>
+                </a>
+                <a href="{{ url_for('history') }}" class="nav-item">
+                    <i class="fas fa-history"></i>
+                    <span>Historial</span>
+                </a>
+                {% if session.get('user_rol') == 'admin' %}
+                <a href="{{ url_for('usuario') }}" class="nav-item">
+                    <i class="fas fa-users"></i>
+                    <span>Usuarios</span>
+                </a>
+                {% endif %}
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="sidebar-user">
+                    <div class="user-avatar">
+                        <i class="fas fa-user"></i>
                     </div>
-                    
-                </button>
-                {% endfor %}
-            {% else %}
-                <p>No se encontraron proyectos.</p>
-            {% endif %}
-        </div>
+                    <div class="user-info">
+                        <span class="user-name">{{ session.get('user_name', 'Usuario') }}</span>
+                        <span class="user-role">{{ session.get('user_rol', '') }}</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
 
-        <!-- Menú inferior (ahora fijo)-->
-        <div class="bottom-menu">
-            <a href="{{ url_for('history') }}" class="bottom-button"><i class="fas fa-history"></i></a>
-            <!--<a href="{{ url_for('registros') }}" class="bottom-button"><i class="fas fa-home"></i></a>-->
-            <!--<button class="bottom-button"><i class="fas fa-user"></i></button>-->
-            <button class="bottom-button" onclick="abrirInviteModal()">
-                <i class="fas fa-plus"></i>
-            </button>
+        <!-- ÁREA PRINCIPAL -->
+        <main class="main-content">
 
-            {% if session.get('user_rol') == 'admin' %}
-            <a href="{{ url_for('usuario') }}" class="bottom-button">
-                <i class="fas fa-user"></i>
-            </a>
-            {% endif %}
-        </div>
-        
+            <!-- Header móvil -->
+            <div class="mobile-header">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="IAC" class="mobile-logo">
+                <span class="mobile-title">Proyectos</span>
+            </div>
+
+            <!-- Barra de búsqueda -->
+            <div class="search-bar-container">
+                <i class="fas fa-search search-icon"></i>
+                <input
+                    type="text"
+                    id="searchInput"
+                    class="search-input"
+                    placeholder="Buscar proyecto..."
+                    oninput="filtrarProyectos()"
+                >
+            </div>
+
+            <!-- Tabs de filtro -->
+            <div class="filter-tabs">
+                <button class="tab active" onclick="filtrarTab(this, 'todos')">Todos</button>
+                <button class="tab" onclick="filtrarTab(this, 'activo')">Activos</button>
+                <button class="tab" onclick="filtrarTab(this, 'pausa')">Pausa</button>
+                <button class="tab" onclick="filtrarTab(this, 'finalizado')">Hechos</button>
+            </div>
+
+            <!-- Contador de resultados -->
+            <div class="results-header">
+                <span class="results-count" id="resultsCount">
+                    RESULTADOS ({{ db_projects | length }})
+                </span>
+                <a href="{{ url_for('history') }}" class="ver-todos">Ver todos</a>
+            </div>
+
+            <!-- Grilla de proyectos -->
+            <div class="projects-grid" id="projectsGrid">
+                {% if db_projects %}
+                    {% for proyecto in db_projects %}
+                    <div class="project-card"
+                         data-name="{{ proyecto.name | lower }}"
+                         data-estado="{{ proyecto.estado | default('activo') | lower }}"
+                         onclick="redirectToProjectDetails('{{ proyecto.name }}', '{{ proyecto.id_proyecto }}')">
+
+                        <div class="card-top">
+                            <h3 class="card-title">{{ proyecto.name }}</h3>
+                            <span class="status-badge {{ proyecto.estado | default('activo') | lower | replace(' ', '-') }}">
+                                {{ proyecto.estado | default('En Curso') }}
+                            </span>
+                        </div>
+
+                        <p class="card-client">
+                            <i class="fas fa-building"></i>
+                            {{ proyecto.cliente }}
+                        </p>
+
+                        <div class="card-meta">
+                            <div class="meta-item">
+                                <i class="fas fa-calendar-alt"></i>
+                                <div>
+                                    <span class="meta-label">INICIO</span>
+                                    <span class="meta-value">{{ proyecto.fecha_inicio }}</span>
+                                </div>
+                            </div>
+                            <div class="meta-item">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <div>
+                                    <span class="meta-label">UBICACIÓN</span>
+                                    <span class="meta-value">{{ proyecto.ubicacion | default('—') }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="card-footer">
+                            <span class="ver-detalles">Ver Detalles <i class="fas fa-chevron-right"></i></span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="empty-state">
+                        <i class="fas fa-folder-open"></i>
+                        <p>No se encontraron proyectos.</p>
+                        <button onclick="redirectToAddProject()" class="btn-empty">Crear primer proyecto</button>
+                    </div>
+                {% endif %}
+            </div>
+
+        </main>
     </div>
+
+    <!-- FAB — Botón flotante agregar -->
+    <button class="fab-button" onclick="redirectToAddProject()" title="Agregar proyecto">
+        <i class="fas fa-plus"></i>
+    </button>
+
+    <!-- Nav inferior (solo móvil) -->
+    <nav class="bottom-nav">
+        <a href="{{ url_for('registros') }}" class="bottom-nav-item active">
+            <i class="fas fa-folder-open"></i>
+            <span>Proyectos</span>
+        </a>
+        <button class="bottom-nav-item" onclick="abrirInviteModal()">
+            <i class="fas fa-user-plus"></i>
+            <span>Invitar</span>
+        </button>
+        {% if session.get('user_rol') == 'admin' %}
+        <a href="{{ url_for('usuario') }}" class="bottom-nav-item">
+            <i class="fas fa-users"></i>
+            <span>Usuarios</span>
+        </a>
+        {% endif %}
+        <a href="{{ url_for('history') }}" class="bottom-nav-item">
+            <i class="fas fa-history"></i>
+            <span>Historial</span>
+        </a>
+    </nav>
 
     <!-- ===== MODAL: INVITAR USUARIOS ===== -->
     <div class="invite-overlay" id="invite-overlay">
         <div class="invite-modal">
-
             <div class="invite-header">
                 <h3><i class="fas fa-user-plus"></i> Invitar Usuarios</h3>
                 <button class="invite-close" onclick="cerrarInviteModal()">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-
             <p class="invite-subtitle">
                 Agrega los correos de las personas que deseas invitar a tu espacio de trabajo.
             </p>
-
             <div id="email-list">
                 <div class="email-row" id="email-row-1">
-                    <input type="email" class="email-input" 
-                        placeholder="correo@ejemplo.com" id="email-1">
-                    <button class="remove-email-btn" id="remove-btn-1" 
-                            onclick="eliminarCorreo(1)" style="display:none">
+                    <input type="email" class="email-input" placeholder="correo@ejemplo.com" id="email-1">
+                    <button class="remove-email-btn" id="remove-btn-1" onclick="eliminarCorreo(1)" style="display:none">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
             </div>
-
             <button class="add-email-btn" onclick="agregarCorreo()">
                 <i class="fas fa-plus"></i> Agregar otro correo
             </button>
-
             <button class="send-invite-btn" id="send-invite-btn" onclick="enviarInvitaciones()">
                 <i class="fas fa-paper-plane"></i> Enviar invitación
             </button>
-
             <div class="invite-feedback" id="invite-feedback"></div>
         </div>
     </div>
 
-
     <script>
-
         // ===== NAVEGACIÓN =====
         function redirectToAddProject() {
             window.location.href = "{{ url_for('add_project') }}";
@@ -117,6 +208,37 @@
 
         function redirectToProjectDetails(projectName, projectId) {
             window.location.href = `/paginaprincipal?project_id=${projectId}&project=${encodeURIComponent(projectName)}?id=${encodeURIComponent(projectId)}`;
+        }
+
+        // ===== BÚSQUEDA =====
+        function filtrarProyectos() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const cards = document.querySelectorAll('.project-card');
+            let visibles = 0;
+            cards.forEach(card => {
+                const nombre = card.dataset.name || '';
+                const visible = nombre.includes(query);
+                card.style.display = visible ? '' : 'none';
+                if (visible) visibles++;
+            });
+            document.getElementById('resultsCount').textContent = `RESULTADOS (${visibles})`;
+        }
+
+        // ===== FILTRO POR TABS =====
+        let tabActivo = 'todos';
+        function filtrarTab(btn, estado) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            tabActivo = estado;
+            const cards = document.querySelectorAll('.project-card');
+            let visibles = 0;
+            cards.forEach(card => {
+                const cardEstado = card.dataset.estado || 'activo';
+                const visible = estado === 'todos' || cardEstado.includes(estado);
+                card.style.display = visible ? '' : 'none';
+                if (visible) visibles++;
+            });
+            document.getElementById('resultsCount').textContent = `RESULTADOS (${visibles})`;
         }
 
         // ===== MODAL INVITACIÓN =====
@@ -134,8 +256,7 @@
         function limpiarModal() {
             document.getElementById('email-list').innerHTML = `
                 <div class="email-row" id="email-row-1">
-                    <input type="email" class="email-input" 
-                        placeholder="correo@ejemplo.com" id="email-1">
+                    <input type="email" class="email-input" placeholder="correo@ejemplo.com" id="email-1">
                     <button class="remove-email-btn" onclick="eliminarCorreo(1)" style="display:none">
                         <i class="fas fa-times"></i>
                     </button>
@@ -153,25 +274,19 @@
             row.className = 'email-row';
             row.id = `email-row-${emailCounter}`;
             row.innerHTML = `
-                <input type="email" class="email-input" 
-                    placeholder="correo@ejemplo.com" id="email-${emailCounter}">
+                <input type="email" class="email-input" placeholder="correo@ejemplo.com" id="email-${emailCounter}">
                 <button class="remove-email-btn" onclick="eliminarCorreo(${emailCounter})">
                     <i class="fas fa-times"></i>
                 </button>`;
             lista.appendChild(row);
-            // Mostrar X en la primera fila cuando hay más de una
             document.querySelector('#email-row-1 .remove-email-btn').style.display = 'flex';
-            // Focus en el nuevo campo
             document.getElementById(`email-${emailCounter}`).focus();
         }
 
         function eliminarCorreo(id) {
             document.getElementById(`email-row-${id}`)?.remove();
-            // Ocultar X del primero si solo queda uno
             const rows = document.querySelectorAll('.email-row');
-            if (rows.length === 1) {
-                rows[0].querySelector('.remove-email-btn').style.display = 'none';
-            }
+            if (rows.length === 1) rows[0].querySelector('.remove-email-btn').style.display = 'none';
         }
 
         async function enviarInvitaciones() {
@@ -181,11 +296,10 @@
             const btn     = document.getElementById('send-invite-btn');
 
             if (correos.length === 0) {
-                fb.textContent  = 'Por favor ingresa al menos un correo.';
-                fb.className    = 'invite-feedback error';
+                fb.textContent = 'Por favor ingresa al menos un correo.';
+                fb.className   = 'invite-feedback error';
                 return;
             }
-
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             const invalido   = correos.find(c => !emailRegex.test(c));
             if (invalido) {
@@ -193,11 +307,9 @@
                 fb.className   = 'invite-feedback error';
                 return;
             }
-
-            btn.disabled   = true;
-            btn.innerHTML  = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+            btn.disabled  = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
             fb.textContent = '';
-
             try {
                 const res  = await fetch('/invitar-usuarios', {
                     method:  'POST',
@@ -205,7 +317,6 @@
                     body:    JSON.stringify({ correos })
                 });
                 const data = await res.json();
-
                 if (data.success) {
                     fb.textContent = `✅ Invitación enviada a ${correos.length} usuario(s).`;
                     fb.className   = 'invite-feedback success';
@@ -223,11 +334,9 @@
             }
         }
 
-        // Cerrar modal al tocar el fondo oscuro
         document.getElementById('invite-overlay').addEventListener('click', function(e) {
             if (e.target === this) cerrarInviteModal();
         });
-
     </script>
 </body>
 </html>
