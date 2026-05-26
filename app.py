@@ -1375,23 +1375,22 @@ def detalleRegistro(id_registro):
  
         # Traer fotos del registro
         cursor.execute("""
-            SELECT imagen_base64, description
+            SELECT imagen_url, imagen_base64, description
             FROM fotos_registro_terranovus
             WHERE id_registro = %s
         """, (id_registro,))
- 
+
         for foto_row in cursor.fetchall():
-            if foto_row[0]:
-                # Limpiar el prefijo si viene con data:image/...;base64,
-                base64_data = foto_row[0]
-                #if ',' in base64_data:
-                    #base64_data = base64_data.split(',')[1]
-                registro['fotos'].append({
-                    'base64': base64_data,
-                    'desc':   foto_row[1] or ''
-                })
- 
-        return render_template('detalleRegistro.html', registro=registro)
+            imagen_url   = foto_row[0]
+            imagen_base64 = foto_row[1]
+            desc         = foto_row[2] or ''
+
+            if imagen_url:
+                registro['fotos'].append({'url': imagen_url, 'desc': desc})
+            elif imagen_base64:
+                registro['fotos'].append({'url': imagen_base64, 'desc': desc})
+        
+                return render_template('detalleRegistro.html', registro=registro)
  
     except Exception as e:
         print(f"Error en detalleRegistro: {e}")
