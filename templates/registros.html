@@ -94,13 +94,13 @@
                     {% for proyecto in db_projects %}
                     <div class="project-card"
                          data-name="{{ proyecto.name | lower }}"
-                         data-estado="{{ proyecto.estado | default('activo') | lower }}"
+                         data-estado="{{ proyecto.estado | lower }}"
                          onclick="redirectToProjectDetails('{{ proyecto.name }}', '{{ proyecto.id_proyecto }}')">
 
                         <div class="card-top">
                             <h3 class="card-title">{{ proyecto.name }}</h3>
-                            <span class="status-badge {{ proyecto.estado | default('activo') | lower | replace(' ', '-') }}">
-                                {{ proyecto.estado | default('En Curso') }}
+                            <span class="status-badge {{ proyecto.estado | lower | replace(' ', '-') }}">
+                                {{ proyecto.estado }}
                             </span>
                         </div>
 
@@ -118,10 +118,10 @@
                                 </div>
                             </div>
                             <div class="meta-item">
-                                <i class="fas fa-map-marker-alt"></i>
+                                <i class="fas fa-clipboard-list"></i>
                                 <div>
-                                    <span class="meta-label">UBICACIÓN</span>
-                                    <span class="meta-value">{{ proyecto.ubicacion | default('—') }}</span>
+                                    <span class="meta-label">REGISTROS</span>
+                                    <span class="meta-value">{{ proyecto.total_registros }} entradas</span>
                                 </div>
                             </div>
                         </div>

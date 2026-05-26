@@ -629,24 +629,37 @@ def get_user_projects(user_id):
     conn = None
     try:
         conn = psycopg2.connect(POSTGRES_CONFIG)
-        #conn = get_db_connection()
         cursor = conn.cursor()
         
         cursor.execute(
-            """SELECT id_proyecto, nombre_proyecto, fecha_inicio, cliente, user_id 
-               FROM proyectosTerranovus WHERE user_id = %s ORDER BY fecha_inicio DESC""",
+            """SELECT 
+                p.id_proyecto, 
+                p.nombre_proyecto, 
+                p.fecha_inicio, 
+                p.cliente, 
+                p.user_id,
+                p.estado,
+                COUNT(r.id_registro) as total_registros
+               FROM proyectosTerranovus p
+               LEFT JOIN registrosbitacoraterranovus r 
+                   ON r.id_proyecto = p.id_proyecto
+               WHERE p.user_id = %s 
+               GROUP BY p.id_proyecto, p.nombre_proyecto, 
+                        p.fecha_inicio, p.cliente, p.user_id, p.estado
+               ORDER BY p.fecha_inicio DESC""",
             (user_id,)
         )
         
         projects = []
         for row in cursor.fetchall():
             projects.append({
-                'id_proyecto': row[0],
-                'name': row[1],
-                'fecha_inicio': row[2].strftime('%Y-%m-%d'),
-                'cliente': row[3],
-                'user_id': row[4],
-
+                'id_proyecto':      row[0],
+                'name':             row[1],
+                'fecha_inicio':     row[2].strftime('%Y-%m-%d'),
+                'cliente':          row[3],
+                'user_id':          row[4],
+                'estado':           row[5] or 'En Curso',
+                'total_registros':  row[6],
             })
         
         return projects
