@@ -3,70 +3,166 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registrar Proyecto</title>
+    <title>Nuevo Proyecto — Bitácora IAC</title>
     <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
     <link rel="stylesheet" href="{{ url_for('static', filename='addproject.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="main-container">
-        <div class="logo-container">
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo Vihesa" class="logo">
-        </div>
 
-        <div class="form-header">
-            <h2>Registrar Proyecto</h2>
-        </div>
+    <div class="page-wrapper">
 
-        <div class="form-container">
-            <form id="project-form" class="project-form">
-                
-                <label for="cliente">Cliente:</label>
-                <input type="text" id="cliente" name="cliente" required placeholder="Nombre del cliente">
+        <!-- Header -->
+        <header class="page-header">
+            <button class="btn-back" onclick="window.location.href='/registros'">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <span class="page-title">Nuevo Proyecto</span>
+        </header>
 
-                <label for="contratista">Contratista:</label>
-                <input type="text" id="contratista" name="contratista" required placeholder="Nombre del contratista">
+        <!-- Formulario con scroll -->
+        <div class="form-scroll">
+            <form id="project-form">
 
-                <label for="orden-trabajo">Orden de Trabajo:</label>
-                <input type="text" id="orden-trabajo" name="orden-trabajo" required placeholder="Ej: OT-2026-001">
+                <!-- ── Sección 1: Identificación ── -->
+                <div class="section">
+                    <div class="section-header">
+                        <span class="section-icon" style="background:#fff8ee; color:#FFAF33;">
+                            <i class="fas fa-tag"></i>
+                        </span>
+                        <h3 class="section-title">Identificación</h3>
+                    </div>
 
-                <label for="project-name">Nombre del Proyecto:</label>
-                <input type="text" id="project-name" name="project-name" required placeholder="Ingrese nombre del proyecto">
+                    <div class="field-group">
+                        <label for="project-name">Nombre del proyecto</label>
+                        <input type="text" id="project-name" name="project-name" required
+                               placeholder="Ej. Mantenimiento Planta Norte">
+                    </div>
 
-                <label for="start-date">Fecha de Inicio:</label>
-                <input type="date" id="start-date" name="start-date" required>
+                    <div class="field-group">
+                        <label for="cliente">Cliente</label>
+                        <input type="text" id="cliente" name="cliente" required
+                               placeholder="Nombre del cliente">
+                    </div>
 
-                <label for="end-date">Fecha de Fin:</label>
-                <input type="date" id="end-date" name="end-date" required>
+                    <div class="field-group">
+                        <label for="contratista">Contratista</label>
+                        <input type="text" id="contratista" name="contratista" required
+                               placeholder="Nombre del contratista">
+                    </div>
 
-                <label for="location">Ubicación / Municipio:</label>
-                <input type="text" id="location" name="location" required placeholder="Ej: Medellín, Antioquia">
+                    <div class="field-group">
+                        <label for="orden-trabajo">Orden de Trabajo</label>
+                        <input type="text" id="orden-trabajo" name="orden-trabajo" required
+                               placeholder="Ej: OT-2026-001">
+                    </div>
 
-                <div class="form-actions" style="margin-top: 30px;">
-                    <button type="button" onclick="saveProject(event)" class="save-button">
-                        <i class="fas fa-save"></i> Guardar Proyecto
-                    </button>
-                    <button type="button" onclick="window.location.href='/registros'" class="cancel-button">
-                        <i class="fas fa-times"></i> Cancelar
-                    </button>
+                    <div class="field-group">
+                        <label for="location">Ubicación / Municipio</label>
+                        <input type="text" id="location" name="location" required
+                               placeholder="Ej: Medellín, Antioquia">
+                    </div>
                 </div>
+
+                <!-- ── Sección 2: Cronograma ── -->
+                <div class="section">
+                    <div class="section-header">
+                        <span class="section-icon" style="background:#fff8ee; color:#FFAF33;">
+                            <i class="fas fa-calendar-alt"></i>
+                        </span>
+                        <h3 class="section-title">Cronograma</h3>
+                    </div>
+
+                    <div class="date-row">
+                        <div class="field-group">
+                            <label for="start-date">Fecha de inicio</label>
+                            <input type="date" id="start-date" name="start-date" required>
+                        </div>
+                        <div class="field-group">
+                            <label for="end-date">Fecha de fin</label>
+                            <input type="date" id="end-date" name="end-date" required>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Sección 3: Equipo ── -->
+                <div class="section">
+                    <div class="section-header">
+                        <span class="section-icon" style="background:#fff8ee; color:#FFAF33;">
+                            <i class="fas fa-users"></i>
+                        </span>
+                        <h3 class="section-title">Responsable / Equipo</h3>
+                    </div>
+
+                    <p class="section-hint">Selecciona los miembros que participarán en este proyecto.</p>
+
+                    <div class="team-list" id="team-list">
+                        {% if usuarios %}
+                            {% for u in usuarios %}
+                            <div class="team-member" onclick="toggleMember(this, {{ u.user_id }})"
+                                 data-id="{{ u.user_id }}">
+                                <div class="member-avatar">
+                                    {{ u.name[0] | upper }}{{ u.apellido[0] | upper }}
+                                </div>
+                                <div class="member-info">
+                                    <span class="member-name">{{ u.name }} {{ u.apellido }}</span>
+                                    <span class="member-role">{{ u.cargo }}</span>
+                                </div>
+                                <div class="member-check">
+                                    <i class="fas fa-check"></i>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="no-users">No hay usuarios disponibles para asignar.</p>
+                        {% endif %}
+                    </div>
+                </div>
+
             </form>
         </div>
+
+        <!-- Botones fijos abajo -->
+        <div class="bottom-actions">
+            <button type="button" onclick="saveProject()" class="btn-guardar">
+                Guardar proyecto
+            </button>
+            <button type="button" onclick="window.location.href='/registros'" class="btn-cancelar">
+                Cancelar
+            </button>
+        </div>
+
     </div>
 
     <script>
-        async function saveProject(event) {
-            if (event) event.preventDefault();
-            
+        // ── Toggle selección de miembro ──
+        const selectedMembers = new Set();
+
+        function toggleMember(el, userId) {
+            if (selectedMembers.has(userId)) {
+                selectedMembers.delete(userId);
+                el.classList.remove('selected');
+            } else {
+                selectedMembers.add(userId);
+                el.classList.add('selected');
+            }
+        }
+
+        // ── Guardar proyecto ──
+        async function saveProject() {
             const form = document.getElementById('project-form');
             const formData = new FormData(form);
             const data = {};
-            
             formData.forEach((value, key) => { data[key] = value; });
 
-            // Validación mínima
+            // Agregar miembros seleccionados
+            data['miembros'] = Array.from(selectedMembers);
+
+            // Validación
             if (!data['project-name'] || !data['cliente'] || !data['location']) {
-                alert("Por favor, complete los campos obligatorios (Nombre, Cliente y Ubicación).");
+                alert("Por favor, completa los campos obligatorios: Nombre, Cliente y Ubicación.");
                 return;
             }
 

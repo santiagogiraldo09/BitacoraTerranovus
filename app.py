@@ -1352,7 +1352,6 @@ def add_project():
             conn = psycopg2.connect(POSTGRES_CONFIG)
             cursor = conn.cursor()
             
-            # Query ajustado a la tabla "proyectosVihesa" con sus 10 columnas
             cursor.execute("""
                 INSERT INTO proyectosTerranovus (
                     nombre_proyecto, fecha_inicio, fecha_fin, cliente, contratista, 
@@ -1370,13 +1369,36 @@ def add_project():
             cursor.close()
             conn.close()
             
-            return jsonify({"status": "success", "message": f"Proyecto registrado exitosamente"}), 201
+            return jsonify({"status": "success", "message": "Proyecto registrado exitosamente"}), 201
             
         except Exception as e:
             print(f"Error en BD: {str(e)}")
             return jsonify({"status": "error", "error": str(e)}), 500
 
-    return render_template('addproject.html')
+    # GET — cargar usuarios disponibles para mostrar en el equipo
+    usuarios = []
+    try:
+        conn = psycopg2.connect(POSTGRES_CONFIG)
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT user_id, name, apellido, cargo 
+            FROM usuario 
+            WHERE estado = 'activo'
+            ORDER BY name ASC
+        """)
+        for row in cursor.fetchall():
+            usuarios.append({
+                'user_id':  row[0],
+                'name':     row[1],
+                'apellido': row[2],
+                'cargo':    row[3] or 'Sin cargo'
+            })
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        print(f"Error al cargar usuarios: {e}")
+
+    return render_template('addproject.html', usuarios=usuarios)
 
 
 @app.route('/ask', methods=['POST'])
