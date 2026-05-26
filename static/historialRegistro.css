@@ -35,13 +35,15 @@ button { font-family: inherit; cursor: pointer; border: none; }
 
 /* Header */
 .page-header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 100;
     display: flex;
     align-items: center;
     gap: 14px;
     padding: 16px 20px;
     background: var(--blanco);
     border-bottom: 1px solid var(--gris-borde);
-    flex-shrink: 0;
 }
 
 .btn-back {
@@ -63,7 +65,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
 .content-scroll {
     flex: 1;
     overflow-y: auto;
-    padding: 20px 16px 100px;
+    padding: 80px 16px 120px;
     display: flex;
     flex-direction: column;
     gap: 16px;
@@ -223,11 +225,15 @@ button { font-family: inherit; cursor: pointer; border: none; }
 
 /* Bottom nav */
 .bottom-nav {
-    display: none; position: fixed;
+    display: flex;
+    position: fixed;
     bottom: 0; left: 0; right: 0;
-    background: var(--blanco); border-top: 1px solid var(--gris-borde);
+    background: var(--blanco);
+    border-top: 1px solid var(--gris-borde);
     padding: 8px 0 12px;
-    justify-content: space-around; align-items: center; z-index: 150;
+    justify-content: space-around;
+    align-items: center;
+    z-index: 150;
 }
 .bottom-nav-item {
     display: flex; flex-direction: column; align-items: center; gap: 4px;
