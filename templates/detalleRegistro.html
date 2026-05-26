@@ -85,7 +85,7 @@
             <div class="galeria-grid">
                 {% for foto in registro.fotos %}
                 <div class="foto-item" onclick="abrirFoto(this)">
-                    <img src="data:image/jpeg;base64,{{ foto.base64 }}"
+                    <img src="{{ foto.base64 }}"
                          alt="{{ foto.desc | default('Foto de registro') }}"
                          class="foto-img">
                     {% if foto.desc %}
