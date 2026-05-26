@@ -1,115 +1,247 @@
-/* Configuración general de la pantalla */
+/* ─── Variables ─────────────────────────────────────────────── */
+:root {
+    --naranja:      #FFAF33;
+    --naranja-dark: #e89e28;
+    --gris-fondo:   #f3f4f6;
+    --gris-borde:   #d1d5db;
+    --gris-texto:   #6b7280;
+    --texto:        #1a1a1a;
+    --blanco:       #ffffff;
+    --radio:        12px;
+    --sombra:       0 8px 32px rgba(0,0,0,0.10);
+}
+
+/* ─── Reset ──────────────────────────────────────────────────── */
+*, *::before, *::after {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* ─── Body ───────────────────────────────────────────────────── */
 body, html {
-  margin: 0;
-  /*padding: 0;*/
-  font-family: Arial, sans-serif;
-  background-color: #f0f0f0;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100%;
+    height: 100%;
+    font-family: 'DM Sans', sans-serif;
+    background-color: var(--gris-fondo);
+    color: var(--texto);
 }
 
-/* Contenedor principal, que se adapta al tamaño de la pantalla */
-.main-container {
-  width: 100%;
-  max-width: 400px; /* Ajusta el ancho máximo para pantallas pequeñas */
-  height: 100vh;
-  height: auto; /* Deja que la altura se ajuste automáticamente */
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  background-color: #ffffff;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  border-radius: 10px; /* Bordes redondeados */
-  padding: 20px; /* Espaciado interno */
+/* ─── Wrapper ────────────────────────────────────────────────── */
+.page-wrapper {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 24px 16px 12px;
+    gap: 16px;
 }
 
-/* Espacio del logo */
-.logo-container {
-  display: flex;
-  justify-content: center;
-  padding: 20px 0;
+/* ─── Tarjeta principal ──────────────────────────────────────── */
+.login-card {
+    width: 100%;
+    max-width: 860px;
+    background: var(--blanco);
+    border-radius: var(--radio);
+    box-shadow: var(--sombra);
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+    min-height: 480px;
+}
+
+/* ─── Panel izquierdo ────────────────────────────────────────── */
+.left-panel {
+    flex: 1;
+    background-color: #fafafa;
+    border-right: 1px solid #f0f0f0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 48px 40px;
+    gap: 28px;
 }
 
 .logo {
-  max-width: 210px; /* Tamaño del logo más pequeño para móviles */
-  height: auto;
+    width: 140px;
+    height: auto;
 }
 
-/* Títulos y texto de introducción */
-#heading {
-  text-align: center;
-  font-size: 24px;
-  margin-bottom: 20px;
+.left-text h1 {
+    font-family: 'Sora', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    color: #4b5563;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
 }
 
-/* Contenedor de los campos de entrada */
-.field {
-  display: flex;
-  align-items: center;
-  margin-bottom: 15px; /* Espaciado entre campos */
+.left-text p {
+    font-size: 14px;
+    line-height: 1.7;
+    color: var(--gris-texto);
+    max-width: 260px;
 }
 
-.input-icon {
-  margin-right: 10px; /* Espaciado entre el icono y el campo de texto */
+/* ─── Panel derecho ──────────────────────────────────────────── */
+.right-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 48px 44px;
 }
 
-/* Campo de entrada */
+/* ─── Formulario ─────────────────────────────────────────────── */
+.form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.field-group label {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--texto);
+}
+
 .input-field {
-  flex: 1; /* El campo de entrada ocupa el espacio restante */
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
-  font-size: 16px;
+    width: 100%;
+    padding: 13px 16px;
+    border: 1.5px solid var(--gris-borde);
+    border-radius: 8px;
+    font-size: 15px;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--texto);
+    background: var(--blanco);
+    transition: border-color 0.2s;
+    outline: none;
 }
 
-/* Estilo de los botones */
-.btn {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 20px; /* Espaciado inferior */
+.input-field:focus {
+    border-color: var(--naranja);
+    box-shadow: 0 0 0 3px rgba(255,175,51,0.15);
 }
 
-.button1, .button2 {
-  background-color: #FFAF33;
-  color: white;
-  padding: 10px 15px;
-  border-radius: 5px;
-  border: none;
-  cursor: pointer;
-  text-align: center;
-  flex: 1; /* Los botones ocupan el mismo espacio */
-  margin: 0 5px; /* Espaciado entre los botones */
+.input-field::placeholder {
+    color: #c4c9d4;
 }
 
-.button3 {
-  background-color: transparent;
-  color: #FFAF33;
-  border: none;
-  cursor: pointer;
-  text-align: center;
+/* ─── Password con ojo ───────────────────────────────────────── */
+.password-wrapper {
+    position: relative;
 }
 
-/* Ajustes responsivos */
-@media screen and (max-width: 480px) {
-  .main-container {
-      padding: 10px; /* Espaciado interno reducido para pantallas pequeñas */
-  }
+.password-wrapper .input-field {
+    padding-right: 46px;
+}
 
-  .logo {
-      max-width: 80px; /* Tamaño más pequeño del logo en móviles */
-  }
+.toggle-password {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    display: flex;
+    align-items: center;
+}
 
-  #heading {
-      font-size: 20px; /* Tamaño de fuente más pequeño en móviles */
-  }
+/* ─── Botón ingresar ─────────────────────────────────────────── */
+.btn-ingresar {
+    width: 100%;
+    padding: 14px;
+    background-color: var(--naranja);
+    color: var(--blanco);
+    font-family: 'Sora', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    margin-top: 4px;
+    transition: background-color 0.2s, transform 0.1s;
+}
 
-  .input-field {
-      font-size: 14px; /* Tamaño de fuente de los campos más pequeño */
-  }
+.btn-ingresar:hover {
+    background-color: var(--naranja-dark);
+}
 
-  .button1, .button2, .button3 {
-      font-size: 14px; /* Tamaño de fuente más pequeño para botones */
-  }
+.btn-ingresar:active {
+    transform: scale(0.98);
+}
+
+/* ─── Links secundarios ──────────────────────────────────────── */
+.links-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.link-secondary {
+    font-size: 13px;
+    color: var(--gris-texto);
+    text-decoration: none;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    padding: 0;
+    transition: color 0.2s;
+}
+
+.link-secondary:hover {
+    color: var(--naranja);
+}
+
+/* ─── Footer ─────────────────────────────────────────────────── */
+.footer {
+    font-size: 12px;
+    color: #9ca3af;
+    text-align: center;
+}
+
+/* ─── Responsive — Mobile ────────────────────────────────────── */
+@media screen and (max-width: 640px) {
+    .login-card {
+        flex-direction: column;
+        min-height: unset;
+    }
+
+    .left-panel {
+        border-right: none;
+        border-bottom: 1px solid #f0f0f0;
+        padding: 32px 28px 24px;
+        align-items: center;
+        text-align: center;
+        gap: 16px;
+    }
+
+    .left-text p {
+        max-width: 100%;
+    }
+
+    .logo {
+        width: 110px;
+    }
+
+    .right-panel {
+        padding: 28px 24px 32px;
+    }
+
+    .links-row {
+        flex-direction: column;
+        align-items: center;
+    }
 }
