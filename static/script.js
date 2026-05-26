@@ -169,11 +169,10 @@ async function startCamera() {
     }
 }
 
-function takePhoto() {
+async function takePhoto() {
     const canvas = document.getElementById('photoCanvas');
     const video = document.getElementById('videoElement');
     const context = canvas.getContext('2d');
-
     if (!video || !canvas) return;
 
     canvas.width = video.videoWidth;
@@ -181,21 +180,30 @@ function takePhoto() {
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
     const dataUrl = canvas.toDataURL('image/png');
-    
-    if (activeItemIdx !== null) {
-        // Inicializar el objeto si no existe para evitar errores de 'undefined'
-        if (!window.itemMediaData) window.itemMediaData = {};
-        if (!window.itemMediaData[activeItemIdx]) {
-            window.itemMediaData[activeItemIdx] = { fotos: [], videos: [] };
-        }
-        
-        window.itemMediaData[activeItemIdx].fotos.push({
-            file_data: dataUrl,
-            description: ""
-        });
 
-        // Refrescar miniaturas específicamente para este ítem
-        renderThumbnails(activeItemIdx);
+    try {
+        const response = await fetch('/upload_foto', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file_data: dataUrl })
+        });
+        const result = await response.json();
+
+        if (result.url && activeItemIdx !== null) {
+            if (!window.itemMediaData) window.itemMediaData = {};
+            if (!window.itemMediaData[activeItemIdx]) {
+                window.itemMediaData[activeItemIdx] = { fotos: [], videos: [] };
+            }
+            window.itemMediaData[activeItemIdx].fotos.push({
+                imagen_url: result.url,
+                description: ""
+            });
+            // Mostrar miniatura
+            agregarMiniaturaItem(result.url, activeItemIdx);
+        }
+    } catch (e) {
+        console.error("Error subiendo foto:", e);
+        alert("No se pudo subir la foto. Intenta de nuevo.");
     }
 }
 
@@ -1306,31 +1314,48 @@ function handleLocalFiles(event, idx, type) {
     const files = event.target.files;
     if (!files || files.length === 0) return;
 
-    // Usamos window. para asegurar que acceda a la variable global
     if (!window.itemMediaData[idx]) {
         window.itemMediaData[idx] = { fotos: [], videos: [] };
     }
 
     Array.from(files).forEach(file => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const base64Data = e.target.result;
-            
-            if (type === 'foto') {
-                window.itemMediaData[idx].fotos.push({
-                    file_data: base64Data,
-                    description: ""
-                });
-            } else {
+        if (type === 'foto') {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const base64Data = e.target.result;
+                try {
+                    const response = await fetch('/upload_foto', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ file_data: base64Data })
+                    });
+                    const result = await response.json();
+                    if (result.url) {
+                        window.itemMediaData[idx].fotos.push({
+                            imagen_url: result.url,
+                            description: ""
+                        });
+                        renderThumbnails(idx);
+                    } else {
+                        alert("No se pudo subir la foto. Intenta de nuevo.");
+                    }
+                } catch (e) {
+                    console.error("Error subiendo foto:", e);
+                    alert("Error de conexión al subir la foto.");
+                }
+            };
+            reader.readAsDataURL(file);
+        } else {
+            const reader = new FileReader();
+            reader.onload = (e) => {
                 window.itemMediaData[idx].videos.push({
-                    file_data: base64Data,
+                    file_data: e.target.result,
                     description: ""
                 });
-            }
-            // Llamamos al render para mostrar la miniatura inmediatamente
-            renderThumbnails(idx);
-        };
-        reader.readAsDataURL(file);
+                renderThumbnails(idx);
+            };
+            reader.readAsDataURL(file);
+        }
     });
 }
 

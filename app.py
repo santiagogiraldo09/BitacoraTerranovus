@@ -35,8 +35,13 @@ from datetime import datetime
 import pytz
 from fpdf import FPDF
 import io
-import base64
 from tempfile import NamedTemporaryFile
+from supabase import create_client
+
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY")
+supabase_client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 # Configurar zona horaria
@@ -112,6 +117,39 @@ blob_service_client = BlobServiceClient.from_connection_string(connection_string
 def generar_password_temporal(longitud=10):
     caracteres = string.ascii_letters + string.digits
     return ''.join(random.choices(caracteres, k=longitud))
+
+
+@app.route('/upload_foto', methods=['POST'])
+def upload_foto():
+    if 'user_id' not in session:
+        return jsonify({"error": "No autorizado"}), 401
+    try:
+        data = request.json
+        file_data = data.get('file_data', '')
+
+        # Quitar el prefijo data:image/...;base64,
+        if ',' in file_data:
+            header, b64 = file_data.split(',', 1)
+            ext = 'png' if 'png' in header else 'jpg'
+        else:
+            b64, ext = file_data, 'jpg'
+
+        imagen_bytes = base64.b64decode(b64)
+        nombre_archivo = f"{uuid.uuid4()}.{ext}"
+        ruta = f"registros/{nombre_archivo}"
+
+        supabase_client.storage.from_('fotos-bitacora').upload(
+            ruta,
+            imagen_bytes,
+            {"content-type": f"image/{ext}"}
+        )
+
+        url_publica = f"{SUPABASE_URL}/storage/v1/object/public/fotos-bitacora/{ruta}"
+        return jsonify({"url": url_publica}), 200
+
+    except Exception as e:
+        print(f"Error subiendo foto: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/invitar-usuarios', methods=['POST'])
 def invitar_usuarios():
@@ -1408,11 +1446,11 @@ def guardar_reporte_terranovus():
             for foto_obj in nota.get('fotos_detalle', []):
                 cursor.execute("""
                     INSERT INTO fotos_registro_terranovus (
-                        id_registro, imagen_base64, description
+                        id_registro, imagen_url, description
                     ) VALUES (%s, %s, %s)
                 """, (
-                    id_registro, 
-                    foto_obj.get('file_data'), 
+                    id_registro,
+                    foto_obj.get('imagen_url'),
                     foto_obj.get('description')
                 ))
 
