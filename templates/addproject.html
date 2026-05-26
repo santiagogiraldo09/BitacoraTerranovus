@@ -12,6 +12,41 @@
 </head>
 <body>
 
+<div class="app-layout">
+
+    <!-- SIDEBAR (solo desktop) -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="IAC Logo" class="sidebar-logo-img">
+        </div>
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('registros') }}" class="nav-item">
+                <i class="fas fa-folder-open"></i>
+                <span>Proyectos</span>
+            </a>
+            <a href="{{ url_for('history') }}" class="nav-item">
+                <i class="fas fa-history"></i>
+                <span>Historial</span>
+            </a>
+            {% if session.get('user_rol') == 'admin' %}
+            <a href="{{ url_for('usuario') }}" class="nav-item">
+                <i class="fas fa-users"></i>
+                <span>Usuarios</span>
+            </a>
+            {% endif %}
+        </nav>
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <div class="user-avatar"><i class="fas fa-user"></i></div>
+                <div class="user-info">
+                    <span class="user-name">{{ session.get('user_name', 'Usuario') }}</span>
+                    <span class="user-role">{{ session.get('user_rol', '') }}</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- AREA PRINCIPAL -->
     <div class="page-wrapper">
 
         <!-- Header -->
@@ -22,11 +57,11 @@
             <span class="page-title">Nuevo Proyecto</span>
         </header>
 
-        <!-- Formulario con scroll -->
+        <!-- Formulario con scroll interno -->
         <div class="form-scroll">
             <form id="project-form">
 
-                <!-- ── Sección 1: Identificación ── -->
+                <!-- Seccion 1: Identificacion -->
                 <div class="section">
                     <div class="section-header">
                         <span class="section-icon" style="background:#fff8ee; color:#FFAF33;">
@@ -34,39 +69,29 @@
                         </span>
                         <h3 class="section-title">Identificación</h3>
                     </div>
-
                     <div class="field-group">
                         <label for="project-name">Nombre del proyecto</label>
-                        <input type="text" id="project-name" name="project-name" required
-                               placeholder="Ej. Mantenimiento Planta Norte">
+                        <input type="text" id="project-name" name="project-name" required placeholder="Ej. Mantenimiento Planta Norte">
                     </div>
-
                     <div class="field-group">
                         <label for="cliente">Cliente</label>
-                        <input type="text" id="cliente" name="cliente" required
-                               placeholder="Nombre del cliente">
+                        <input type="text" id="cliente" name="cliente" required placeholder="Nombre del cliente">
                     </div>
-
                     <div class="field-group">
                         <label for="contratista">Contratista</label>
-                        <input type="text" id="contratista" name="contratista" required
-                               placeholder="Nombre del contratista">
+                        <input type="text" id="contratista" name="contratista" required placeholder="Nombre del contratista">
                     </div>
-
                     <div class="field-group">
                         <label for="orden-trabajo">Orden de Trabajo</label>
-                        <input type="text" id="orden-trabajo" name="orden-trabajo" required
-                               placeholder="Ej: OT-2026-001">
+                        <input type="text" id="orden-trabajo" name="orden-trabajo" required placeholder="Ej: OT-2026-001">
                     </div>
-
                     <div class="field-group">
                         <label for="location">Ubicación / Municipio</label>
-                        <input type="text" id="location" name="location" required
-                               placeholder="Ej: Medellín, Antioquia">
+                        <input type="text" id="location" name="location" required placeholder="Ej: Medellín, Antioquia">
                     </div>
                 </div>
 
-                <!-- ── Sección 2: Cronograma ── -->
+                <!-- Seccion 2: Cronograma -->
                 <div class="section">
                     <div class="section-header">
                         <span class="section-icon" style="background:#fff8ee; color:#FFAF33;">
@@ -74,7 +99,6 @@
                         </span>
                         <h3 class="section-title">Cronograma</h3>
                     </div>
-
                     <div class="date-row">
                         <div class="field-group">
                             <label for="start-date">Fecha de inicio</label>
@@ -87,7 +111,7 @@
                     </div>
                 </div>
 
-                <!-- ── Sección 3: Equipo ── -->
+                <!-- Seccion 3: Equipo -->
                 <div class="section">
                     <div class="section-header">
                         <span class="section-icon" style="background:#fff8ee; color:#FFAF33;">
@@ -95,14 +119,11 @@
                         </span>
                         <h3 class="section-title">Responsable / Equipo</h3>
                     </div>
-
                     <p class="section-hint">Selecciona los miembros que participarán en este proyecto.</p>
-
                     <div class="team-list" id="team-list">
                         {% if usuarios %}
                             {% for u in usuarios %}
-                            <div class="team-member" onclick="toggleMember(this, {{ u.user_id }})"
-                                 data-id="{{ u.user_id }}">
+                            <div class="team-member" onclick="toggleMember(this, {{ u.user_id }})" data-id="{{ u.user_id }}">
                                 <div class="member-avatar">
                                     {{ u.name[0] | upper }}{{ u.apellido[0] | upper }}
                                 </div>
@@ -134,58 +155,70 @@
             </button>
         </div>
 
-    </div>
+    </div><!-- fin page-wrapper -->
+</div><!-- fin app-layout -->
 
-    <script>
-        // ── Toggle selección de miembro ──
-        const selectedMembers = new Set();
+<!-- Nav inferior (solo movil) -->
+<nav class="bottom-nav">
+    <a href="{{ url_for('registros') }}" class="bottom-nav-item">
+        <i class="fas fa-folder-open"></i>
+        <span>Proyectos</span>
+    </a>
+    {% if session.get('user_rol') == 'admin' %}
+    <a href="{{ url_for('usuario') }}" class="bottom-nav-item">
+        <i class="fas fa-users"></i>
+        <span>Usuarios</span>
+    </a>
+    {% endif %}
+    <a href="{{ url_for('history') }}" class="bottom-nav-item">
+        <i class="fas fa-history"></i>
+        <span>Historial</span>
+    </a>
+</nav>
 
-        function toggleMember(el, userId) {
-            if (selectedMembers.has(userId)) {
-                selectedMembers.delete(userId);
-                el.classList.remove('selected');
+<script>
+    const selectedMembers = new Set();
+
+    function toggleMember(el, userId) {
+        if (selectedMembers.has(userId)) {
+            selectedMembers.delete(userId);
+            el.classList.remove('selected');
+        } else {
+            selectedMembers.add(userId);
+            el.classList.add('selected');
+        }
+    }
+
+    async function saveProject() {
+        const form = document.getElementById('project-form');
+        const formData = new FormData(form);
+        const data = {};
+        formData.forEach((value, key) => { data[key] = value; });
+        data['miembros'] = Array.from(selectedMembers);
+
+        if (!data['project-name'] || !data['cliente'] || !data['location']) {
+            alert("Por favor, completa los campos obligatorios: Nombre, Cliente y Ubicación.");
+            return;
+        }
+
+        try {
+            const response = await fetch('/add_project', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            if (response.ok) {
+                alert("Proyecto registrado exitosamente");
+                window.location.href = '/registros';
             } else {
-                selectedMembers.add(userId);
-                el.classList.add('selected');
+                throw new Error(result.error || "Error al procesar la solicitud");
             }
+        } catch (error) {
+            alert("Error: " + error.message);
+            console.error("Error:", error);
         }
-
-        // ── Guardar proyecto ──
-        async function saveProject() {
-            const form = document.getElementById('project-form');
-            const formData = new FormData(form);
-            const data = {};
-            formData.forEach((value, key) => { data[key] = value; });
-
-            // Agregar miembros seleccionados
-            data['miembros'] = Array.from(selectedMembers);
-
-            // Validación
-            if (!data['project-name'] || !data['cliente'] || !data['location']) {
-                alert("Por favor, completa los campos obligatorios: Nombre, Cliente y Ubicación.");
-                return;
-            }
-
-            try {
-                const response = await fetch('/add_project', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-
-                const result = await response.json();
-
-                if (response.ok) {
-                    alert("✅ " + result.message);
-                    window.location.href = '/registros';
-                } else {
-                    throw new Error(result.error || "Error al procesar la solicitud");
-                }
-            } catch (error) {
-                alert("❌ Error: " + error.message);
-                console.error("Error:", error);
-            }
-        }
-    </script>
+    }
+</script>
 </body>
 </html>
