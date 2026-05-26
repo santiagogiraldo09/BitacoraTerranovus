@@ -1381,16 +1381,16 @@ def detalleRegistro(id_registro):
         """, (id_registro,))
 
         for foto_row in cursor.fetchall():
-            imagen_url   = foto_row[0]
+            imagen_url    = foto_row[0]
             imagen_base64 = foto_row[1]
-            desc         = foto_row[2] or ''
+            desc          = foto_row[2] or ''
 
             if imagen_url:
                 registro['fotos'].append({'url': imagen_url, 'desc': desc})
             elif imagen_base64:
                 registro['fotos'].append({'url': imagen_base64, 'desc': desc})
-        
-                return render_template('detalleRegistro.html', registro=registro)
+
+        return render_template('detalleRegistro.html', registro=registro)
  
     except Exception as e:
         print(f"Error en detalleRegistro: {e}")
