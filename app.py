@@ -1346,8 +1346,8 @@ def detalleRegistro(id_registro):
             if foto_row[0]:
                 # Limpiar el prefijo si viene con data:image/...;base64,
                 base64_data = foto_row[0]
-                if ',' in base64_data:
-                    base64_data = base64_data.split(',')[1]
+                #if ',' in base64_data:
+                    #base64_data = base64_data.split(',')[1]
                 registro['fotos'].append({
                     'base64': base64_data,
                     'desc':   foto_row[1] or ''
