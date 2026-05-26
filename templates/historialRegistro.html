@@ -3,95 +3,210 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Historial de Registros</title>
+    <title>{{ proyecto[0] }} — Bitácora IAC</title>
     <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
-    <link rel="stylesheet" href="{{ url_for('static', filename='history.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='historialRegistro.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        /* Estética original restaurada */
-        .record-details {
-            background-color: #ffffff;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-            border-left: 6px solid #FFAF33;
-        }
-        .media-gallery {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            margin-top: 10px;
-        }
-        .media-item img, .media-item video {
-            width: 120px;
-            height: 120px;
-            object-fit: cover;
-            border-radius: 5px;
-            border: 1px solid #ddd;
-            cursor: pointer;
-        }
-        .equipos-section {
-            margin-top: 10px;
-            background: #fff9f0;
-            padding: 10px;
-            border-radius: 5px;
-            border: 1px dashed #FFAF33;
-        }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="main-container">
-        <div class="logo-container">
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo Vihesa" class="logo">
+
+<div class="page-wrapper">
+
+    <!-- Header -->
+    <header class="page-header">
+        <button class="btn-back" onclick="window.location.href='{{ url_for('registros') }}'">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <div class="header-text">
+            <span class="header-label">Revisión:</span>
+            <span class="header-title">{{ proyecto[0] }}</span>
         </div>
-        <div class="header-info" style="text-align: center; margin-top: 20px; margin-bottom: 20px;">
-            <h1 style="color: #333;">{{ proyecto[0] }}</h1>
-            <p>Cliente: {{ proyecto[1] }}</p>
+    </header>
+
+    <!-- Contenido con scroll -->
+    <div class="content-scroll">
+
+        <!-- Filtros -->
+        <div class="filter-row">
+            <button class="filter-chip active" onclick="filtrarSemana(this)">
+                <i class="fas fa-calendar-week"></i> Esta semana
+            </button>
+            <button class="filter-chip" onclick="filtrarTodos(this)">
+                <i class="fas fa-user"></i> Todos los autores
+            </button>
+            <button class="filter-chip icon-only" onclick="exportarInforme()" title="Exportar">
+                <i class="fas fa-download"></i>
+            </button>
         </div>
 
-        <div class="records-container" style="padding: 0 20px;">
+        <!-- Contador -->
+        <div class="section-header-row">
+            <h2 class="section-title">Bitácora de actividades</h2>
+            <span class="badge-count" id="contadorRegistros">
+                {{ reportes | length }} registros
+            </span>
+        </div>
+
+        <!-- Tarjetas de registros -->
+        <div class="records-list" id="recordsList">
             {% if reportes %}
                 {% for registro in reportes %}
-                <div class="record-details">
-                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px;">
-                        <h3 style="margin: 0; color: #FFAF33;">Actividad: {{ registro.actividad }}</h3>
-                        <span style="color: #666; font-weight: bold;"><i class="far fa-calendar-alt"></i> {{ registro.fecha }}</span>
+                <div class="record-card"
+                     data-fecha="{{ registro.fecha }}"
+                     data-autor="{{ registro.usuario_id | default('') }}">
+
+                    <div class="card-top">
+                        <h3 class="card-activity">{{ registro.actividad }}</h3>
+                        <i class="fas fa-chevron-right card-arrow"></i>
                     </div>
 
-                    <div style="margin-top: 15px;">
-                        <p><strong>Descripción:</strong> {{ registro.descripcion }}</p>
-                        <div style="display: flex; gap: 20px; background: #f9f9f9; padding: 10px; border-radius: 5px; border: 1px solid #eee;">
-                            <span><strong>Estado:</strong> {{ registro.estado }}</span>
-                            <span><strong>Avance:</strong> {{ registro.avance }}%</span>
+                    <span class="estado-badge {{ registro.estado | lower | replace(' ', '-') }}">
+                        {{ registro.estado }}
+                    </span>
+
+                    <div class="card-meta">
+                        <div class="meta-item">
+                            <i class="fas fa-chart-line meta-icon"></i>
+                            <div>
+                                <span class="meta-label">Avance</span>
+                                <span class="meta-value">{{ registro.avance }}%</span>
+                            </div>
+                        </div>
+                        <div class="meta-item">
+                            <i class="fas fa-calendar-alt meta-icon"></i>
+                            <div>
+                                <span class="meta-label">Fecha</span>
+                                <span class="meta-value">{{ registro.fecha }}</span>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="media-gallery" style="margin-top: 15px;">
-                        {% for foto in registro.fotos %}
-                        <div class="media-item" style="text-align: center;">
-                            <img src="data:image/png;base64,{{ foto.base64 }}" onclick="window.open(this.src)" title="{{ foto.desc }}">
-                            {% if foto.desc %}
-                                <p style="font-size: 10px; color: #888; margin-top: 5px;">{{ foto.desc }}</p>
-                            {% endif %}
-                        </div>
+                    {% if registro.hora %}
+                    <div class="card-hora">
+                        <i class="fas fa-clock meta-icon"></i>
+                        <span class="meta-value">{{ registro.hora }}</span>
+                    </div>
+                    {% endif %}
+
+                    {% if registro.fotos %}
+                    <div class="fotos-row">
+                        {% for foto in registro.fotos[:3] %}
+                        <img src="data:image/jpeg;base64,{{ foto.base64 }}"
+                             class="foto-thumb"
+                             onclick="window.open(this.src)"
+                             title="{{ foto.desc }}">
                         {% endfor %}
+                        {% if registro.fotos | length > 3 %}
+                        <div class="fotos-more">+{{ registro.fotos | length - 3 }}</div>
+                        {% endif %}
                     </div>
+                    {% endif %}
+
+                    <div class="card-user">
+                        <div class="user-initials">
+                            {{ registro.usuario_iniciales | default('??') }}
+                        </div>
+                        <div class="user-info">
+                            <span class="user-name">{{ registro.usuario_nombre | default('Usuario') }}</span>
+                            <span class="user-role">{{ registro.usuario_cargo | default('') }}</span>
+                        </div>
+                    </div>
+
                 </div>
                 {% endfor %}
             {% else %}
-                <div style="text-align: center; padding: 50px; color: #999;">
-                    <i class="fas fa-folder-open fa-3x"></i>
-                    <p>No hay reportes registrados para este proyecto.</p>
+                <div class="empty-state">
+                    <i class="fas fa-clipboard fa-3x"></i>
+                    <p>No hay registros para este proyecto.</p>
                 </div>
             {% endif %}
         </div>
 
-        <div class="bottom-menu" style="text-align: center; margin: 30px 0;">
-            <a href="{{ url_for('history') }}" class="bottom-button" style="background: #FFAF33; color: white; padding: 10px 20px; border-radius: 5px; text-decoration: none; font-weight: bold;">
-                <i class="fas fa-arrow-left"></i> Volver a Proyectos
-            </a>
+        <!-- Resumen de informe -->
+        <div class="informe-box">
+            <div class="informe-header">
+                <div class="informe-icon">
+                    <i class="fas fa-file-alt"></i>
+                </div>
+                <div>
+                    <strong>Resumen de Informe</strong>
+                    <p>Genera un reporte detallado de los registros filtrados.</p>
+                </div>
+            </div>
+            <form id="export-form" method="POST">
+                <input type="hidden" name="project_id" value="{{ proyecto[2] | default('') }}">
+                <button type="submit" formaction="/exportar-proyectos-pdf" class="btn-exportar">
+                    Exportar informe
+                </button>
+                <div class="btn-row">
+                    <button type="submit" formaction="/exportar-proyectos-pdf" class="btn-secondary">
+                        <i class="fas fa-file-pdf"></i> Descargar PDF
+                    </button>
+                    <button type="submit" formaction="/exportar-proyectos-excel" class="btn-secondary">
+                        <i class="fas fa-file-csv"></i> Descargar CSV
+                    </button>
+                </div>
+            </form>
         </div>
+
     </div>
+
+    <!-- FAB -->
+    <button class="fab-button"
+            onclick="window.location.href='/paginaprincipal?project_id={{ proyecto[2] | default('') }}&project={{ proyecto[0] }}'"
+            title="Nuevo registro">
+        <i class="fas fa-plus"></i>
+    </button>
+
+</div>
+
+<!-- Nav inferior (solo movil) -->
+<nav class="bottom-nav">
+    <a href="{{ url_for('registros') }}" class="bottom-nav-item">
+        <i class="fas fa-folder-open"></i>
+        <span>Proyectos</span>
+    </a>
+    <a href="{{ url_for('history') }}" class="bottom-nav-item active">
+        <i class="fas fa-history"></i>
+        <span>Informes</span>
+    </a>
+    <a href="#" class="bottom-nav-item">
+        <i class="fas fa-user"></i>
+        <span>Perfil</span>
+    </a>
+</nav>
+
+<script>
+    function filtrarSemana(btn) {
+        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        const hoy = new Date();
+        const lunes = new Date(hoy);
+        lunes.setDate(hoy.getDate() - hoy.getDay() + 1);
+        const cards = document.querySelectorAll('.record-card');
+        let visibles = 0;
+        cards.forEach(card => {
+            const fecha = new Date(card.dataset.fecha);
+            const visible = fecha >= lunes && fecha <= hoy;
+            card.style.display = visible ? '' : 'none';
+            if (visible) visibles++;
+        });
+        document.getElementById('contadorRegistros').textContent = visibles + ' registros';
+    }
+
+    function filtrarTodos(btn) {
+        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        const cards = document.querySelectorAll('.record-card');
+        cards.forEach(card => card.style.display = '');
+        document.getElementById('contadorRegistros').textContent = cards.length + ' registros';
+    }
+
+    function exportarInforme() {
+        document.getElementById('export-form').submit();
+    }
+</script>
 </body>
 </html>
