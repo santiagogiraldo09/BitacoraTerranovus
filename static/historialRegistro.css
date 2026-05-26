@@ -72,15 +72,18 @@ button { font-family: inherit; cursor: pointer; border: none; }
 }
 
 /* Filtros */
-.filter-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.filter-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
 
-.filter-chip {
-    display: flex; align-items: center; gap: 6px;
-    padding: 7px 16px; border-radius: 20px;
-    border: 1.5px solid var(--gris-borde);
-    background: var(--blanco);
-    font-size: 13px; font-weight: 500; color: var(--gris-texto);
-    transition: all 0.18s;
+.filter-row::-webkit-scrollbar {
+    display: none;
 }
 .filter-chip:hover { border-color: var(--naranja); color: var(--naranja); }
 .filter-chip.active { background: var(--naranja-light); border-color: var(--naranja); color: var(--naranja-dark); font-weight: 600; }
