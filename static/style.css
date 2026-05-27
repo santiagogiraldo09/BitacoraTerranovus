@@ -29,8 +29,7 @@ a { text-decoration: none; color: inherit; }
     display: flex;
     flex-direction: column;
     min-height: 100vh;
-    max-width: 720px;
-    margin: 0 auto;
+    width: 100%;
     background: var(--gris-fondo);
 }
 
@@ -45,9 +44,6 @@ a { text-decoration: none; color: inherit; }
     padding: 14px 16px;
     background: var(--blanco);
     border-bottom: 1px solid var(--gris-borde);
-    max-width: 720px;
-    margin: 0 auto;
-    right: auto;
     width: 100%;
 }
 
@@ -401,7 +397,9 @@ textarea.field-input { resize: vertical; min-height: 80px; }
 /* ─── Responsive desktop ─────────────────────────────────────── */
 @media screen and (min-width: 721px) {
     #app {
-        margin: 0 auto;
+        width: 100%;
+        max-width: 100%;
+        margin: 0;
         box-shadow: none;
         min-height: 100vh;
     }
@@ -412,6 +410,7 @@ textarea.field-input { resize: vertical; min-height: 80px; }
         right: 0;
         transform: none;
         width: 100%;
+        max-width: 100%;
         border-radius: 0;
     }
 
@@ -421,6 +420,7 @@ textarea.field-input { resize: vertical; min-height: 80px; }
         right: 0;
         transform: none;
         width: 100%;
+        max-width: 100%;
         border-radius: 0;
     }
 
