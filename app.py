@@ -1340,7 +1340,7 @@ def detalleRegistro(id_registro):
         # Traer el registro con datos del usuario
         cursor.execute("""
             SELECT 
-                r.id_registro,
+                r.id,
                 r.actividad,
                 r.descripcion_actividad,
                 r.estado,
@@ -1352,7 +1352,7 @@ def detalleRegistro(id_registro):
                 u.cargo
             FROM registros r
             LEFT JOIN usuario u ON u.user_id = r.user_id
-            WHERE r.id_registro = %s
+            WHERE r.id = %s
         """, (id_registro,))
  
         row = cursor.fetchone()
@@ -1387,20 +1387,16 @@ def detalleRegistro(id_registro):
  
         # Traer fotos del registro
         cursor.execute("""
-            SELECT imagen_url, imagen_base64, description
+            SELECT imagen_url, description
             FROM fotos_registro
             WHERE id_registro = %s
         """, (id_registro,))
 
         for foto_row in cursor.fetchall():
-            imagen_url    = foto_row[0]
-            imagen_base64 = foto_row[1]
-            desc          = foto_row[2] or ''
-
-            if imagen_url:
-                registro['fotos'].append({'url': imagen_url, 'desc': desc})
-            elif imagen_base64:
-                registro['fotos'].append({'url': imagen_base64, 'desc': desc})
+            url  = foto_row[0]
+            desc = foto_row[1] or ''
+            if url:
+                registro['fotos'].append({'url': url, 'desc': desc})
 
         return render_template('detalleRegistro.html', registro=registro)
  
