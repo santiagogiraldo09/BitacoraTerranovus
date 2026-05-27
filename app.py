@@ -669,8 +669,8 @@ def get_user_projects(user_id):
     try:
         conn, cursor = get_db_connection()
         
-        cursor.execute(
-            """SELECT 
+        cursor.execute("""
+            SELECT 
                 p.id, 
                 p.nombre_proyecto, 
                 p.fecha_inicio, 
@@ -678,14 +678,14 @@ def get_user_projects(user_id):
                 p.user_id,
                 p.estado,
                 COUNT(r.id) as total_registros
-               FROM proyectos p
-               LEFT JOIN registros r 
-                   ON r.id_proyecto = p.id
-               WHERE p.user_id = %s 
-               GROUP BY p.id, p.nombre_proyecto, 
-                        p.fecha_inicio, p.cliente, p.user_id, p.estado
-               ORDER BY p.fecha_inicio DESC""",
-            (user_id,)
+            FROM proyectos p
+            INNER JOIN proyecto_usuarios pu ON pu.id_proyecto = p.id
+            LEFT JOIN registros r ON r.id_proyecto = p.id
+            WHERE pu.user_id = %s 
+            GROUP BY p.id, p.nombre_proyecto, 
+                    p.fecha_inicio, p.cliente, p.user_id, p.estado
+            ORDER BY p.fecha_inicio DESC
+        """, (user_id,)
         )
         
         projects = []
@@ -1532,10 +1532,11 @@ def add_project():
 
     return render_template('addproject.html', usuarios=usuarios)
 
-@app.route('/generar-hash')
-def generar_hash():
-    from werkzeug.security import generate_password_hash
-    return generate_password_hash('Bitacora2026*')
+
+#@app.route('/generar-hash')
+#def generar_hash():
+    #from werkzeug.security import generate_password_hash
+    #return generate_password_hash('Bitacora2026*')
 
 
 @app.route('/ask', methods=['POST'])
