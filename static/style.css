@@ -400,16 +400,31 @@ textarea.field-input { resize: vertical; min-height: 80px; }
 
 /* ─── Responsive desktop ─────────────────────────────────────── */
 @media screen and (min-width: 721px) {
+    #app {
+        margin: 0 auto;
+        box-shadow: none;
+        min-height: 100vh;
+    }
+
     .page-header {
         position: fixed;
-        left: 50%; transform: translateX(-50%);
-        width: 720px;
+        left: 0;
+        right: 0;
+        transform: none;
+        width: 100%;
+        border-radius: 0;
     }
 
     .bottom-nav {
-        left: 50%; transform: translateX(-50%);
-        width: 720px; border-radius: 16px 16px 0 0;
+        position: fixed;
+        left: 0;
+        right: 0;
+        transform: none;
+        width: 100%;
+        border-radius: 0;
     }
 
-    .content-scroll { padding: 86px 24px 120px; }
+    .content-scroll {
+        padding: 86px 32px 120px;
+    }
 }
