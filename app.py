@@ -1272,13 +1272,13 @@ def historialregistro(id_proyecto):
 
         # 2. Consultar registros de la nueva tabla Terranovus
         cursor.execute("""
-            SELECT r.id_registro, r.fecha, r.actividad, r.descripcion_actividad, 
+            SELECT r.id, r.fecha, r.actividad, r.descripcion_actividad, 
                 r.estado, r.porcentaje_avance,
                 u.name, u.apellido, u.cargo
             FROM registros r
             LEFT JOIN usuario u ON u.user_id = r.user_id
             WHERE r.id_proyecto = %s 
-            ORDER BY r.fecha DESC, r.id_registro DESC
+            ORDER BY r.fecha DESC, r.id DESC
         """, (id_proyecto,))
         
         registros_rows = cursor.fetchall()
