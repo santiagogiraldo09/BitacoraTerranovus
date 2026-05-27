@@ -677,12 +677,12 @@ def get_user_projects(user_id):
                 p.cliente, 
                 p.user_id,
                 p.estado,
-                COUNT(r.id_registro) as total_registros
+                COUNT(r.id) as total_registros
                FROM proyectos p
                LEFT JOIN registros r 
-                   ON r.id_proyecto = p.id_proyecto
+                   ON r.id_proyecto = p.id
                WHERE p.user_id = %s 
-               GROUP BY p.id_proyecto, p.nombre_proyecto, 
+               GROUP BY p.id, p.nombre_proyecto, 
                         p.fecha_inicio, p.cliente, p.user_id, p.estado
                ORDER BY p.fecha_inicio DESC""",
             (user_id,)
