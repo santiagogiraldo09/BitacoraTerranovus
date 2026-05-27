@@ -93,14 +93,18 @@
                     {% if registro.fotos %}
                     <div class="fotos-row">
                         {% for foto in registro.fotos[:3] %}
+                        {% if foto.url %}
+                        <img src="{{ foto.url }}"
+                            class="foto-thumb"
+                            onclick="window.open(this.src)"
+                            title="{{ foto.desc }}">
+                        {% elif foto.base64 %}
                         <img src="data:image/jpeg;base64,{{ foto.base64 }}"
-                             class="foto-thumb"
-                             onclick="window.open(this.src)"
-                             title="{{ foto.desc }}">
-                        {% endfor %}
-                        {% if registro.fotos | length > 3 %}
-                        <div class="fotos-more">+{{ registro.fotos | length - 3 }}</div>
+                            class="foto-thumb"
+                            onclick="window.open(this.src)"
+                            title="{{ foto.desc }}">
                         {% endif %}
+                        {% endfor %}
                     </div>
                     {% endif %}
 

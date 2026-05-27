@@ -1298,10 +1298,10 @@ def historialregistro(id_proyecto):
                 b64  = f[1]
                 desc = f[2] or ''
                 if url:
-                    fotos.append({'base64': url, 'desc': desc})
+                    fotos.append({'url': url, 'base64': None, 'desc': desc})
                 elif b64:
                     img_str = b64.split(',')[1] if ',' in b64 else b64
-                    fotos.append({'base64': img_str, 'desc': desc})
+                    fotos.append({'url': None, 'base64': img_str, 'desc': desc})
 
             reportes_completos.append({
                 'id_registro': id_reg,
