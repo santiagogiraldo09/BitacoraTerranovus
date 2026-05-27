@@ -1484,26 +1484,42 @@ def add_project():
         try:
             data = request.json
             conn, cursor = get_db_connection()
-            
+            empresa_id = session.get('empresa_id', 1)
+
             cursor.execute("""
                 INSERT INTO proyectos (
                     nombre_proyecto, fecha_inicio, fecha_fin, cliente, contratista, 
-                    orden_de_trabajo, ubicacion, user_id
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) 
-                RETURNING id_proyecto
+                    orden_de_trabajo, ubicacion, user_id, empresa_id
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) 
+                RETURNING id
             """, (
                 data.get('project-name'), data.get('start-date'), data.get('end-date'),
                 data.get('cliente'), data.get('contratista'), data.get('orden-trabajo'),
-                data.get('location'), session['user_id']
+                data.get('location'), session['user_id'], empresa_id
             ))
-            
+
             nuevo_id = cursor.fetchone()[0]
+
+            # Insertar miembros seleccionados en proyecto_usuarios
+            miembros = data.get('miembros', [])
+
+            # Si no se seleccionó ningún miembro, asignar al creador
+            if not miembros:
+                miembros = [session['user_id']]
+
+            for user_id in miembros:
+                cursor.execute("""
+                    INSERT INTO proyecto_usuarios (id_proyecto, user_id, empresa_id)
+                    VALUES (%s, %s, %s)
+                """, (nuevo_id, user_id, empresa_id)
+            )
+
             conn.commit()
             cursor.close()
             conn.close()
-            
+
             return jsonify({"status": "success", "message": "Proyecto registrado exitosamente"}), 201
-            
+
         except Exception as e:
             print(f"Error en BD: {str(e)}")
             return jsonify({"status": "error", "error": str(e)}), 500
