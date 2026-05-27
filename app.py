@@ -1188,6 +1188,7 @@ def indexFormulario():
 
 @app.route('/registros')
 def registros():
+    print(f"empresa_id en sesión: {session.get('empresa_id')}")
     if 'user_id' not in session:
         return redirect(url_for('principalscreen'))
     
