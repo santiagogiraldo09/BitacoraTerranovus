@@ -118,7 +118,7 @@
 
 <!-- Template de actividad -->
 <template id="note-template">
-    <div class="activity-card">
+    <div class="dynamic-item-box">
         <div class="activity-header">
             <h3 class="item-title">Actividad #1</h3>
             <button type="button" class="remove-item-btn" style="display:none;">
@@ -226,7 +226,7 @@
         const container = document.getElementById('items-container');
         const template = document.getElementById('note-template');
         const clone = template.content.cloneNode(true);
-        const box = clone.querySelector('.activity-card');
+        const box = clone.querySelector('.dynamic-item-box');
 
         const currentIdx = itemCount - 1;
         box.setAttribute('data-index', currentIdx);
@@ -291,7 +291,7 @@
 
     // Actualizar contador de fotos en la tarjeta
     function actualizarContadorFotos(idx) {
-        const card = document.querySelector(`.activity-card[data-index="${idx}"]`);
+        const card = document.querySelector(`.dynamic-item-box[data-index="${idx}"]`);
         if (!card) return;
         const count = (window.itemMediaData[idx]?.fotos?.length || 0);
         const counter = card.querySelector('.foto-count');

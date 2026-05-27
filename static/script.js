@@ -195,7 +195,8 @@ async function takePhoto() {
                 window.itemMediaData[activeItemIdx] = { fotos: [], videos: [] };
             }
             window.itemMediaData[activeItemIdx].fotos.push({
-                imagen_url: result.url,
+                file_data:   base64Data,  // para mostrar miniatura
+                imagen_url:  result.url,  // para guardar en Storage
                 description: ""
             });
             // Mostrar miniatura
@@ -1332,7 +1333,8 @@ function handleLocalFiles(event, idx, type) {
                     const result = await response.json();
                     if (result.url) {
                         window.itemMediaData[idx].fotos.push({
-                            imagen_url: result.url,
+                            file_data:   base64Data,  // para mostrar miniatura
+                            imagen_url:  result.url,  // para guardar en Storage
                             description: ""
                         });
                         renderThumbnails(idx);
