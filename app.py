@@ -671,7 +671,7 @@ def get_user_projects(user_id):
         
         cursor.execute(
             """SELECT 
-                p.id_proyecto, 
+                p.id, 
                 p.nombre_proyecto, 
                 p.fecha_inicio, 
                 p.cliente, 
