@@ -1285,15 +1285,23 @@ def historialregistro(id_proyecto):
             id_reg, fecha_dt, act, desc, est, avan = r_row
             
             # 3. Consultar fotos asociadas a este registro
-            cursor.execute('SELECT imagen_base64, description FROM fotos_registro_terranovus WHERE id_registro = %s', (id_reg,))
+            cursor.execute("""
+                SELECT imagen_url, imagen_base64, description 
+                FROM fotos_registro_terranovus 
+                WHERE id_registro = %s
+            """, (id_reg,))
             fotos_raw = cursor.fetchall()
-            
+
             fotos = []
             for f in fotos_raw:
-                img_str = f[0]
-                if img_str and "," in img_str:
-                    img_str = img_str.split(",")[1]
-                fotos.append({'base64': img_str, 'desc': f[1]})
+                url  = f[0]
+                b64  = f[1]
+                desc = f[2] or ''
+                if url:
+                    fotos.append({'base64': url, 'desc': desc})
+                elif b64:
+                    img_str = b64.split(',')[1] if ',' in b64 else b64
+                    fotos.append({'base64': img_str, 'desc': desc})
 
             reportes_completos.append({
                 'id_registro': id_reg,
