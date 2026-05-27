@@ -165,9 +165,7 @@ def invitar_usuarios():
 
     conn = None
     try:
-        conn = psycopg2.connect(POSTGRES_CONFIG)
-        cursor = conn.cursor()
-
+        conn, cursor = get_db_connection()
         # Obtener datos del administrador y su empresa
         cursor.execute("""
             SELECT name, empresa FROM usuario WHERE user_id = %s
@@ -529,8 +527,7 @@ def guardar_formulario():
 
 def create_user(nombre, apellido, email, password, cargo, rol, empresa):
     try:
-        conn = psycopg2.connect(POSTGRES_CONFIG)
-        cursor = conn.cursor()
+        conn, cursor = get_db_connection()
         
         hashed_password = generate_password_hash(password)
         
@@ -579,8 +576,7 @@ def insert_registro_bitacora(respuestas, id_proyecto, fotos=None, videos=None):
     """
     conn = None  # Definimos conn aquí para asegurarnos de que exista en el bloque finally
     try:
-        conn = psycopg2.connect(POSTGRES_CONFIG)
-        cursor = conn.cursor()
+        conn, cursor = get_db_connection()
 
         # CAMBIO 1: Simplificamos el INSERT principal.
         # - Eliminamos la columna 'foto_base64' que ya es obsoleta.
@@ -643,9 +639,7 @@ def insert_registro_bitacora(respuestas, id_proyecto, fotos=None, videos=None):
 
 def create_project(user_id, nombre, fecha_inicio, fecha_fin, director, ubicacion, coordenadas, cliente, numero_proyecto):
     try:
-        conn = psycopg2.connect(POSTGRES_CONFIG)
-        #conn = get_db_connection()
-        cursor = conn.cursor()
+        conn, cursor = get_db_connection()
         
         cursor.execute(
             """INSERT INTO proyectos (nombre_proyecto, fecha_inicio, fecha_fin, director_obra, ubicacion, coordenadas, user_id, cliente, numero_proyecto)
@@ -663,11 +657,16 @@ def create_project(user_id, nombre, fecha_inicio, fecha_fin, director, ubicacion
         if conn:
             conn.close()
 
+def get_db_connection():
+    conn, cursor = get_db_connection()
+    empresa_id = session.get('empresa_id', 1)
+    cursor.execute("SET app.empresa_id = %s", (empresa_id,))
+    return conn, cursor
+
 def get_user_projects(user_id):
     conn = None
     try:
-        conn = psycopg2.connect(POSTGRES_CONFIG)
-        cursor = conn.cursor()
+        conn, cursor = get_db_connection()
         
         cursor.execute(
             """SELECT 
@@ -678,8 +677,8 @@ def get_user_projects(user_id):
                 p.user_id,
                 p.estado,
                 COUNT(r.id_registro) as total_registros
-               FROM proyectosTerranovus p
-               LEFT JOIN registrosbitacoraterranovus r 
+               FROM proyectos p
+               LEFT JOIN registros r 
                    ON r.id_proyecto = p.id_proyecto
                WHERE p.user_id = %s 
                GROUP BY p.id_proyecto, p.nombre_proyecto, 
@@ -806,11 +805,10 @@ def paginaprincipal():
         return redirect(url_for('history')) # <--- AQUÍ ES DONDE TE ESTÁ MANDANDO
 
     try:
-        conn = psycopg2.connect(POSTGRES_CONFIG)
-        cursor = conn.cursor()
+        conn, cursor = get_db_connection()
         
         # ASEGÚRATE DE QUE ESTE QUERY USE LA TABLA NUEVA
-        cursor.execute('SELECT * FROM proyectosTerranovus WHERE id_proyecto = %s', (project_id,))
+        cursor.execute('SELECT * FROM proyectos WHERE id_proyecto = %s', (project_id,))
         proyecto = cursor.fetchone()
         
         if not proyecto:
@@ -852,24 +850,25 @@ def login():
     email = request.form.get('email')
     password = request.form.get('password')
     
-    # Validación básica de campos vacíos
     if not email or not password:
         flash('Por favor ingrese ambos campos: email y contraseña', 'error')
         return redirect(url_for('principalscreen'))
 
     user_id = verify_user(email, password)
     if user_id:
-        # Aquí puedes implementar sesiones o JWT
-        session['user_id'] = user_id #Establecer sesión
+        session['user_id'] = user_id
         conn_rol = psycopg2.connect(POSTGRES_CONFIG)
         cursor_rol = conn_rol.cursor()
-        cursor_rol.execute("SELECT rol FROM usuario WHERE user_id = %s", (user_id,))
+        cursor_rol.execute(
+            "SELECT rol, empresa_id FROM usuario WHERE user_id = %s", 
+            (user_id,)
+        )
         fila = cursor_rol.fetchone()
-        session['user_rol'] = fila[0] if fila else 'viewer'
+        session['user_rol']    = fila[0] if fila else 'viewer'
+        session['empresa_id']  = fila[1] if fila else 1
         conn_rol.close()
         try:
-            conn = psycopg2.connect(POSTGRES_CONFIG)
-            cursor = conn.cursor()
+            conn, cursor = get_db_connection()
             cursor.execute("""
                 UPDATE usuario SET estado = 'activo' 
                 WHERE user_id = %s AND estado = 'pendiente'
@@ -883,6 +882,7 @@ def login():
     else:
         flash('Email o contraseña incorrectos', 'error')
         return redirect(url_for('principalscreen'))
+
 """
 @app.route('/index')
 def index():
@@ -899,12 +899,11 @@ def index():
     
     if project_id:
         try:
-            conn = psycopg2.connect(POSTGRES_CONFIG)
-            cursor = conn.cursor()
+            conn, cursor = get_db_connection()
             # Consultamos las columnas exactas de tu tabla según las imágenes
             cursor.execute("""
                 SELECT nombre_proyecto, cliente, contratista, orden_de_trabajo, ubicacion 
-                FROM proyectosTerranovus 
+                FROM proyectos 
                 WHERE id_proyecto = %s
             """, (project_id,))
             row = cursor.fetchone()
@@ -1222,8 +1221,7 @@ def usuario():
         return redirect(url_for('registros'))
     conn = None
     try:
-        conn = psycopg2.connect(POSTGRES_CONFIG)
-        cursor = conn.cursor()
+        conn, cursor = get_db_connection()
         
         # Usuarios del mismo tenant/organización
         cursor.execute("""
@@ -1261,11 +1259,10 @@ def historialregistro(id_proyecto):
     
     conn = None
     try:
-        conn = psycopg2.connect(POSTGRES_CONFIG)
-        cursor = conn.cursor()
+        conn, cursor = get_db_connection()
 
         # 1. Info del proyecto (Usar comillas dobles para la tabla)
-        cursor.execute('SELECT nombre_proyecto, cliente FROM proyectosTerranovus WHERE id_proyecto = %s', (id_proyecto,))
+        cursor.execute('SELECT nombre_proyecto, cliente FROM proyectos WHERE id_proyecto = %s', (id_proyecto,))
         proyecto_info = cursor.fetchone()
 
         if not proyecto_info:
@@ -1276,7 +1273,7 @@ def historialregistro(id_proyecto):
             SELECT r.id_registro, r.fecha, r.actividad, r.descripcion_actividad, 
                 r.estado, r.porcentaje_avance,
                 u.name, u.apellido, u.cargo
-            FROM registrosbitacoraterranovus r
+            FROM registros r
             LEFT JOIN usuario u ON u.user_id = r.user_id
             WHERE r.id_proyecto = %s 
             ORDER BY r.fecha DESC, r.id_registro DESC
@@ -1291,7 +1288,7 @@ def historialregistro(id_proyecto):
             # 3. Consultar fotos asociadas a este registro
             cursor.execute("""
                 SELECT imagen_url, imagen_base64, description 
-                FROM fotos_registro_terranovus 
+                FROM fotos_registro
                 WHERE id_registro = %s
             """, (id_reg,))
             fotos_raw = cursor.fetchall()
@@ -1337,8 +1334,7 @@ def detalleRegistro(id_registro):
  
     conn = None
     try:
-        conn = psycopg2.connect(POSTGRES_CONFIG)
-        cursor = conn.cursor()
+        conn, cursor = get_db_connection()
  
         # Traer el registro con datos del usuario
         cursor.execute("""
@@ -1353,7 +1349,7 @@ def detalleRegistro(id_registro):
                 u.name,
                 u.apellido,
                 u.cargo
-            FROM registrosbitacoraterranovus r
+            FROM registros r
             LEFT JOIN usuario u ON u.user_id = r.user_id
             WHERE r.id_registro = %s
         """, (id_registro,))
@@ -1391,7 +1387,7 @@ def detalleRegistro(id_registro):
         # Traer fotos del registro
         cursor.execute("""
             SELECT imagen_url, imagen_base64, description
-            FROM fotos_registro_terranovus
+            FROM fotos_registro
             WHERE id_registro = %s
         """, (id_registro,))
 
@@ -1429,8 +1425,7 @@ def guardar_reporte_terranovus():
     data = request.json
     conn = None
     try:
-        conn = psycopg2.connect(POSTGRES_CONFIG)
-        cursor = conn.cursor()
+        conn, cursor = get_db_connection()
 
         # Extraer el ID del proyecto y del usuario
         id_proyecto = data.get('id_proyecto')
@@ -1440,7 +1435,7 @@ def guardar_reporte_terranovus():
         for nota in data.get('notas', []):
             # 1. Insertar en la tabla maestra de registros
             cursor.execute("""
-                INSERT INTO registrosbitacoraterranovus (
+                INSERT INTO registros(
                     id_proyecto, actividad, descripcion_actividad, 
                     estado, porcentaje_avance, user_id
                 ) VALUES (%s, %s, %s, %s, %s, %s) 
@@ -1459,7 +1454,7 @@ def guardar_reporte_terranovus():
             # 2. Insertar las fotos asociadas a ESTA actividad específica
             for foto_obj in nota.get('fotos_detalle', []):
                 cursor.execute("""
-                    INSERT INTO fotos_registro_terranovus (
+                    INSERT INTO fotos_registro (
                         id_registro, imagen_url, description
                     ) VALUES (%s, %s, %s)
                 """, (
@@ -1486,11 +1481,10 @@ def add_project():
     if request.method == 'POST':
         try:
             data = request.json
-            conn = psycopg2.connect(POSTGRES_CONFIG)
-            cursor = conn.cursor()
+            conn, cursor = get_db_connection()
             
             cursor.execute("""
-                INSERT INTO proyectosTerranovus (
+                INSERT INTO proyectos (
                     nombre_proyecto, fecha_inicio, fecha_fin, cliente, contratista, 
                     orden_de_trabajo, ubicacion, user_id
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s) 
@@ -1515,8 +1509,7 @@ def add_project():
     # GET — cargar usuarios disponibles para mostrar en el equipo
     usuarios = []
     try:
-        conn = psycopg2.connect(POSTGRES_CONFIG)
-        cursor = conn.cursor()
+        conn, cursor = get_db_connection()
         cursor.execute("""
             SELECT user_id, name, apellido, cargo 
             FROM usuario 
@@ -1562,8 +1555,7 @@ def guardar_inspeccion():
         if not project_id or not items:
             return jsonify({'success': False, 'error': 'Datos incompletos'}), 400
 
-        conn = psycopg2.connect(POSTGRES_CONFIG)
-        cursor = conn.cursor()
+        conn, cursor = get_db_connection()
 
         for item in items:
             cursor.execute("""
@@ -1611,8 +1603,7 @@ def guardar_registro():
         if not project_id or not items:
             return jsonify({"error": "Faltan datos requeridos."}), 400
 
-        conn = psycopg2.connect(POSTGRES_CONFIG)
-        cursor = conn.cursor()
+        conn, cursor = get_db_connection()
 
         # 1. Bucle principal para guardar cada ítem
         for item in items:
@@ -1671,8 +1662,7 @@ def eliminar_usuario(user_id):
 
     conn = None
     try:
-        conn = psycopg2.connect(POSTGRES_CONFIG)
-        cursor = conn.cursor()
+        conn, cursor = get_db_connection()
 
         # Verificar que el usuario pertenece a la misma empresa
         cursor.execute("""
@@ -1706,8 +1696,7 @@ def eliminar_proyecto():
         return jsonify({'error': 'Falta el ID del proyecto'}), 400
 
     try:
-        conn = psycopg2.connect(POSTGRES_CONFIG)
-        cursor = conn.cursor()
+        conn, cursor = get_db_connection()
 
         # Asegurarse de que el proyecto pertenece al usuario
         cursor.execute("""
@@ -1800,8 +1789,7 @@ def exportar_registros_excel():
         return "No se seleccionaron registros ni proyecto", 400
 
     try:
-        conn = psycopg2.connect(POSTGRES_CONFIG)
-        cursor = conn.cursor()
+        conn, cursor = get_db_connection()
 
         if not registro_ids:
             cursor.execute("""
@@ -1889,14 +1877,13 @@ def exportar_proyectos_pdf():
     pdf.set_auto_page_break(auto=True, margin=15)
 
     try:
-        conn = psycopg2.connect(POSTGRES_CONFIG)
-        cursor = conn.cursor()
+        conn, cursor = get_db_connection()
 
         for pid in project_ids:
-            # 1. Info del proyecto (Tabla: proyectosTerranovus)
+            # 1. Info del proyecto (Tabla: proyectos)
             cursor.execute("""
                 SELECT nombre_proyecto, cliente, contratista, orden_de_trabajo, ubicacion, fecha_inicio 
-                FROM proyectosTerranovus WHERE id_proyecto = %s
+                FROM proyectos WHERE id_proyecto = %s
             """, (pid,))
             proyecto = cursor.fetchone()
             if not proyecto: continue
@@ -1942,7 +1929,7 @@ def exportar_proyectos_pdf():
             # --- REGISTROS DE ACTIVIDAD ---
             cursor.execute("""
                 SELECT id_registro, actividad, descripcion_actividad, estado, porcentaje_avance, fecha
-                FROM registrosbitacoraterranovus 
+                FROM registros
                 WHERE id_proyecto = %s ORDER BY fecha DESC
             """, (pid,))
             registros = cursor.fetchall()
@@ -1969,7 +1956,7 @@ def exportar_proyectos_pdf():
                 pdf.cell(95, 8, f" AVANCE: {avance or 0}%", border=1, fill=True, ln=True)
                 
                 # --- SECCIÓN DE EVIDENCIA FOTOGRÁFICA ---
-                cursor.execute("SELECT imagen_base64, description FROM fotos_registro_terranovus WHERE id_registro = %s", (id_reg,))
+                cursor.execute("SELECT imagen_base64, description FROM fotos_registro WHERE id_registro = %s", (id_reg,))
                 fotos = cursor.fetchall()
                 
                 if fotos:
@@ -2041,11 +2028,10 @@ def tablero_bi():
     
     conn = None
     try:
-        conn = psycopg2.connect(POSTGRES_CONFIG)
-        cursor = conn.cursor()
+        conn, cursor = get_db_connection()
 
         # 1. Estadísticas Generales de Proyectos
-        cursor.execute('SELECT COUNT(*) FROM proyectosTerranovus WHERE user_id = %s', (session['user_id'],))
+        cursor.execute('SELECT COUNT(*) FROM proyectos WHERE user_id = %s', (session['user_id'],))
         total_proyectos = cursor.fetchone()[0]
 
         # 2. Avance promedio y total de registros
@@ -2053,8 +2039,8 @@ def tablero_bi():
             SELECT 
                 COUNT(r.id_registro), 
                 AVG(r.porcentaje_avance) 
-            FROM registrosbitacoraterranovus r
-            JOIN proyectosTerranovus p ON r.id_proyecto = p.id_proyecto
+            FROM registros r
+            JOIN proyectos p ON r.id_proyecto = p.id_proyecto
             WHERE p.user_id = %s
         """, (session['user_id'],))
         stats = cursor.fetchone()
@@ -2064,8 +2050,8 @@ def tablero_bi():
         # 3. Conteo por Estados (para gráfico de torta)
         cursor.execute("""
             SELECT estado, COUNT(*) 
-            FROM registrosbitacoraterranovus r
-            JOIN proyectosTerranovus p ON r.id_proyecto = p.id_proyecto
+            FROM registros r
+            JOIN proyectos p ON r.id_proyecto = p.id_proyecto
             WHERE p.user_id = %s
             GROUP BY estado
         """, (session['user_id'],))
@@ -2095,8 +2081,7 @@ def exportar_proyectos_excel():
         return "No se seleccionaron proyectos", 400
 
     try:
-        conn = psycopg2.connect(POSTGRES_CONFIG)
-        cursor = conn.cursor()
+        conn, cursor = get_db_connection()
         wb = Workbook()
         wb.remove(wb.active)  # Eliminar hoja por defecto
 
