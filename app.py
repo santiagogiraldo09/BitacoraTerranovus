@@ -1273,16 +1273,20 @@ def historialregistro(id_proyecto):
 
         # 2. Consultar registros de la nueva tabla Terranovus
         cursor.execute("""
-            SELECT id_registro, fecha, actividad, descripcion_actividad, estado, porcentaje_avance 
-            FROM registrosbitacoraterranovus 
-            WHERE id_proyecto = %s ORDER BY fecha DESC, id_registro DESC
+            SELECT r.id_registro, r.fecha, r.actividad, r.descripcion_actividad, 
+                r.estado, r.porcentaje_avance,
+                u.name, u.apellido, u.cargo
+            FROM registrosbitacoraterranovus r
+            LEFT JOIN usuario u ON u.user_id = r.user_id
+            WHERE r.id_proyecto = %s 
+            ORDER BY r.fecha DESC, r.id_registro DESC
         """, (id_proyecto,))
         
         registros_rows = cursor.fetchall()
         reportes_completos = []
 
         for r_row in registros_rows:
-            id_reg, fecha_dt, act, desc, est, avan = r_row
+            id_reg, fecha_dt, act, desc, est, avan, nombre, apellido, cargo = r_row
             
             # 3. Consultar fotos asociadas a este registro
             cursor.execute("""
@@ -1304,13 +1308,16 @@ def historialregistro(id_proyecto):
                     fotos.append({'url': None, 'base64': img_str, 'desc': desc})
 
             reportes_completos.append({
-                'id_registro': id_reg,
-                'fecha': fecha_dt.strftime('%d/%m/%Y') if fecha_dt else "S/F",
-                'actividad': act,
-                'descripcion': desc,
-                'estado': est,
-                'avance': avan,
-                'fotos': fotos
+                'id_registro':       id_reg,
+                'fecha':             fecha_dt.strftime('%d/%m/%Y') if fecha_dt else "S/F",
+                'actividad':         act,
+                'descripcion':       desc,
+                'estado':            est,
+                'avance':            avan,
+                'usuario_nombre':    f"{nombre or ''} {apellido or ''}".strip() or 'Sin asignar',
+                'usuario_cargo':     cargo or '',
+                'usuario_iniciales': ((nombre or '')[0] + (apellido or '')[0]).upper() if nombre and apellido else '??',
+                'fotos':             fotos
             })
 
         return render_template('historialRegistro.html', 
