@@ -657,7 +657,7 @@ def create_project(user_id, nombre, fecha_inicio, fecha_fin, director, ubicacion
         if conn:
             conn.close()
 
-ddef get_db_connection():
+def get_db_connection():
     conn = psycopg2.connect(POSTGRES_CONFIG)
     cursor = conn.cursor()
     empresa_id = session.get('empresa_id', 1)
