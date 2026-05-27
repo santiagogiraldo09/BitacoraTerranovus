@@ -1441,14 +1441,15 @@ def guardar_reporte_terranovus():
                     id_proyecto, actividad, descripcion_actividad, 
                     estado, porcentaje_avance, user_id
                 ) VALUES (%s, %s, %s, %s, %s, %s) 
-                RETURNING id_registro
+                RETURNING id
             """, (
                 id_proyecto, 
                 nota.get('titulo'), # Campo 'Actividad' en tu SQL
                 nota.get('texto'),  # Campo 'descripcion_actividad'
                 nota.get('estado'), 
                 nota.get('avance'), 
-                user_id
+                user_id,
+                session.get('empresa_id')
             ))
             
             id_registro = cursor.fetchone()[0]
