@@ -905,7 +905,7 @@ def index():
             cursor.execute("""
                 SELECT nombre_proyecto, cliente, contratista, orden_de_trabajo, ubicacion 
                 FROM proyectos 
-                WHERE id_proyecto = %s
+                WHERE id = %s
             """, (project_id,))
             row = cursor.fetchone()
             if row:
@@ -1439,8 +1439,8 @@ def guardar_reporte_terranovus():
             cursor.execute("""
                 INSERT INTO registros(
                     id_proyecto, actividad, descripcion_actividad, 
-                    estado, porcentaje_avance, user_id
-                ) VALUES (%s, %s, %s, %s, %s, %s) 
+                    estado, porcentaje_avance, user_id, empresa_id
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s) 
                 RETURNING id
             """, (
                 id_proyecto, 
