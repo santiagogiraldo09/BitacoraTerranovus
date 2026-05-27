@@ -1264,7 +1264,7 @@ def historialregistro(id_proyecto):
         conn, cursor = get_db_connection()
 
         # 1. Info del proyecto (Usar comillas dobles para la tabla)
-        cursor.execute('SELECT nombre_proyecto, cliente FROM proyectos WHERE id_proyecto = %s', (id_proyecto,))
+        cursor.execute('SELECT nombre_proyecto, cliente FROM proyectos WHERE id = %s', (id_proyecto,))
         proyecto_info = cursor.fetchone()
 
         if not proyecto_info:
