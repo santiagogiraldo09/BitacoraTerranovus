@@ -1458,12 +1458,13 @@ def guardar_reporte_terranovus():
             for foto_obj in nota.get('fotos_detalle', []):
                 cursor.execute("""
                     INSERT INTO fotos_registro (
-                        id_registro, imagen_url, description
-                    ) VALUES (%s, %s, %s)
+                        id_registro, imagen_url, description, empresa_id
+                    ) VALUES (%s, %s, %s, %s)
                 """, (
                     id_registro,
                     foto_obj.get('imagen_url'),
-                    foto_obj.get('description')
+                    foto_obj.get('description'),
+                    session.get('empresa_id')
                 ))
 
         conn.commit()
