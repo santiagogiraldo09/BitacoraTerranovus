@@ -1289,7 +1289,7 @@ def historialregistro(id_proyecto):
             
             # 3. Consultar fotos asociadas a este registro
             cursor.execute("""
-                SELECT imagen_url, imagen_base64, description 
+                SELECT imagen_url, description 
                 FROM fotos_registro
                 WHERE id_registro = %s
             """, (id_reg,))
@@ -1298,13 +1298,12 @@ def historialregistro(id_proyecto):
             fotos = []
             for f in fotos_raw:
                 url  = f[0]
-                b64  = f[1]
-                desc = f[2] or ''
+                desc = f[1] or ''
                 if url:
                     fotos.append({'url': url, 'base64': None, 'desc': desc})
-                elif b64:
-                    img_str = b64.split(',')[1] if ',' in b64 else b64
-                    fotos.append({'url': None, 'base64': img_str, 'desc': desc})
+                #elif b64:
+                    #img_str = b64.split(',')[1] if ',' in b64 else b64
+                    #fotos.append({'url': None, 'base64': img_str, 'desc': desc})
 
             reportes_completos.append({
                 'id_registro':       id_reg,
