@@ -1532,6 +1532,11 @@ def add_project():
 
     return render_template('addproject.html', usuarios=usuarios)
 
+@app.route('/generar-hash')
+def generar_hash():
+    from werkzeug.security import generate_password_hash
+    return generate_password_hash('Bitacora2026*')
+
 
 @app.route('/ask', methods=['POST'])
 def ask_question_route():
