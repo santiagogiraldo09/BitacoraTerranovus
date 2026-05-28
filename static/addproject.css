@@ -215,6 +215,7 @@ input::placeholder { color: #c4c9d4; }
 .btn-cancelar:hover { color: var(--texto); border-color: var(--texto); }
 
 /* Nav inferior */
+/*
 .bottom-nav {
     display: flex;
     position: fixed;
@@ -235,6 +236,7 @@ input::placeholder { color: #c4c9d4; }
 }
 .bottom-nav-item i { font-size: 20px; }
 .bottom-nav-item:hover { color: var(--naranja); }
+*/
 
 /* Desktop */
 @media screen and (min-width: 769px) {
@@ -243,9 +245,11 @@ input::placeholder { color: #c4c9d4; }
         max-width: 100%;
     }
 
-    .section {
+    .bottom-nav { display: flex; }
+
+    /*.section {
         max-width: 720px;
-    }
+    }*/
 
     .bottom-actions {
         flex-direction: row;
