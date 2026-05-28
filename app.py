@@ -1444,6 +1444,75 @@ def guardar_contacto():
         return jsonify({"error": str(e)}), 500
 
 
+@app.route('/detalleContacto/<int:id_contacto>')
+def detalleContacto(id_contacto):
+    if 'user_id' not in session:
+        return redirect(url_for('principalscreen'))
+ 
+    conn = None
+    try:
+        conn, cursor = get_db_connection()
+ 
+        cursor.execute("""
+            SELECT 
+                c.id, c.nombre, c.empresa, c.cargo,
+                c.telefono, c.email, c.ciudad, c.notas,
+                c.created_at,
+                u.name, u.apellido, u.cargo as user_cargo
+            FROM contactos c
+            LEFT JOIN usuario u ON u.user_id = c.user_id
+            WHERE c.id = %s
+        """, (id_contacto,))
+ 
+        row = cursor.fetchone()
+        if not row:
+            return redirect(url_for('registros'))
+ 
+        created_at = row[8]
+        nombre     = row[9] or ''
+        apellido   = row[10] or ''
+        iniciales  = (nombre[0] + apellido[0]).upper() if nombre and apellido else '??'
+ 
+        contacto = {
+            'id':                id_contacto,
+            'nombre':            row[1],
+            'empresa':           row[2] or '',
+            'cargo':             row[3] or '',
+            'telefono':          row[4] or '',
+            'email':             row[5] or '',
+            'ciudad':            row[6] or '',
+            'notas':             row[7] or '',
+            'fecha':             created_at.strftime('%d %b %Y') if created_at else '',
+            'created_at_texto':  created_at.strftime('%d %b %Y - %H:%M') if created_at else '',
+            'usuario_nombre':    f"{nombre} {apellido}".strip() or 'Sin asignar',
+            'usuario_cargo':     row[11] or '',
+            'usuario_iniciales': iniciales,
+            'imagenes':          []
+        }
+ 
+        cursor.execute("""
+            SELECT imagen_url, descripcion
+            FROM contacto_imagenes
+            WHERE contacto_id = %s
+        """, (id_contacto,))
+ 
+        for img_row in cursor.fetchall():
+            if img_row[0]:
+                contacto['imagenes'].append({
+                    'url':  img_row[0],
+                    'desc': img_row[1] or ''
+                })
+ 
+        return render_template('detalleContacto.html', contacto=contacto)
+ 
+    except Exception as e:
+        print(f"Error en detalleContacto: {e}")
+        return redirect(url_for('registros'))
+    finally:
+        if conn:
+            conn.close()
+
+
 @app.route('/formContacto')
 def form_contacto():
     if 'user_id' not in session:

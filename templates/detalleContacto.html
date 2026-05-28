@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalle de Contacto — Bitácora IAC</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='detalleRegistro.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="page-wrapper">
+
+    <!-- Header fijo -->
+    <header class="page-header">
+        <button class="btn-back" onclick="history.back()">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <span class="header-title">Detalle de Contacto</span>
+    </header>
+
+    <div class="content-scroll">
+
+        <!-- ID y fecha -->
+        <div class="meta-top">
+            <span class="registro-id">CONT-{{ '%04d' | format(contacto.id) }}</span>
+            <span class="updated-at">
+                <i class="fas fa-clock"></i> {{ contacto.created_at_texto | default('Sin fecha') }}
+            </span>
+        </div>
+
+        <!-- Nombre -->
+        <h1 class="actividad-title">{{ contacto.nombre }}</h1>
+
+        <!-- Datos clave -->
+        <div class="datos-row">
+            <div class="dato-item">
+                <span class="dato-label"><i class="fas fa-building"></i> EMPRESA</span>
+                <span class="dato-value">{{ contacto.empresa or '—' }}</span>
+            </div>
+            <div class="dato-item">
+                <span class="dato-label"><i class="fas fa-briefcase"></i> CARGO</span>
+                <span class="dato-value">{{ contacto.cargo or '—' }}</span>
+            </div>
+        </div>
+
+        <div class="datos-row">
+            <div class="dato-item">
+                <span class="dato-label"><i class="fas fa-phone"></i> TELÉFONO</span>
+                <span class="dato-value">
+                    {% if contacto.telefono %}
+                    <a href="tel:{{ contacto.telefono }}" style="color: var(--naranja);">
+                        {{ contacto.telefono }}
+                    </a>
+                    {% else %}—{% endif %}
+                </span>
+            </div>
+            <div class="dato-item">
+                <span class="dato-label"><i class="fas fa-envelope"></i> CORREO</span>
+                <span class="dato-value">
+                    {% if contacto.email %}
+                    <a href="mailto:{{ contacto.email }}" style="color: var(--naranja); font-size: 12px;">
+                        {{ contacto.email }}
+                    </a>
+                    {% else %}—{% endif %}
+                </span>
+            </div>
+        </div>
+
+        <div class="datos-row">
+            <div class="dato-item">
+                <span class="dato-label"><i class="fas fa-map-marker-alt"></i> CIUDAD</span>
+                <span class="dato-value">{{ contacto.ciudad or '—' }}</span>
+            </div>
+            <div class="dato-item">
+                <span class="dato-label"><i class="fas fa-calendar-alt"></i> FECHA</span>
+                <span class="dato-value">{{ contacto.fecha }}</span>
+            </div>
+        </div>
+
+        <!-- Notas -->
+        {% if contacto.notas %}
+        <div class="seccion">
+            <div class="seccion-header">
+                <i class="fas fa-sticky-note seccion-icon"></i>
+                <h2 class="seccion-title">Notas Generales</h2>
+            </div>
+            <div class="descripcion-box">
+                <p>"{{ contacto.notas }}"</p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Galería -->
+        {% if contacto.imagenes %}
+        <div class="seccion">
+            <div class="seccion-header">
+                <i class="fas fa-images seccion-icon"></i>
+                <h2 class="seccion-title">Imágenes</h2>
+                <span class="fotos-count">{{ contacto.imagenes | length }} foto{% if contacto.imagenes | length != 1 %}s{% endif %}</span>
+            </div>
+            <div class="galeria-grid">
+                {% for img in contacto.imagenes %}
+                <div class="foto-item" onclick="abrirFoto(this)">
+                    <img src="{{ img.url }}" alt="{{ img.desc | default('Imagen') }}" class="foto-img">
+                    {% if img.desc %}
+                    <p class="foto-caption">{{ img.desc }}</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Capturado por -->
+        <div class="seccion">
+            <div class="seccion-header">
+                <i class="fas fa-user seccion-icon"></i>
+                <h2 class="seccion-title">Capturado por</h2>
+            </div>
+            <div class="card-user" style="padding-top: 0; border-top: none;">
+                <div class="user-initials">{{ contacto.usuario_iniciales }}</div>
+                <div class="user-info">
+                    <span class="user-name">{{ contacto.usuario_nombre }}</span>
+                    <span class="user-role">{{ contacto.usuario_cargo }}</span>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Nav inferior -->
+    <nav class="bottom-nav">
+        <a href="{{ url_for('registros') }}" class="bottom-nav-item">
+            <i class="fas fa-folder-open"></i>
+            <span>Proyectos</span>
+        </a>
+    </nav>
+
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="cerrarFoto()">
+    <img id="lightbox-img" src="" alt="">
+</div>
+
+<script>
+    function abrirFoto(el) {
+        const img = el.querySelector('img');
+        document.getElementById('lightbox-img').src = img.src;
+        document.getElementById('lightbox').classList.add('active');
+    }
+    function cerrarFoto() {
+        document.getElementById('lightbox').classList.remove('active');
+    }
+</script>
+</body>
+</html>
