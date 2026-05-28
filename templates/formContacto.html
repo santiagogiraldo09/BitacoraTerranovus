@@ -242,9 +242,14 @@
     }
 
     async function subirFoto(file) {
-        const reader = new FileReader();
-        reader.onload = async (e) => await subirFotoBase64(e.target.result);
-        reader.readAsDataURL(file);
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                await subirFotoBase64(e.target.result);
+                resolve();
+            };
+            reader.readAsDataURL(file);
+        });
     }
 
     async function subirFotoBase64(base64Data) {
@@ -258,9 +263,11 @@
             if (result.url) {
                 fotos.push({ url: result.url, descripcion: '' });
                 renderGaleria();
+            } else {
+                alert('Error al subir la imagen.');
             }
         } catch (e) {
-            alert('Error al subir la imagen.');
+            alert('Error de conexión al subir la imagen.');
         }
     }
 
