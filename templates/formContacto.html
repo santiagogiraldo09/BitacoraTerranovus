@@ -291,26 +291,32 @@
 
     // ── Voz ──
     function setupVoz() {
-        document.querySelectorAll('.form-group').forEach(group => {
-            const recordBtn = group.querySelector('.record-btn');
-            const stopBtn   = group.querySelector('.stop-btn');
-            const input     = group.querySelector('.field-input');
-            if (!recordBtn || !input) return;
+    document.querySelectorAll('.form-group').forEach(group => {
+        const recordBtn = group.querySelector('.record-btn');
+        const stopBtn   = group.querySelector('.stop-btn');
+        const input     = group.querySelector('.field-input');
+        if (!recordBtn || !input) return;
 
-            recordBtn.onclick = () => {
-                recordBtn.style.display = 'none';
-                stopBtn.style.display   = 'inline-flex';
-                if (typeof startVoiceRecognition === 'function') {
-                    startVoiceRecognition(input, recordBtn, stopBtn);
-                }
-            };
-            stopBtn.onclick = () => {
-                if (window.currentRecognition) window.currentRecognition.stop();
+        recordBtn.setAttribute('data-target-input', input.id);
+
+        recordBtn.onclick = () => {
+            recordBtn.style.display = 'none';
+            stopBtn.style.display   = 'inline-flex';
+            if (typeof startVoiceRecognition === 'function') {
+                startVoiceRecognition(input, recordBtn, stopBtn);
+            } else {
+                alert('Reconocimiento de voz no disponible.');
                 stopBtn.style.display   = 'none';
                 recordBtn.style.display = 'inline-flex';
-            };
-        });
-    }
+            }
+        };
+        stopBtn.onclick = () => {
+            if (window.currentRecognition) window.currentRecognition.stop();
+            stopBtn.style.display   = 'none';
+            recordBtn.style.display = 'inline-flex';
+        };
+    });
+}
 
     // ── Guardar ──
     async function guardarContacto() {
@@ -355,5 +361,6 @@
 
     document.addEventListener('DOMContentLoaded', setupVoz);
 </script>
+<script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

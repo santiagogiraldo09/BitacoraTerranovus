@@ -1340,9 +1340,9 @@ def guardar_contacto():
 
         cursor.execute("""
             INSERT INTO contactos 
-                (empresa_id, user_id, nombre, empresa, cargo, 
-                 telefono, email, ciudad, notas)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (empresa_id, user_id, id_proyecto, nombre, empresa, cargo, 
+                telefono, email, ciudad, notas)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id
         """, (
             empresa_id, session['user_id'],
