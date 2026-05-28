@@ -26,10 +26,11 @@
                     <i class="fas fa-folder-open"></i>
                     <span>Proyectos</span>
                 </a>
+                <!--
                 <a href="{{ url_for('history') }}" class="nav-item">
                     <i class="fas fa-history"></i>
                     <span>Historial</span>
-                </a>
+                </a> -->
                 {% if session.get('user_rol') == 'admin' %}
                 <a href="{{ url_for('usuario') }}" class="nav-item">
                     <i class="fas fa-users"></i>

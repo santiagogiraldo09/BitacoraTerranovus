@@ -42,12 +42,18 @@
         </div>
 
         <!-- Contador -->
-        <div class="section-header-row">
+         <div class="section-header-row">
+            <h2 class="section-title">Contactos capturados</h2>
+            <span class="badge-count" id="contadorRegistros">
+                {{ reportes | length }} contactos
+            </span>
+        </div>
+        <!--<div class="section-header-row">
             <h2 class="section-title">Bitácora de actividades</h2>
             <span class="badge-count" id="contadorRegistros">
                 {{ reportes | length }} registros
             </span>
-        </div>
+        </div> -->
 
         <!-- Tarjetas de registros -->
         <div class="records-list" id="recordsList">
@@ -123,8 +129,12 @@
             {% else %}
                 <div class="empty-state">
                     <i class="fas fa-clipboard fa-3x"></i>
-                    <p>No hay registros para este proyecto.</p>
+                    <p>No hay contactos capturados para este proyecto.</p>
                 </div>
+                <!--<div class="empty-state">
+                    <i class="fas fa-clipboard fa-3x"></i>
+                    <p>No hay registros para este proyecto.</p>
+                </div> -->
             {% endif %}
         </div>
 

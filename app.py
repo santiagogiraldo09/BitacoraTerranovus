@@ -677,6 +677,26 @@ def get_user_projects(user_id):
                 p.cliente, 
                 p.user_id,
                 p.estado,
+                COUNT(c.id) as total_registros
+            FROM proyectos p
+            INNER JOIN proyecto_usuarios pu ON pu.id_proyecto = p.id
+            LEFT JOIN contactos c ON c.id_proyecto = p.id
+            WHERE pu.user_id = %s 
+            GROUP BY p.id, p.nombre_proyecto, 
+                    p.fecha_inicio, p.cliente, p.user_id, p.estado
+            ORDER BY p.fecha_inicio DESC
+        """, (user_id,)
+        )
+
+        '''
+        cursor.execute("""
+            SELECT 
+                p.id, 
+                p.nombre_proyecto, 
+                p.fecha_inicio, 
+                p.cliente, 
+                p.user_id,
+                p.estado,
                 COUNT(r.id) as total_registros
             FROM proyectos p
             INNER JOIN proyecto_usuarios pu ON pu.id_proyecto = p.id
@@ -687,6 +707,7 @@ def get_user_projects(user_id):
             ORDER BY p.fecha_inicio DESC
         """, (user_id,)
         )
+        '''
         
         projects = []
         for row in cursor.fetchall():
@@ -1272,6 +1293,58 @@ def historialregistro(id_proyecto):
 
         # 2. Consultar registros de la nueva tabla Terranovus
         cursor.execute("""
+            SELECT c.id, c.nombre, c.empresa, c.cargo,
+                c.telefono, c.email, c.ciudad, c.notas,
+                c.created_at,
+                u.name, u.apellido, u.cargo as user_cargo
+            FROM contactos c
+            LEFT JOIN usuario u ON u.user_id = c.user_id
+            WHERE c.id_proyecto = %s
+            ORDER BY c.created_at DESC
+        """, (id_proyecto,))
+
+        registros_rows = cursor.fetchall()
+        reportes_completos = []
+
+        for r_row in registros_rows:
+            id_c, nombre, empresa, cargo, telefono, email, ciudad, notas, created_at, u_name, u_apellido, u_cargo = r_row
+
+            u_name    = u_name or ''
+            u_apellido = u_apellido or ''
+            iniciales = (u_name[0] + u_apellido[0]).upper() if u_name and u_apellido else '??'
+
+            # Fotos del contacto
+            cursor.execute("""
+                SELECT imagen_url, descripcion
+                FROM contacto_imagenes
+                WHERE contacto_id = %s
+            """, (id_c,))
+
+            fotos = []
+            for f in cursor.fetchall():
+                if f[0]:
+                    fotos.append({'url': f[0], 'base64': None, 'desc': f[1] or ''})
+
+            reportes_completos.append({
+                'id_registro':       id_c,
+                'actividad':         nombre,
+                'descripcion':       f"{empresa or ''} · {cargo or ''}".strip(' ·'),
+                'estado':            ciudad or '',
+                'avance':            None,
+                'fecha':             created_at.strftime('%d/%m/%Y') if created_at else 'S/F',
+                'hora':              created_at.strftime('%I:%M %p') if created_at else None,
+                'usuario_nombre':    f"{u_name} {u_apellido}".strip() or 'Sin asignar',
+                'usuario_cargo':     u_cargo or '',
+                'usuario_iniciales': iniciales,
+                'fotos':             fotos,
+                'telefono':          telefono or '',
+                'email':             email or '',
+                'notas':             notas or ''
+            })
+
+
+        '''
+        cursor.execute("""
             SELECT r.id, r.fecha, r.actividad, r.descripcion_actividad, 
                 r.estado, r.porcentaje_avance,
                 u.name, u.apellido, u.cargo
@@ -1317,6 +1390,7 @@ def historialregistro(id_proyecto):
                 'usuario_iniciales': ((nombre or '')[0] + (apellido or '')[0]).upper() if nombre and apellido else '??',
                 'fotos':             fotos
             })
+            '''
 
         return render_template('historialRegistro.html', 
                                proyecto=proyecto_info, 
