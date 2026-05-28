@@ -185,7 +185,7 @@ input::placeholder { color: #c4c9d4; }
 /* Botones fijos abajo */
 .bottom-actions {
     position: fixed;
-    bottom: 60px; left: 0; right: 0;
+    bottom: 0px; left: 0; right: 0;
     padding: 12px 16px;
     background: var(--blanco);
     border-top: 1px solid var(--gris-borde);
