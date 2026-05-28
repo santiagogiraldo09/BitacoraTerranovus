@@ -12,153 +12,123 @@
 </head>
 <body>
 
-<div class="app-layout">
+<div class="page-wrapper">
 
-    <!-- SIDEBAR (solo desktop) -->
-    <aside class="sidebar">
-        <div class="sidebar-logo">
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="IAC Logo" class="sidebar-logo-img">
-        </div>
-        <nav class="sidebar-nav">
-            <a href="{{ url_for('registros') }}" class="nav-item">
-                <i class="fas fa-folder-open"></i>
-                <span>Proyectos</span>
-            </a>
-            <a href="{{ url_for('history') }}" class="nav-item">
-                <i class="fas fa-history"></i>
-                <span>Historial</span>
-            </a>
-            {% if session.get('user_rol') == 'admin' %}
-            <a href="{{ url_for('usuario') }}" class="nav-item">
-                <i class="fas fa-users"></i>
-                <span>Usuarios</span>
-            </a>
-            {% endif %}
-        </nav>
-        <div class="sidebar-footer">
-            <div class="sidebar-user">
-                <div class="user-avatar"><i class="fas fa-user"></i></div>
-                <div class="user-info">
-                    <span class="user-name">{{ session.get('user_name', 'Usuario') }}</span>
-                    <span class="user-role">{{ session.get('user_rol', '') }}</span>
+    <!-- Header fijo -->
+    <header class="page-header">
+        <button class="btn-back" onclick="window.location.href='/registros'">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <span class="page-title">Nuevo Proyecto</span>
+    </header>
+
+    <!-- Formulario con scroll interno -->
+    <div class="form-scroll">
+        <form id="project-form">
+
+            <!-- Sección 1: Identificación -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-icon">
+                        <i class="fas fa-tag"></i>
+                    </span>
+                    <h3 class="section-title">Identificación</h3>
+                </div>
+                <div class="field-group">
+                    <label for="project-name">Nombre del proyecto</label>
+                    <input type="text" id="project-name" name="project-name" required
+                           placeholder="Ej. Mantenimiento Planta Norte">
+                </div>
+                <div class="field-group">
+                    <label for="cliente">Cliente</label>
+                    <input type="text" id="cliente" name="cliente" required
+                           placeholder="Nombre del cliente">
+                </div>
+                <div class="field-group">
+                    <label for="contratista">Contratista</label>
+                    <input type="text" id="contratista" name="contratista" required
+                           placeholder="Nombre del contratista">
+                </div>
+                <div class="field-group">
+                    <label for="orden-trabajo">Orden de Trabajo</label>
+                    <input type="text" id="orden-trabajo" name="orden-trabajo" required
+                           placeholder="Ej: OT-2026-001">
+                </div>
+                <div class="field-group">
+                    <label for="location">Ubicación / Municipio</label>
+                    <input type="text" id="location" name="location" required
+                           placeholder="Ej: Medellín, Antioquia">
                 </div>
             </div>
-        </div>
-    </aside>
 
-    <!-- AREA PRINCIPAL -->
-    <div class="page-wrapper">
-
-        <!-- Header -->
-        <header class="page-header">
-            <button class="btn-back" onclick="window.location.href='/registros'">
-                <i class="fas fa-chevron-left"></i>
-            </button>
-            <span class="page-title">Nuevo Proyecto</span>
-        </header>
-
-        <!-- Formulario con scroll interno -->
-        <div class="form-scroll">
-            <form id="project-form">
-
-                <!-- Seccion 1: Identificacion -->
-                <div class="section">
-                    <div class="section-header">
-                        <span class="section-icon" style="background:#fff8ee; color:#FFAF33;">
-                            <i class="fas fa-tag"></i>
-                        </span>
-                        <h3 class="section-title">Identificación</h3>
+            <!-- Sección 2: Cronograma -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-icon">
+                        <i class="fas fa-calendar-alt"></i>
+                    </span>
+                    <h3 class="section-title">Cronograma</h3>
+                </div>
+                <div class="date-row">
+                    <div class="field-group">
+                        <label for="start-date">Fecha de inicio</label>
+                        <input type="date" id="start-date" name="start-date" required>
                     </div>
                     <div class="field-group">
-                        <label for="project-name">Nombre del proyecto</label>
-                        <input type="text" id="project-name" name="project-name" required placeholder="Ej. Mantenimiento Planta Norte">
-                    </div>
-                    <div class="field-group">
-                        <label for="cliente">Cliente</label>
-                        <input type="text" id="cliente" name="cliente" required placeholder="Nombre del cliente">
-                    </div>
-                    <div class="field-group">
-                        <label for="contratista">Contratista</label>
-                        <input type="text" id="contratista" name="contratista" required placeholder="Nombre del contratista">
-                    </div>
-                    <div class="field-group">
-                        <label for="orden-trabajo">Orden de Trabajo</label>
-                        <input type="text" id="orden-trabajo" name="orden-trabajo" required placeholder="Ej: OT-2026-001">
-                    </div>
-                    <div class="field-group">
-                        <label for="location">Ubicación / Municipio</label>
-                        <input type="text" id="location" name="location" required placeholder="Ej: Medellín, Antioquia">
+                        <label for="end-date">Fecha de fin</label>
+                        <input type="date" id="end-date" name="end-date" required>
                     </div>
                 </div>
+            </div>
 
-                <!-- Seccion 2: Cronograma -->
-                <div class="section">
-                    <div class="section-header">
-                        <span class="section-icon" style="background:#fff8ee; color:#FFAF33;">
-                            <i class="fas fa-calendar-alt"></i>
-                        </span>
-                        <h3 class="section-title">Cronograma</h3>
-                    </div>
-                    <div class="date-row">
-                        <div class="field-group">
-                            <label for="start-date">Fecha de inicio</label>
-                            <input type="date" id="start-date" name="start-date" required>
-                        </div>
-                        <div class="field-group">
-                            <label for="end-date">Fecha de fin</label>
-                            <input type="date" id="end-date" name="end-date" required>
-                        </div>
-                    </div>
+            <!-- Sección 3: Equipo -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-icon">
+                        <i class="fas fa-users"></i>
+                    </span>
+                    <h3 class="section-title">Responsable / Equipo</h3>
                 </div>
-
-                <!-- Seccion 3: Equipo -->
-                <div class="section">
-                    <div class="section-header">
-                        <span class="section-icon" style="background:#fff8ee; color:#FFAF33;">
-                            <i class="fas fa-users"></i>
-                        </span>
-                        <h3 class="section-title">Responsable / Equipo</h3>
-                    </div>
-                    <p class="section-hint">Selecciona los miembros que participarán en este proyecto.</p>
-                    <div class="team-list" id="team-list">
-                        {% if usuarios %}
-                            {% for u in usuarios %}
-                            <div class="team-member" onclick="toggleMember(this, {{ u.user_id }})" data-id="{{ u.user_id }}">
-                                <div class="member-avatar">
-                                    {{ u.name[0] | upper }}{{ u.apellido[0] | upper }}
-                                </div>
-                                <div class="member-info">
-                                    <span class="member-name">{{ u.name }} {{ u.apellido }}</span>
-                                    <span class="member-role">{{ u.cargo }}</span>
-                                </div>
-                                <div class="member-check">
-                                    <i class="fas fa-check"></i>
-                                </div>
+                <p class="section-hint">Selecciona los miembros que participarán en este proyecto.</p>
+                <div class="team-list" id="team-list">
+                    {% if usuarios %}
+                        {% for u in usuarios %}
+                        <div class="team-member" onclick="toggleMember(this, {{ u.user_id }})"
+                             data-id="{{ u.user_id }}">
+                            <div class="member-avatar">
+                                {{ u.name[0] | upper }}{{ u.apellido[0] | upper }}
                             </div>
-                            {% endfor %}
-                        {% else %}
-                            <p class="no-users">No hay usuarios disponibles para asignar.</p>
-                        {% endif %}
-                    </div>
+                            <div class="member-info">
+                                <span class="member-name">{{ u.name }} {{ u.apellido }}</span>
+                                <span class="member-role">{{ u.cargo }}</span>
+                            </div>
+                            <div class="member-check">
+                                <i class="fas fa-check"></i>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="no-users">No hay usuarios disponibles para asignar.</p>
+                    {% endif %}
                 </div>
+            </div>
 
-            </form>
-        </div>
+        </form>
+    </div>
 
-        <!-- Botones fijos abajo -->
-        <div class="bottom-actions">
-            <button type="button" onclick="saveProject()" class="btn-guardar">
-                Guardar proyecto
-            </button>
-            <button type="button" onclick="window.location.href='/registros'" class="btn-cancelar">
-                Cancelar
-            </button>
-        </div>
+    <!-- Botones fijos abajo -->
+    <div class="bottom-actions">
+        <button type="button" onclick="saveProject()" class="btn-guardar">
+            Guardar proyecto
+        </button>
+        <button type="button" onclick="window.location.href='/registros'" class="btn-cancelar">
+            Cancelar
+        </button>
+    </div>
 
-    </div><!-- fin page-wrapper -->
-</div><!-- fin app-layout -->
+</div>
 
-<!-- Nav inferior (solo movil) -->
+<!-- Nav inferior -->
 <nav class="bottom-nav">
     <a href="{{ url_for('registros') }}" class="bottom-nav-item">
         <i class="fas fa-folder-open"></i>
