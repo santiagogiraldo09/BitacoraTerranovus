@@ -1328,6 +1328,55 @@ def historialregistro(id_proyecto):
     finally:
         if conn: conn.close()
 
+
+@app.route('/guardar_contacto', methods=['POST'])
+def guardar_contacto():
+    if 'user_id' not in session:
+        return jsonify({"error": "No autorizado"}), 401
+    try:
+        data = request.json
+        conn, cursor = get_db_connection()
+        empresa_id = session.get('empresa_id')
+
+        cursor.execute("""
+            INSERT INTO contactos 
+                (empresa_id, user_id, nombre, empresa, cargo, 
+                 telefono, email, ciudad, notas)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id
+        """, (
+            empresa_id, session['user_id'],
+            data.get('id_proyecto'),
+            data.get('nombre'), data.get('empresa'), data.get('cargo'),
+            data.get('telefono'), data.get('email'),
+            data.get('ciudad'), data.get('notas')
+        ))
+
+        contacto_id = cursor.fetchone()[0]
+
+        for img in data.get('imagenes', []):
+            cursor.execute("""
+                INSERT INTO contacto_imagenes 
+                    (contacto_id, empresa_id, imagen_url, descripcion)
+                VALUES (%s, %s, %s, %s)
+            """, (contacto_id, empresa_id, img.get('url'), img.get('descripcion')))
+
+        conn.commit()
+        conn.close()
+        return jsonify({"status": "success", "message": "Contacto guardado"}), 201
+
+    except Exception as e:
+        print(f"Error guardando contacto: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/formContacto')
+def form_contacto():
+    if 'user_id' not in session:
+        return redirect(url_for('principalscreen'))
+    return render_template('formContacto.html')
+
+
 @app.route('/detalleRegistro/<int:id_registro>')
 def detalleRegistro(id_registro):
     if 'user_id' not in session:

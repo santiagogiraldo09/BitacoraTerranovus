@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nuevo Contacto — Bitácora IAC</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='formContacto.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+<div class="page-wrapper">
+
+    <!-- Header fijo -->
+    <header class="page-header">
+        <button class="btn-back" onclick="history.back()">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <div class="header-center">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="IAC" class="header-logo">
+            <span class="header-title">Nuevo Contacto</span>
+        </div>
+    </header>
+
+    <!-- Contenido con scroll -->
+    <div class="content-scroll">
+
+        <!-- Sección 1: Datos personales -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-icon">
+                    <i class="fas fa-user"></i>
+                </span>
+                <h3 class="section-title">Datos Personales</h3>
+            </div>
+
+            <div class="field-group form-group">
+                <label class="field-label">Nombre completo *</label>
+                <div class="input-with-icon">
+                    <input type="text" id="nombre" class="field-input"
+                           placeholder="Nombre y apellido del contacto">
+                    <button class="record-btn" type="button"><i class="fas fa-microphone"></i></button>
+                    <button class="stop-btn" type="button" style="display:none;"><i class="fas fa-stop"></i></button>
+                </div>
+            </div>
+
+            <div class="field-group form-group">
+                <label class="field-label">Empresa</label>
+                <div class="input-with-icon">
+                    <input type="text" id="empresa" class="field-input"
+                           placeholder="Nombre de la empresa">
+                    <button class="record-btn" type="button"><i class="fas fa-microphone"></i></button>
+                    <button class="stop-btn" type="button" style="display:none;"><i class="fas fa-stop"></i></button>
+                </div>
+            </div>
+
+            <div class="field-group form-group">
+                <label class="field-label">Cargo</label>
+                <div class="input-with-icon">
+                    <input type="text" id="cargo" class="field-input"
+                           placeholder="Cargo o rol en la empresa">
+                    <button class="record-btn" type="button"><i class="fas fa-microphone"></i></button>
+                    <button class="stop-btn" type="button" style="display:none;"><i class="fas fa-stop"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección 2: Datos de contacto -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-icon">
+                    <i class="fas fa-address-book"></i>
+                </span>
+                <h3 class="section-title">Datos de Contacto</h3>
+            </div>
+
+            <div class="field-group form-group">
+                <label class="field-label">Número de teléfono</label>
+                <div class="input-with-icon">
+                    <input type="tel" id="telefono" class="field-input"
+                           placeholder="Ej: +57 300 123 4567">
+                    <button class="record-btn" type="button"><i class="fas fa-microphone"></i></button>
+                    <button class="stop-btn" type="button" style="display:none;"><i class="fas fa-stop"></i></button>
+                </div>
+            </div>
+
+            <div class="field-group form-group">
+                <label class="field-label">Correo electrónico</label>
+                <div class="input-with-icon">
+                    <input type="email" id="email" class="field-input"
+                           placeholder="correo@empresa.com">
+                    <button class="record-btn" type="button"><i class="fas fa-microphone"></i></button>
+                    <button class="stop-btn" type="button" style="display:none;"><i class="fas fa-stop"></i></button>
+                </div>
+            </div>
+
+            <div class="field-group form-group">
+                <label class="field-label">Ciudad</label>
+                <div class="input-with-icon">
+                    <input type="text" id="ciudad" class="field-input"
+                           placeholder="Ej: Medellín, Antioquia">
+                    <button class="record-btn" type="button"><i class="fas fa-microphone"></i></button>
+                    <button class="stop-btn" type="button" style="display:none;"><i class="fas fa-stop"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección 3: Notas -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-icon">
+                    <i class="fas fa-sticky-note"></i>
+                </span>
+                <h3 class="section-title">Notas Generales</h3>
+            </div>
+
+            <div class="field-group form-group">
+                <label class="field-label">Observaciones</label>
+                <div class="input-with-icon textarea-group">
+                    <textarea id="notas" class="field-input"
+                              rows="4"
+                              placeholder="Contexto del contacto, necesidades, próximos pasos..."></textarea>
+                    <button class="record-btn" type="button"><i class="fas fa-microphone"></i></button>
+                    <button class="stop-btn" type="button" style="display:none;"><i class="fas fa-stop"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección 4: Imágenes -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-icon">
+                    <i class="fas fa-images"></i>
+                </span>
+                <h3 class="section-title">Evidencia / Imágenes</h3>
+                <span class="foto-count" id="foto-count">0 Archivos</span>
+            </div>
+
+            <div class="evidencia-buttons">
+                <button type="button" class="btn-evidencia" id="btn-camara">
+                    <i class="fas fa-camera"></i> Tomar Foto
+                </button>
+                <button type="button" class="btn-evidencia" id="btn-subir">
+                    <i class="fas fa-image"></i> Subir Imagen
+                </button>
+                <input type="file" id="file-input" accept="image/*" multiple style="display:none;">
+            </div>
+
+            <div class="galeria-grid" id="galeria"></div>
+        </div>
+
+        <!-- Nota -->
+        <p class="form-note">
+            <i class="fas fa-info-circle"></i>
+            Los campos con asterisco (*) son obligatorios. Puede usar el dictado por voz.
+        </p>
+
+    </div>
+
+    <!-- Botones fijos abajo -->
+    <div class="bottom-actions">
+        <button type="button" onclick="guardarContacto()" class="btn-guardar">
+            <i class="fas fa-save"></i> Guardar Contacto
+        </button>
+        <button type="button" onclick="history.back()" class="btn-cancelar">
+            Cancelar
+        </button>
+    </div>
+
+</div>
+
+<!-- Cámara -->
+<div id="camera-container" style="display:none;">
+    <video id="videoElement" autoplay playsinline muted></video>
+    <canvas id="photoCanvas" style="display:none;"></canvas>
+    <button type="button" class="btn-cerrar-video" onclick="cerrarCamara()">
+        <i class="fas fa-times"></i> Cerrar
+    </button>
+    <button type="button" class="btn-capturar" onclick="capturarFoto()">
+        <i class="fas fa-camera"></i> Capturar
+    </button>
+</div>
+
+<!-- Nav inferior -->
+<nav class="bottom-nav">
+    <a href="{{ url_for('registros') }}" class="bottom-nav-item">
+        <i class="fas fa-folder-open"></i>
+        <span>Proyectos</span>
+    </a>
+    <a href="#" class="bottom-nav-item active">
+        <div class="nav-fab"><i class="fas fa-plus"></i></div>
+        <span>Formulario</span>
+    </a>
+    <a href="#" class="bottom-nav-item">
+        <i class="fas fa-user"></i>
+        <span>Perfil</span>
+    </a>
+</nav>
+
+<script>
+    // ── Fotos ──
+    let fotos = [];
+
+    document.getElementById('btn-subir').onclick = () => {
+        document.getElementById('file-input').click();
+    };
+
+    document.getElementById('file-input').onchange = async (e) => {
+        const files = Array.from(e.target.files);
+        for (const file of files) {
+            await subirFoto(file);
+        }
+    };
+
+    document.getElementById('btn-camara').onclick = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            document.getElementById('videoElement').srcObject = stream;
+            document.getElementById('camera-container').style.display = 'flex';
+        } catch (err) {
+            alert('No se pudo acceder a la cámara.');
+        }
+    };
+
+    function cerrarCamara() {
+        const video = document.getElementById('videoElement');
+        if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+        document.getElementById('camera-container').style.display = 'none';
+    }
+
+    async function capturarFoto() {
+        const video = document.getElementById('videoElement');
+        const canvas = document.getElementById('photoCanvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        const dataUrl = canvas.toDataURL('image/png');
+        cerrarCamara();
+        await subirFotoBase64(dataUrl);
+    }
+
+    async function subirFoto(file) {
+        const reader = new FileReader();
+        reader.onload = async (e) => await subirFotoBase64(e.target.result);
+        reader.readAsDataURL(file);
+    }
+
+    async function subirFotoBase64(base64Data) {
+        try {
+            const response = await fetch('/upload_foto', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ file_data: base64Data })
+            });
+            const result = await response.json();
+            if (result.url) {
+                fotos.push({ url: result.url, descripcion: '' });
+                renderGaleria();
+            }
+        } catch (e) {
+            alert('Error al subir la imagen.');
+        }
+    }
+
+    function renderGaleria() {
+        const galeria = document.getElementById('galeria');
+        galeria.innerHTML = '';
+        fotos.forEach((foto, i) => {
+            const div = document.createElement('div');
+            div.className = 'foto-item';
+            div.innerHTML = `
+                <img src="${foto.url}" class="foto-img" onclick="window.open('${foto.url}')">
+                <input type="text" class="foto-desc" placeholder="Descripción..."
+                       value="${foto.descripcion}"
+                       onchange="fotos[${i}].descripcion = this.value">
+                <button type="button" class="foto-delete" onclick="eliminarFoto(${i})">
+                    <i class="fas fa-times"></i>
+                </button>`;
+            galeria.appendChild(div);
+        });
+        document.getElementById('foto-count').textContent =
+            fotos.length + (fotos.length === 1 ? ' Archivo' : ' Archivos');
+    }
+
+    function eliminarFoto(idx) {
+        fotos.splice(idx, 1);
+        renderGaleria();
+    }
+
+    // ── Voz ──
+    function setupVoz() {
+        document.querySelectorAll('.form-group').forEach(group => {
+            const recordBtn = group.querySelector('.record-btn');
+            const stopBtn   = group.querySelector('.stop-btn');
+            const input     = group.querySelector('.field-input');
+            if (!recordBtn || !input) return;
+
+            recordBtn.onclick = () => {
+                recordBtn.style.display = 'none';
+                stopBtn.style.display   = 'inline-flex';
+                if (typeof startVoiceRecognition === 'function') {
+                    startVoiceRecognition(input, recordBtn, stopBtn);
+                }
+            };
+            stopBtn.onclick = () => {
+                if (window.currentRecognition) window.currentRecognition.stop();
+                stopBtn.style.display   = 'none';
+                recordBtn.style.display = 'inline-flex';
+            };
+        });
+    }
+
+    // ── Guardar ──
+    async function guardarContacto() {
+        const nombre = document.getElementById('nombre').value.trim();
+        if (!nombre) {
+            alert('El nombre es obligatorio.');
+            return;
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const projectId = urlParams.get('project_id');
+
+        const payload = {
+            id_proyecto: projectId,
+            nombre:   nombre,
+            empresa:  document.getElementById('empresa').value.trim(),
+            cargo:    document.getElementById('cargo').value.trim(),
+            telefono: document.getElementById('telefono').value.trim(),
+            email:    document.getElementById('email').value.trim(),
+            ciudad:   document.getElementById('ciudad').value.trim(),
+            notas:    document.getElementById('notas').value.trim(),
+            imagenes: fotos
+        };
+
+        try {
+            const response = await fetch('/guardar_contacto', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const result = await response.json();
+            if (response.ok) {
+                alert('✅ Contacto guardado correctamente.');
+                window.location.href = '/registros';
+            } else {
+                throw new Error(result.error || 'Error al guardar.');
+            }
+        } catch (e) {
+            alert('❌ ' + e.message);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', setupVoz);
+</script>
+</body>
+</html>
