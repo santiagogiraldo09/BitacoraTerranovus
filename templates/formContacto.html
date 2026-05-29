@@ -437,6 +437,14 @@
         });
         fotos = [];
         renderGaleria();
+
+        // Rehabilitar el botón para el siguiente registro
+        const btnGuardar = document.querySelector('.btn-guardar');
+        if (btnGuardar) {
+            btnGuardar.disabled = false;
+            btnGuardar.style.opacity = '1';
+            btnGuardar.style.cursor = 'pointer';
+        }
     }
 
     function volverAlHistorial() {
