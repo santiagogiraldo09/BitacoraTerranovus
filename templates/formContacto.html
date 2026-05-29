@@ -365,7 +365,8 @@
                 throw new Error(result.error || 'Error al guardar.');
             }
         } catch (e) {
-            alert('❌ ' + e.message);
+            console.error('Error completo:', e);
+            mostrarToastExito('❌ ' + e.message);
         }
     }
 
