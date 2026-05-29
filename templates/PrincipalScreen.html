@@ -114,10 +114,15 @@
             toast.style.background = tipo === 'error' ? '#ef4444' : '#1a1a1a';
             toast.style.display = 'block';
             toast.style.opacity = '1';
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                setTimeout(() => toast.style.display = 'none', 300);
-            }, tipo === 'error' ? 3000 : 1500);
+
+            if (tipo === 'error') {
+                setTimeout(() => {
+                    toast.style.opacity = '0';
+                    setTimeout(() => toast.style.display = 'none', 300);
+                }, 4000);
+            }
+            // Si es 'info' no se cierra automáticamente,
+            // se queda visible hasta que la página cambie
         }
 
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
