@@ -356,14 +356,58 @@
             });
             const result = await response.json();
             if (response.ok) {
-                alert('✅ Contacto guardado correctamente.');
-                window.location.href = '/registros';
+                mostrarToastExito('✅ Contacto guardado correctamente.');
+                limpiarFormulario();
             } else {
                 throw new Error(result.error || 'Error al guardar.');
             }
         } catch (e) {
             alert('❌ ' + e.message);
         }
+    }
+
+    function mostrarToastExito(mensaje) {
+        let toast = document.getElementById('toast-exito');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'toast-exito';
+            toast.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: #1a1a1a;
+                color: white;
+                padding: 20px 32px;
+                border-radius: 12px;
+                font-size: 15px;
+                font-weight: 600;
+                z-index: 9999;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+                text-align: center;
+                transition: opacity 0.3s;
+            `;
+            document.body.appendChild(toast);
+        }
+        toast.textContent = mensaje;
+        toast.style.opacity = '1';
+        toast.style.display = 'block';
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            setTimeout(() => toast.style.display = 'none', 300);
+        }, 3000);
+    }
+
+    function limpiarFormulario() {
+        document.getElementById('nombre').value   = '';
+        document.getElementById('empresa').value  = '';
+        document.getElementById('cargo').value    = '';
+        document.getElementById('telefono').value = '';
+        document.getElementById('email').value    = '';
+        document.getElementById('ciudad').value   = '';
+        document.getElementById('notas').value    = '';
+        fotos = [];
+        renderGaleria();
     }
 
     document.addEventListener('DOMContentLoaded', setupVoz);
