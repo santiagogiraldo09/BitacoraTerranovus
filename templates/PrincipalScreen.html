@@ -25,7 +25,7 @@
 
             <!-- COLUMNA DERECHA -->
             <div class="right-panel">
-                <form class="form" method="POST" action="{{ url_for('login') }}" id="loginForm">
+                <form class="form" id="loginForm">
 
                     <div class="field-group">
                         <label for="email">Usuario</label>
@@ -78,6 +78,23 @@
         </footer>
     </div>
 
+    <div id="toast" style="
+        display: none;
+        position: fixed;
+        top: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #1a1a1a;
+        color: white;
+        padding: 12px 24px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 500;
+        z-index: 9999;
+        box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        transition: opacity 0.3s;
+    "></div>
+
     <script>
         function togglePassword() {
             const input = document.getElementById('password');
@@ -90,6 +107,42 @@
                 icon.setAttribute('stroke', '#9ca3af');
             }
         }
+
+        function mostrarToast(mensaje, tipo) {
+            const toast = document.getElementById('toast');
+            toast.textContent = mensaje;
+            toast.style.background = tipo === 'error' ? '#ef4444' : '#1a1a1a';
+            toast.style.display = 'block';
+            toast.style.opacity = '1';
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.style.display = 'none', 300);
+            }, tipo === 'error' ? 3000 : 1500);
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            mostrarToast('Validando usuario...', 'info');
+
+            const formData = new FormData(this);
+
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json().catch(() => null);
+                if (response.ok || response.redirected) {
+                    window.location.href = '/registros';
+                } else {
+                    mostrarToast('Correo o contraseña incorrectos', 'error');
+                }
+            } catch (err) {
+                mostrarToast('Error de conexión', 'error');
+            }
+        });
+
     </script>
 </body>
 </html>

@@ -903,8 +903,9 @@ def login():
         return redirect(url_for('registros'))
     else:
         flash('Email o contraseña incorrectos', 'error')
-        return redirect(url_for('principalscreen'))
-
+        #return redirect(url_for('principalscreen'))
+        return jsonify({'error': 'Credenciales incorrectas'}), 401
+        
 """
 @app.route('/index')
 def index():
