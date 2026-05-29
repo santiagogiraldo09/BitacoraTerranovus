@@ -360,7 +360,7 @@
             const result = await response.json();
             if (response.ok) {
                 mostrarToastExito('✅ Contacto guardado correctamente.');
-                limpiarFormulario();
+                limpiarFormularioContacto();
             } else {
                 throw new Error(result.error || 'Error al guardar.');
             }
@@ -414,7 +414,7 @@
         renderGaleria();
     }*/
 
-    function limpiarFormulario() {
+    function limpiarFormularioContacto() {
         const campos = ['nombre', 'empresa', 'cargo', 'telefono', 'email', 'ciudad', 'notas'];
         campos.forEach(id => {
             const el = document.getElementById(id);
