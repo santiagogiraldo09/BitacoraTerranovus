@@ -74,7 +74,8 @@ document.getElementById('logo_empresa')?.addEventListener('change', function(e) 
         const dataUrl = ev.target.result;
 
         // Actualizar preview en la página de usuario
-        document.getElementById('logo-preview-img').src = dataUrl;
+        const preview = document.getElementById('logo-preview-img');
+        if (preview) preview.src = dataUrl;
 
         // Guardar en localStorage para que otros templates lo usen
         localStorage.setItem('app_logo', dataUrl);
@@ -89,8 +90,10 @@ document.getElementById('logo_empresa')?.addEventListener('change', function(e) 
 // 2. Cambio de color primario
 document.getElementById('color_primario')?.addEventListener('input', function(e) {
     const color = e.target.value;
-    document.getElementById('swatch-primario').style.background = color;
-    document.getElementById('hex-primario').textContent = color.toUpperCase();
+    const swatchP = document.getElementById('swatch-primario');
+    const hexP = document.getElementById('hex-primario');
+    if (swatchP) swatchP.style.background = color;
+    if (hexP) hexP.textContent = color.toUpperCase();
     document.documentElement.style.setProperty('--color-primario', color);
     localStorage.setItem('color_primario', color);
     aplicarColores(); // aplicar a elementos en vivo
@@ -99,8 +102,10 @@ document.getElementById('color_primario')?.addEventListener('input', function(e)
 // 3. Cambio de color secundario
 document.getElementById('color_secundario')?.addEventListener('input', function(e) {
     const color = e.target.value;
-    document.getElementById('swatch-secundario').style.background = color;
-    document.getElementById('hex-secundario').textContent = color.toUpperCase();
+    const swatchS = document.getElementById('swatch-secundario');
+    const hexS = document.getElementById('hex-secundario');
+    if (swatchS) swatchS.style.background = color;
+    if (hexS) hexS.textContent = color.toUpperCase();
     document.documentElement.style.setProperty('--color-secundario', color);
     localStorage.setItem('color_secundario', color);
 });
