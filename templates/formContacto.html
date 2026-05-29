@@ -273,6 +273,7 @@
 
     function renderGaleria() {
         const galeria = document.getElementById('galeria');
+        if (!galeria) return;  // Si no existe el elemento, no hace nada
         galeria.innerHTML = '';
         fotos.forEach((foto, i) => {
             const div = document.createElement('div');
