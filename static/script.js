@@ -1422,7 +1422,10 @@ function startFieldRecording(recordButton) {
             const audioBlob = new Blob(audioFieldChunks, { type: 'audio/webm' });
             transcribeAudio(audioBlob);
         };
-    }).catch(() => alert("No se pudo acceder al micrófono."));
+    }).catch((err) => {
+        console.warn('Micrófono no disponible:', err);
+        isFieldRecording = false;
+    });
 }
 
 function stopFieldRecording() {
