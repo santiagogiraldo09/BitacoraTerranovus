@@ -15,9 +15,14 @@
 
     <!-- Header fijo -->
     <header class="page-header">
-        <button class="btn-back" onclick="history.back()">
+
+        <button class="btn-back" onclick="volverAlHistorial()">
             <i class="fas fa-chevron-left"></i>
         </button>
+        <!--
+        <button class="btn-back" onclick="history.back()">
+            <i class="fas fa-chevron-left"></i>
+        </button> -->
         <div class="header-center">
             <img src="{{ url_for('static', filename='logo.png') }}" alt="IAC" class="header-logo">
             <span class="header-title">Nuevo Contacto</span>
@@ -164,9 +169,13 @@
         <button type="button" onclick="guardarContacto()" class="btn-guardar">
             <i class="fas fa-save"></i> Guardar Contacto
         </button>
-        <button type="button" onclick="history.back()" class="btn-cancelar">
+        <button type="button" onclick="volverAlHistorial()" class="btn-cancelar">
             Cancelar
         </button>
+        <!--
+        <button type="button" onclick="history.back()" class="btn-cancelar">
+            Cancelar
+        </button> --<
     </div>
 
 </div>
@@ -359,6 +368,12 @@
             });
             const result = await response.json();
             if (response.ok) {
+                const btnGuardar = document.querySelector('.btn-guardar');
+                if (btnGuardar) {
+                    btnGuardar.disabled = true;
+                    btnGuardar.style.opacity = '0.5';
+                    btnGuardar.style.cursor = 'not-allowed';
+                }
                 mostrarToastExito('✅ Contacto guardado correctamente.');
                 limpiarFormularioContacto();
             } else {
@@ -422,6 +437,16 @@
         });
         fotos = [];
         renderGaleria();
+    }
+
+    function volverAlHistorial() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const projectId = urlParams.get('project_id');
+        if (projectId) {
+            window.location.href = `/historialRegistro/${projectId}`;
+        } else {
+            window.location.href = '/registros';
+        }
     }
 
     document.addEventListener('DOMContentLoaded', setupVoz);
