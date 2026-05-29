@@ -244,88 +244,114 @@
 
         // ===== MODAL INVITACIÓN =====
         let emailCounter = 1;
+        let personaCount = 0;
 
         function abrirInviteModal() {
             document.getElementById('invite-overlay').classList.add('active');
+            document.getElementById('invite-persons-list').innerHTML = '';
+            personaCount = 0;
+            agregarPersona();
         }
 
         function cerrarInviteModal() {
             document.getElementById('invite-overlay').classList.remove('active');
-            limpiarModal();
+            document.getElementById('invite-feedback').textContent = '';
+            document.getElementById('invite-feedback').className = 'invite-feedback';
         }
 
-        function limpiarModal() {
-            document.getElementById('email-list').innerHTML = `
-                <div class="email-row" id="email-row-1">
-                    <input type="email" class="email-input" placeholder="correo@ejemplo.com" id="email-1">
-                    <button class="remove-email-btn" onclick="eliminarCorreo(1)" style="display:none">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>`;
-            emailCounter = 1;
-            const fb = document.getElementById('invite-feedback');
-            fb.textContent = '';
-            fb.className = 'invite-feedback';
+        function agregarPersona() {
+            personaCount++;
+            const lista = document.getElementById('invite-persons-list');
+            const div   = document.createElement('div');
+            div.className = 'persona-row';
+            div.id        = `persona-${personaCount}`;
+            div.innerHTML = `
+                <div class="persona-header">
+                    <span class="persona-num">Persona ${personaCount}</span>
+                    ${personaCount > 1 ? `<button type="button" class="remove-persona-btn" onclick="eliminarPersona(${personaCount})"><i class="fas fa-times"></i></button>` : ''}
+                </div>
+                <div class="invite-field">
+                    <label>Nombre *</label>
+                    <input type="text" id="nombre-${personaCount}" placeholder="Nombre">
+                </div>
+                <div class="invite-field">
+                    <label>Apellido *</label>
+                    <input type="text" id="apellido-${personaCount}" placeholder="Apellido">
+                </div>
+                <div class="invite-field">
+                    <label>Correo electrónico *</label>
+                    <input type="email" id="correo-${personaCount}" placeholder="correo@ejemplo.com">
+                </div>
+                <div class="invite-field">
+                    <label>Cargo</label>
+                    <input type="text" id="cargo-${personaCount}" placeholder="Ej: Ingeniero, Comercial...">
+                </div>
+                <div class="invite-field">
+                    <label>Rol</label>
+                    <select id="rol-${personaCount}">
+                        <option value="viewer">Viewer</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+            `;
+            lista.appendChild(div);
         }
 
-        function agregarCorreo() {
-            emailCounter++;
-            const lista = document.getElementById('email-list');
-            const row = document.createElement('div');
-            row.className = 'email-row';
-            row.id = `email-row-${emailCounter}`;
-            row.innerHTML = `
-                <input type="email" class="email-input" placeholder="correo@ejemplo.com" id="email-${emailCounter}">
-                <button class="remove-email-btn" onclick="eliminarCorreo(${emailCounter})">
-                    <i class="fas fa-times"></i>
-                </button>`;
-            lista.appendChild(row);
-            document.querySelector('#email-row-1 .remove-email-btn').style.display = 'flex';
-            document.getElementById(`email-${emailCounter}`).focus();
+        function eliminarPersona(id) {
+            document.getElementById(`persona-${id}`)?.remove();
         }
 
-        function eliminarCorreo(id) {
-            document.getElementById(`email-row-${id}`)?.remove();
-            const rows = document.querySelectorAll('.email-row');
-            if (rows.length === 1) rows[0].querySelector('.remove-email-btn').style.display = 'none';
-        }
+        async function enviarInvitaciones() {
+            const fb  = document.getElementById('invite-feedback');
+            const btn = document.getElementById('send-invite-btn');
+            const personas = [];
 
-        async function enviarInvitacion() {
-            const nombre   = document.getElementById('inv-nombre').value.trim();
-            const apellido = document.getElementById('inv-apellido').value.trim();
-            const correo   = document.getElementById('inv-correo').value.trim();
-            const cargo    = document.getElementById('inv-cargo').value.trim();
-            const rol      = document.getElementById('inv-rol').value;
-            const fb       = document.getElementById('invite-feedback');
-            const btn      = document.getElementById('send-invite-btn');
+            const rows = document.querySelectorAll('.persona-row');
+            let valido = true;
 
-            if (!nombre || !apellido || !correo) {
-                fb.textContent = 'Nombre, apellido y correo son obligatorios.';
-                fb.className   = 'invite-feedback error';
-                return;
-            }
+            rows.forEach(row => {
+                const id       = row.id.split('-')[1];
+                const nombre   = document.getElementById(`nombre-${id}`)?.value.trim();
+                const apellido = document.getElementById(`apellido-${id}`)?.value.trim();
+                const correo   = document.getElementById(`correo-${id}`)?.value.trim();
+                const cargo    = document.getElementById(`cargo-${id}`)?.value.trim();
+                const rol      = document.getElementById(`rol-${id}`)?.value;
 
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(correo)) {
-                fb.textContent = 'Correo inválido.';
+                if (!nombre || !apellido || !correo) {
+                    valido = false;
+                    return;
+                }
+
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(correo)) {
+                    valido = false;
+                    return;
+                }
+
+                personas.push({ nombre, apellido, correo, cargo, rol });
+            });
+
+            if (!valido || personas.length === 0) {
+                fb.textContent = 'Completa nombre, apellido y correo válido para cada persona.';
                 fb.className   = 'invite-feedback error';
                 return;
             }
 
             btn.disabled  = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+            fb.textContent = '';
 
             try {
                 const res  = await fetch('/invitar-usuarios', {
                     method:  'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body:    JSON.stringify({ nombre, apellido, correo, cargo, rol })
+                    body:    JSON.stringify({ personas })
                 });
                 const data = await res.json();
                 if (data.success) {
-                    fb.textContent = `✅ Invitación enviada a ${correo}`;
+                    fb.textContent = `✅ ${data.mensaje}`;
                     fb.className   = 'invite-feedback success';
-                    setTimeout(() => cerrarInviteModal(), 2200);
+                    setTimeout(() => cerrarInviteModal(), 2500);
                 } else {
                     fb.textContent = data.error || 'Error al enviar.';
                     fb.className   = 'invite-feedback error';
@@ -335,7 +361,7 @@
                 fb.className   = 'invite-feedback error';
             } finally {
                 btn.disabled  = false;
-                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar invitación';
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar invitaciones';
             }
         }
 
