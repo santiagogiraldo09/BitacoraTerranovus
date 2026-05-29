@@ -401,7 +401,7 @@
         }, 3000);
     }
 
-    function limpiarFormulario() {
+    /*function limpiarFormulario() {
         document.getElementById('nombre').value   = '';
         document.getElementById('empresa').value  = '';
         document.getElementById('cargo').value    = '';
@@ -409,6 +409,16 @@
         document.getElementById('email').value    = '';
         document.getElementById('ciudad').value   = '';
         document.getElementById('notas').value    = '';
+        fotos = [];
+        renderGaleria();
+    }*/
+
+    function limpiarFormulario() {
+        const campos = ['nombre', 'empresa', 'cargo', 'telefono', 'email', 'ciudad', 'notas'];
+        campos.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        });
         fotos = [];
         renderGaleria();
     }
