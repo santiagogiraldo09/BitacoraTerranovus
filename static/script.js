@@ -40,7 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
     */
 
     // Listeners para los controles de la cámara
-    document.getElementById('start-record-btn').addEventListener('click', startVideoRecording);
+    //document.getElementById('start-record-btn').addEventListener('click', startVideoRecording);
+    const startRecordBtn = document.getElementById('start-record-btn');
+    if (startRecordBtn) startRecordBtn.addEventListener('click', startVideoRecording);
     document.getElementById('stop-record-btn').addEventListener('click', stopVideoRecording);
 
     // Listeners para adjuntar archivos
