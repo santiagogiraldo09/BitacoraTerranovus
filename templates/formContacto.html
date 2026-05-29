@@ -273,7 +273,7 @@
 
     function renderGaleria() {
         const galeria = document.getElementById('galeria');
-        if (!galeria) return;  // Si no existe el elemento, no hace nada
+        if (!galeria) return;
         galeria.innerHTML = '';
         fotos.forEach((foto, i) => {
             const div = document.createElement('div');
@@ -281,15 +281,17 @@
             div.innerHTML = `
                 <img src="${foto.url}" class="foto-img" onclick="window.open('${foto.url}')">
                 <input type="text" class="foto-desc" placeholder="Descripción..."
-                       value="${foto.descripcion}"
-                       onchange="fotos[${i}].descripcion = this.value">
+                    value="${foto.descripcion}"
+                    onchange="fotos[${i}].descripcion = this.value">
                 <button type="button" class="foto-delete" onclick="eliminarFoto(${i})">
                     <i class="fas fa-times"></i>
                 </button>`;
             galeria.appendChild(div);
         });
-        document.getElementById('foto-count').textContent =
-            fotos.length + (fotos.length === 1 ? ' Archivo' : ' Archivos');
+        const contador = document.getElementById('foto-count');
+        if (contador) {
+            contador.textContent = fotos.length + (fotos.length === 1 ? ' Archivo' : ' Archivos');
+        }
     }
 
     function eliminarFoto(idx) {
