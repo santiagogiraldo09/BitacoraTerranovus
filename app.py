@@ -156,70 +156,72 @@ def invitar_usuarios():
     if 'user_id' not in session:
         return jsonify({'success': False, 'error': 'No autenticado'}), 401
 
-    data    = request.get_json()
-    correos = data.get('correos', [])
-    rol = data.get('rol', 'residente')
+    data     = request.get_json()
+    personas = data.get('personas', [])
 
-    if not correos:
-        return jsonify({'success': False, 'error': 'No se recibieron correos'})
+    if not personas:
+        return jsonify({'success': False, 'error': 'No se recibieron datos'})
 
     conn = None
     try:
         conn, cursor = get_db_connection()
-        # Obtener datos del administrador y su empresa
+        empresa_id = session.get('empresa_id')
+
         cursor.execute("""
-            SELECT name, empresa FROM usuario WHERE user_id = %s
+            SELECT name, empresa_id FROM usuario WHERE user_id = %s
         """, (session['user_id'],))
-        admin = cursor.fetchone()
-        admin_nombre  = admin[0] if admin else 'El administrador'
-        empresa       = admin[1] if admin else 'tu organización'
+        admin      = cursor.fetchone()
+        admin_nombre = admin[0] if admin else 'El administrador'
 
-        enviados  = []
-        omitidos  = []
+        enviados = []
+        omitidos = []
 
-        for correo in correos:
-            # Verificar si el correo ya existe
-            cursor.execute("SELECT user_id FROM usuario WHERE email = %s", (correo,))
+        for p in personas:
+            nombre   = p.get('nombre', '')
+            apellido = p.get('apellido', '')
+            correo   = p.get('correo', '')
+            cargo    = p.get('cargo', 'Sin asignar')
+            rol      = p.get('rol', 'viewer')
+
+            if not nombre or not apellido or not correo:
+                omitidos.append(correo or 'sin correo')
+                continue
+
+            cursor.execute(
+                "SELECT user_id FROM usuario WHERE email = %s", (correo,)
+            )
             if cursor.fetchone():
                 omitidos.append(correo)
                 continue
 
-            # Generar contraseña temporal
             password_temp = generar_password_temporal()
             hashed        = generate_password_hash(password_temp)
 
-            # Crear usuario en BD con estado 'pendiente'
-            # Usar la parte antes del @ como nombre provisional
-            nombre_provisional = correo.split('@')[0]
-
             cursor.execute("""
-                INSERT INTO usuario (name, apellido, email, password, cargo, rol, empresa, estado)
+                INSERT INTO usuario
+                    (name, apellido, email, password, cargo, rol, empresa_id, estado)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, 'pendiente')
-                RETURNING user_id
-            """, (nombre_provisional, 'Invitado', correo, hashed, 'Sin asignar', rol, empresa))
+            """, (nombre, apellido, correo, hashed, cargo, rol, empresa_id))
 
-            # Enviar correo de invitación
             try:
                 msg = Message(
-                    subject=f'Invitación a {empresa} — Bitácora App',
+                    subject=f'Invitación — Bitácora App',
                     recipients=[correo]
                 )
                 msg.html = f"""
-                <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:32px;
-                            background:#fff;border-radius:12px;border:1px solid #eee;">
-                    <img src="cid:logo" style="height:48px;margin-bottom:24px;">
+                <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;
+                            padding:32px;background:#fff;border-radius:12px;border:1px solid #eee;">
                     <h2 style="color:#1A1A2E;margin:0 0 8px;">Has sido invitado</h2>
                     <p style="color:#555;font-size:15px;margin:0 0 24px;">
-                        <strong>{admin_nombre}</strong> te ha invitado a unirte a 
-                        <strong>{empresa}</strong> en Bitácora App.
+                        <strong>{admin_nombre}</strong> te ha invitado a unirte a Bitácora App.
                     </p>
                     <div style="background:#F5F6FA;border-radius:10px;padding:20px;margin-bottom:24px;">
-                        <p style="margin:0 0 8px;color:#888;font-size:13px;">TUS CREDENCIALES DE ACCESO</p>
+                        <p style="margin:0 0 8px;color:#888;font-size:13px;">TUS CREDENCIALES</p>
                         <p style="margin:0 0 4px;font-size:15px;">
                             <strong>Correo:</strong> {correo}
                         </p>
                         <p style="margin:0;font-size:15px;">
-                            <strong>Contraseña temporal:</strong> 
+                            <strong>Contraseña temporal:</strong>
                             <span style="font-family:monospace;background:#fff;padding:2px 8px;
                                          border-radius:4px;border:1px solid #ddd;">
                                 {password_temp}
@@ -227,9 +229,9 @@ def invitar_usuarios():
                         </p>
                     </div>
                     <p style="color:#e09a1f;font-size:13px;margin:0 0 24px;">
-                        ⚠️ Por seguridad, cambia tu contraseña después de ingresar por primera vez.
+                        ⚠️ Cambia tu contraseña después de ingresar por primera vez.
                     </p>
-                    <a href="https://shrimp-ethical-sheep.ngrok-free.app" 
+                    <a href="https://bitacoraiac.onrender.com"
                        style="display:block;text-align:center;background:#FBAF33;color:#fff;
                               padding:14px;border-radius:8px;text-decoration:none;
                               font-weight:bold;font-size:16px;">
@@ -238,18 +240,16 @@ def invitar_usuarios():
                 </div>
                 """
                 mail.send(msg)
-                enviados.append(correo)
-
             except Exception as mail_err:
                 print(f"Error enviando correo a {correo}: {mail_err}")
-                # El usuario se creó en BD aunque falle el correo
-                enviados.append(correo)
+
+            enviados.append(correo)
 
         conn.commit()
 
-        mensaje = f'Invitación enviada a {len(enviados)} usuario(s).'
+        mensaje = f'Invitación enviada a {len(enviados)} persona(s).'
         if omitidos:
-            mensaje += f' {len(omitidos)} correo(s) ya existían y fueron omitidos.'
+            mensaje += f' {len(omitidos)} omitido(s) por ya existir.'
 
         return jsonify({
             'success': True,

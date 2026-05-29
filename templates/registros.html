@@ -155,10 +155,12 @@
             <i class="fas fa-folder-open"></i>
             <span>Proyectos</span>
         </a>
+        {% if session.get('user_rol') == 'admin' %}
         <button class="bottom-nav-item" onclick="abrirInviteModal()">
             <i class="fas fa-user-plus"></i>
             <span>Invitar</span>
         </button>
+        {% endif %}
         {% if session.get('user_rol') == 'admin' %}
         <a href="{{ url_for('usuario') }}" class="bottom-nav-item">
             <i class="fas fa-users"></i>
@@ -172,6 +174,7 @@
     </nav>
 
     <!-- ===== MODAL: INVITAR USUARIOS ===== -->
+    {% if session.get('user_rol') == 'admin' %}
     <div class="invite-overlay" id="invite-overlay">
         <div class="invite-modal">
             <div class="invite-header">
@@ -180,26 +183,23 @@
                     <i class="fas fa-times"></i>
                 </button>
             </div>
-            <p class="invite-subtitle">
-                Agrega los correos de las personas que deseas invitar a tu espacio de trabajo.
-            </p>
-            <div id="email-list">
-                <div class="email-row" id="email-row-1">
-                    <input type="email" class="email-input" placeholder="correo@ejemplo.com" id="email-1">
-                    <button class="remove-email-btn" id="remove-btn-1" onclick="eliminarCorreo(1)" style="display:none">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
+            <p class="invite-subtitle">Completa los datos de cada persona a invitar.</p>
+
+            <div id="invite-persons-list">
+                <!-- Las filas de personas se agregan aquí dinámicamente -->
             </div>
-            <button class="add-email-btn" onclick="agregarCorreo()">
-                <i class="fas fa-plus"></i> Agregar otro correo
+
+            <button class="add-email-btn" onclick="agregarPersona()">
+                <i class="fas fa-plus"></i> Agregar otra persona
             </button>
+
             <button class="send-invite-btn" id="send-invite-btn" onclick="enviarInvitaciones()">
-                <i class="fas fa-paper-plane"></i> Enviar invitación
+                <i class="fas fa-paper-plane"></i> Enviar invitaciones
             </button>
             <div class="invite-feedback" id="invite-feedback"></div>
         </div>
     </div>
+    {% endif %}
 
     <script>
         // ===== NAVEGACIÓN =====
@@ -290,44 +290,48 @@
             if (rows.length === 1) rows[0].querySelector('.remove-email-btn').style.display = 'none';
         }
 
-        async function enviarInvitaciones() {
-            const inputs  = document.querySelectorAll('.email-input');
-            const correos = [...inputs].map(i => i.value.trim()).filter(v => v !== '');
-            const fb      = document.getElementById('invite-feedback');
-            const btn     = document.getElementById('send-invite-btn');
+        async function enviarInvitacion() {
+            const nombre   = document.getElementById('inv-nombre').value.trim();
+            const apellido = document.getElementById('inv-apellido').value.trim();
+            const correo   = document.getElementById('inv-correo').value.trim();
+            const cargo    = document.getElementById('inv-cargo').value.trim();
+            const rol      = document.getElementById('inv-rol').value;
+            const fb       = document.getElementById('invite-feedback');
+            const btn      = document.getElementById('send-invite-btn');
 
-            if (correos.length === 0) {
-                fb.textContent = 'Por favor ingresa al menos un correo.';
+            if (!nombre || !apellido || !correo) {
+                fb.textContent = 'Nombre, apellido y correo son obligatorios.';
                 fb.className   = 'invite-feedback error';
                 return;
             }
+
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            const invalido   = correos.find(c => !emailRegex.test(c));
-            if (invalido) {
-                fb.textContent = `Correo inválido: ${invalido}`;
+            if (!emailRegex.test(correo)) {
+                fb.textContent = 'Correo inválido.';
                 fb.className   = 'invite-feedback error';
                 return;
             }
+
             btn.disabled  = true;
             btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
-            fb.textContent = '';
+
             try {
                 const res  = await fetch('/invitar-usuarios', {
                     method:  'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body:    JSON.stringify({ correos })
+                    body:    JSON.stringify({ nombre, apellido, correo, cargo, rol })
                 });
                 const data = await res.json();
                 if (data.success) {
-                    fb.textContent = `✅ Invitación enviada a ${correos.length} usuario(s).`;
+                    fb.textContent = `✅ Invitación enviada a ${correo}`;
                     fb.className   = 'invite-feedback success';
                     setTimeout(() => cerrarInviteModal(), 2200);
                 } else {
-                    fb.textContent = data.error || 'Error al enviar las invitaciones.';
+                    fb.textContent = data.error || 'Error al enviar.';
                     fb.className   = 'invite-feedback error';
                 }
             } catch (err) {
-                fb.textContent = 'Error de conexión. Intenta de nuevo.';
+                fb.textContent = 'Error de conexión.';
                 fb.className   = 'invite-feedback error';
             } finally {
                 btn.disabled  = false;

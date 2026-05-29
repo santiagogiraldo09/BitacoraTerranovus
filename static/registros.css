@@ -653,3 +653,65 @@ button { font-family: inherit; cursor: pointer; }
     .filter-tabs { gap: 6px; }
     .tab { padding: 6px 14px; font-size: 12px; }
 }
+
+
+.persona-row {
+    border: 1px solid var(--gris-borde);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 12px;
+}
+
+.persona-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.persona-num {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--naranja);
+}
+
+.remove-persona-btn {
+    background: #fee2e2;
+    border: none;
+    border-radius: 50%;
+    width: 24px; height: 24px;
+    color: #ef4444;
+    font-size: 11px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.invite-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+
+.invite-field label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--gris-texto);
+}
+
+.invite-field input,
+.invite-field select {
+    padding: 9px 12px;
+    border: 1.5px solid var(--gris-borde);
+    border-radius: 8px;
+    font-size: 13px;
+    outline: none;
+    font-family: 'DM Sans', sans-serif;
+}
+
+.invite-field input:focus,
+.invite-field select:focus {
+    border-color: var(--naranja);
+}
