@@ -43,7 +43,9 @@ document.addEventListener('DOMContentLoaded', () => {
     //document.getElementById('start-record-btn').addEventListener('click', startVideoRecording);
     const startRecordBtn = document.getElementById('start-record-btn');
     if (startRecordBtn) startRecordBtn.addEventListener('click', startVideoRecording);
-    document.getElementById('stop-record-btn').addEventListener('click', stopVideoRecording);
+    //document.getElementById('stop-record-btn').addEventListener('click', stopVideoRecording);
+    const stopRecordBtn = document.getElementById('stop-record-btn');
+    if (stopRecordBtn) stopRecordBtn.addEventListener('click', stopVideoRecording);
 
     // Listeners para adjuntar archivos
     /*
