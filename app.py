@@ -39,6 +39,7 @@ from tempfile import NamedTemporaryFile
 from supabase import create_client
 from psycopg2 import pool as pg_pool
 import time
+from datetime import timezone
 
 connection_pool = None
 
@@ -1346,6 +1347,15 @@ def historialregistro(id_proyecto):
             u_apellido = u_apellido or ''
             iniciales = (u_name[0] + u_apellido[0]).upper() if u_name and u_apellido else '??'
 
+            if created_at:
+                colombia_tz    = pytz.timezone('America/Bogota')
+                created_at_col = created_at.replace(tzinfo=timezone.utc).astimezone(colombia_tz)
+                hora           = created_at_col.strftime('%I:%M %p')
+                fecha_str      = created_at_col.strftime('%d/%m/%Y')
+            else:
+                hora      = None
+                fecha_str = 'S/F'
+
             # Fotos del contacto
             cursor.execute("""
                 SELECT imagen_url, descripcion
@@ -1507,6 +1517,16 @@ def detalleContacto(id_contacto):
         nombre     = row[9] or ''
         apellido   = row[10] or ''
         iniciales  = (nombre[0] + apellido[0]).upper() if nombre and apellido else '??'
+
+        # Convertir UTC a Colombia
+        if created_at:
+            colombia_tz    = pytz.timezone('America/Bogota')
+            created_at_col = created_at.replace(tzinfo=timezone.utc).astimezone(colombia_tz)
+            fecha_str      = created_at_col.strftime('%d %b %Y')
+            created_texto  = created_at_col.strftime('%d %b %Y - %H:%M')
+        else:
+            fecha_str     = ''
+            created_texto = ''
  
         contacto = {
             'id':                id_contacto,
@@ -1590,7 +1610,14 @@ def detalleRegistro(id_registro):
  
         # Extraer hora de created_at
         created_at = row[6]
-        hora = created_at.strftime('%I:%M %p') if created_at else None
+        #hora = created_at.strftime('%I:%M %p') if created_at else None
+        
+        if created_at:
+            colombia_tz  = pytz.timezone('America/Bogota')
+            created_at_col = created_at.replace(tzinfo=timezone.utc).astimezone(colombia_tz)
+            hora = created_at_col.strftime('%I:%M %p')
+        else:
+            hora = None
         created_at_texto = created_at.strftime('%d %b %Y - %H:%M') if created_at else None
  
         # Iniciales del usuario
