@@ -898,48 +898,34 @@ def registro():
 @app.route('/login', methods=['POST'])
 def login():
     t0 = time.time()
-    email = request.form.get('email')
+    email    = request.form.get('email')
     password = request.form.get('password')
-    
+
+    if not email or not password:
+        return jsonify({'error': 'Por favor ingrese ambos campos'}), 400
+
     t1 = time.time()
     user_id = verify_user(email, password)
     print(f"verify_user tardó: {time.time() - t1:.2f}s")
-    
+
     if user_id:
         session['user_id'] = user_id
         t2 = time.time()
+
         conn_rol = psycopg2.connect(POSTGRES_CONFIG)
         cursor_rol = conn_rol.cursor()
         cursor_rol.execute(
-            "SELECT rol, empresa_id FROM usuario WHERE user_id = %s", 
-            (user_id,)
-        )
-        print(f"Query rol tardó: {time.time() - t2:.2f}s")
-        # ... resto del código
-    
-    print(f"Login total tardó: {time.time() - t0:.2f}s")
-
-
-    email = request.form.get('email')
-    password = request.form.get('password')
-    
-    if not email or not password:
-        flash('Por favor ingrese ambos campos: email y contraseña', 'error')
-        return redirect(url_for('principalscreen'))
-
-    user_id = verify_user(email, password)
-    if user_id:
-        session['user_id'] = user_id
-        conn_rol = psycopg2.connect(POSTGRES_CONFIG)
-        cursor_rol = conn_rol.cursor()
-        cursor_rol.execute(
-            "SELECT rol, empresa_id FROM usuario WHERE user_id = %s", 
+            "SELECT rol, empresa_id, name FROM usuario WHERE user_id = %s",
             (user_id,)
         )
         fila = cursor_rol.fetchone()
-        session['user_rol']    = fila[0] if fila else 'viewer'
-        session['empresa_id']  = fila[1] if fila else 1
+        session['user_rol']   = fila[0] if fila else 'viewer'
+        session['empresa_id'] = fila[1] if fila else 1
+        session['user_name']  = fila[2] if fila else 'Usuario'
+        cursor_rol.close()
         conn_rol.close()
+        print(f"Query rol tardó: {time.time() - t2:.2f}s")
+
         try:
             conn, cursor = get_db_connection()
             cursor.execute("""
@@ -947,14 +933,15 @@ def login():
                 WHERE user_id = %s AND estado = 'pendiente'
             """, (user_id,))
             conn.commit()
-            conn.close()
+            cursor.close()
+            connection_pool.putconn(conn)
         except Exception as e:
             print(f"Error actualizando estado: {e}")
-        flash('Inicio de sesión exitoso', 'success')
+
+        print(f"Login total tardó: {time.time() - t0:.2f}s")
         return redirect(url_for('registros'))
     else:
-        flash('Email o contraseña incorrectos', 'error')
-        #return redirect(url_for('principalscreen'))
+        print(f"Login fallido tardó: {time.time() - t0:.2f}s")
         return jsonify({'error': 'Credenciales incorrectas'}), 401
         
 """
