@@ -1514,6 +1514,9 @@ def detalleContacto(id_contacto):
             return redirect(url_for('registros'))
  
         created_at = row[8]
+        #temporal
+        print(f"created_at raw: {created_at}")
+        print(f"created_at tzinfo: {created_at.tzinfo if created_at else 'None'}")
         nombre     = row[9] or ''
         apellido   = row[10] or ''
         iniciales  = (nombre[0] + apellido[0]).upper() if nombre and apellido else '??'
