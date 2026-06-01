@@ -36,9 +36,10 @@
             <button class="filter-chip" onclick="filtrarTodos(this)">
                 <i class="fas fa-user"></i> Todos los autores
             </button>
+            <!--
             <button class="filter-chip icon-only" onclick="exportarInforme()" title="Exportar">
                 <i class="fas fa-download"></i>
-            </button>
+            </button> -->
         </div>
 
         <!-- Contador -->
@@ -68,6 +69,13 @@
                         <h3 class="card-activity">{{ registro.actividad }}</h3>
                         <i class="fas fa-chevron-right card-arrow"></i>
                     </div>
+
+                    {% if registro.hora %}
+                    <div class="card-hora">
+                        <i class="fas fa-clock meta-icon"></i>
+                        <span class="meta-value">{{ registro.hora }}</span>
+                    </div>
+                    {% endif %}
 
                     {% if registro.fotos %}
                     <div class="fotos-row">
