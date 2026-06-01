@@ -59,60 +59,23 @@
         <div class="records-list" id="recordsList">
             {% if reportes %}
                 {% for registro in reportes %}
-                <div class="record-card"
-                     data-fecha="{{ registro.fecha }}"
-                     data-autor="{{ registro.usuario_id | default('') }}">
+                <div class="record-card" 
+                    data-fecha="{{ registro.fecha }}"
+                    onclick="window.location.href='/detalleContacto/{{ registro.id_registro }}'"
+                    style="cursor:pointer;">
 
-                    <!--<div class="card-top" onclick="window.location.href='/detalleRegistro/{{ registro.id_registro }}'" style="cursor:pointer;">
-                        <h3 class="card-activity">{{ registro.actividad }}</h3>
-                        <i class="fas fa-chevron-right card-arrow"></i>
-                    </div>-->
-                    <div class="card-top" onclick="window.location.href='/detalleContacto/{{ registro.id_registro }}'" style="cursor:pointer;">
+                    <div class="card-top">
                         <h3 class="card-activity">{{ registro.actividad }}</h3>
                         <i class="fas fa-chevron-right card-arrow"></i>
                     </div>
-
-                    <span class="estado-badge {{ registro.estado | lower | replace(' ', '-') }}">
-                        {{ registro.estado }}
-                    </span>
-
-                    <div class="card-meta">
-                        <div class="meta-item">
-                            <i class="fas fa-chart-line meta-icon"></i>
-                            <div>
-                                <span class="meta-label">Avance</span>
-                                <span class="meta-value">{{ registro.avance }}%</span>
-                            </div>
-                        </div>
-                        <div class="meta-item">
-                            <i class="fas fa-calendar-alt meta-icon"></i>
-                            <div>
-                                <span class="meta-label">Fecha</span>
-                                <span class="meta-value">{{ registro.fecha }}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {% if registro.hora %}
-                    <div class="card-hora">
-                        <i class="fas fa-clock meta-icon"></i>
-                        <span class="meta-value">{{ registro.hora }}</span>
-                    </div>
-                    {% endif %}
 
                     {% if registro.fotos %}
                     <div class="fotos-row">
-                        {% for foto in registro.fotos[:3] %}
+                        {% for foto in registro.fotos[:1] %}
                         {% if foto.url %}
-                        <img src="{{ foto.url }}"
-                            class="foto-thumb"
-                            onclick="window.open(this.src)"
-                            title="{{ foto.desc }}">
+                        <img src="{{ foto.url }}" class="foto-thumb">
                         {% elif foto.base64 %}
-                        <img src="data:image/jpeg;base64,{{ foto.base64 }}"
-                            class="foto-thumb"
-                            onclick="window.open(this.src)"
-                            title="{{ foto.desc }}">
+                        <img src="{{ foto.base64 }}" class="foto-thumb">
                         {% endif %}
                         {% endfor %}
                     </div>
