@@ -37,7 +37,10 @@ from fpdf import FPDF
 import io
 from tempfile import NamedTemporaryFile
 from supabase import create_client
+from psycopg2 import pool as pg_pool
 import time
+
+connection_pool = None
 
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -88,6 +91,15 @@ SHAREPOINT_PASSWORD = "Latumbanuncamuere3"
 #load_dotenv('config/settings.env')  # Ruta relativa al archivo .env
 
 app = Flask(__name__,template_folder='templates')
+def init_pool():
+    global connection_pool
+    connection_pool = pg_pool.SimpleConnectionPool(
+        minconn=2,
+        maxconn=5,
+        dsn=os.environ.get('DATABASE_URL')
+    )
+
+init_pool()
 app.secret_key = secrets.token_hex(16)  # Clave secreta para sesiones
 #app.secret_key = '78787878tyg8987652vgdfdf3445'
 CORS(app)
@@ -264,7 +276,9 @@ def invitar_usuarios():
         if conn: conn.rollback()
         return jsonify({'success': False, 'error': str(e)})
     finally:
-        if conn: conn.close()
+        if conn:
+            cursor.close()
+            connection_pool.putconn(conn)
 
 # ========================================
 # OBTENER TOKEN DE BENTLEY
@@ -546,7 +560,8 @@ def create_user(nombre, apellido, email, password, cargo, rol, empresa):
         return None
     finally:
         if conn:
-            conn.close()
+            cursor.close()
+            connection_pool.putconn(conn)
 
 def verify_user(email, password):
     try:
@@ -567,7 +582,8 @@ def verify_user(email, password):
         return None
     finally:
         if conn:
-            conn.close()
+            cursor.close()
+            connection_pool.putconn(conn)
 
 
 def insert_registro_bitacora(respuestas, id_proyecto, fotos=None, videos=None):
@@ -636,7 +652,8 @@ def insert_registro_bitacora(respuestas, id_proyecto, fotos=None, videos=None):
         # raise e
     finally:
         if conn:
-            conn.close()
+            cursor.close()
+            connection_pool.putconn(conn)
 
 def create_project(user_id, nombre, fecha_inicio, fecha_fin, director, ubicacion, coordenadas, cliente, numero_proyecto):
     try:
@@ -656,14 +673,24 @@ def create_project(user_id, nombre, fecha_inicio, fecha_fin, director, ubicacion
         return None
     finally:
         if conn:
-            conn.close()
+            cursor.close()
+            connection_pool.putconn(conn)
 
+def get_db_connection():
+    conn = connection_pool.getconn()
+    cursor = conn.cursor()
+    empresa_id = session.get('empresa_id', 1)
+    cursor.execute("SET app.empresa_id = %s", (empresa_id,))
+    return conn, cursor
+
+'''
 def get_db_connection():
     conn = psycopg2.connect(POSTGRES_CONFIG)
     cursor = conn.cursor()
     empresa_id = session.get('empresa_id', 1)
     cursor.execute("SET app.empresa_id = %s", (empresa_id,))
     return conn, cursor
+'''
 
 def get_user_projects(user_id):
     conn = None
@@ -728,7 +755,8 @@ def get_user_projects(user_id):
         return []
     finally:
         if conn:
-            conn.close()
+            cursor.close()
+            connection_pool.putconn(conn)
 
 # Función para subir archivos a Azure Blob Storage
 def upload_to_blob(file_name, data, content_type):
@@ -1292,7 +1320,9 @@ def usuario():
         print(f"Error en usuario: {e}")
         return render_template('usuario.html', miembros=[])
     finally:
-        if conn: conn.close()
+        if conn:
+            cursor.close()
+            connection_pool.putconn(conn)
 
 @app.route('/inventario')
 def inventario():
@@ -1425,7 +1455,9 @@ def historialregistro(id_proyecto):
         print(f"Error en historialregistro: {e}")
         return redirect(url_for('history'))
     finally:
-        if conn: conn.close()
+        if conn:
+            cursor.close()
+            connection_pool.putconn(conn)
 
 
 @app.route('/guardar_contacto', methods=['POST'])
@@ -1535,7 +1567,8 @@ def detalleContacto(id_contacto):
         return redirect(url_for('registros'))
     finally:
         if conn:
-            conn.close()
+            cursor.close()
+            connection_pool.putconn(conn)
 
 
 @app.route('/formContacto')
@@ -1622,7 +1655,8 @@ def detalleRegistro(id_registro):
         return redirect(url_for('registros'))
     finally:
         if conn:
-            conn.close()
+            cursor.close()
+            connection_pool.putconn(conn)
 
 @app.route('/disciplinerecords')
 def disciplinerecords():
@@ -1687,7 +1721,9 @@ def guardar_reporte_terranovus():
         print(f"Error al guardar: {e}")
         return jsonify({"status": "error", "error": str(e)}), 500
     finally:
-        if conn: conn.close()
+        if conn:
+            cursor.close()
+            connection_pool.putconn(conn)
 
 @app.route('/add_project', methods=['GET', 'POST'])
 def add_project():
@@ -1887,7 +1923,9 @@ def guardar_registro():
         print(f"Error: {str(e)}")
         return jsonify({"error": str(e)}), 500
     finally:
-        if conn: conn.close()
+        if conn:
+            cursor.close()
+            connection_pool.putconn(conn)
 
 @app.route('/eliminar-usuario/<int:user_id>', methods=['DELETE'])
 def eliminar_usuario(user_id):
@@ -1920,7 +1958,9 @@ def eliminar_usuario(user_id):
         print(f"Error eliminando usuario: {e}")
         return jsonify({'success': False, 'error': str(e)})
     finally:
-        if conn: conn.close()
+        if conn:
+            cursor.close()
+            connection_pool.putconn(conn)
 
 @app.route('/eliminar-proyecto', methods=['POST'])
 def eliminar_proyecto():
@@ -1948,7 +1988,8 @@ def eliminar_proyecto():
         return jsonify({'error': str(e)}), 500
     finally:
         if conn:
-            conn.close()
+            cursor.close()
+            connection_pool.putconn(conn)
 
 @app.route('/transcribe-audio', methods=['POST'])
 def transcribe_audio():
@@ -2103,7 +2144,8 @@ def exportar_registros_excel():
         return "Error al exportar", 500
     finally:
         if conn:
-            conn.close()
+            cursor.close()
+            connection_pool.putconn(conn)
 
 @app.route('/exportar-proyectos-pdf', methods=['POST'])
 def exportar_proyectos_pdf():
@@ -2256,7 +2298,9 @@ def exportar_proyectos_pdf():
         print(f"Error PDF: {e}")
         return f"Error: {str(e)}", 500
     finally:
-        if conn: conn.close()
+        if conn:
+            cursor.close()
+            connection_pool.putconn(conn)
 
 
 @app.route('/tablero-bi')
@@ -2308,7 +2352,9 @@ def tablero_bi():
         print(f"Error en Tablero BI: {e}")
         return redirect(url_for('history'))
     finally:
-        if conn: conn.close()
+        if conn:
+            cursor.close()
+            connection_pool.putconn(conn)
 
 
 @app.route('/exportar-proyectos-excel', methods=['POST'])
@@ -2409,7 +2455,8 @@ def exportar_proyectos_excel():
         return "Error interno al exportar", 500
     finally:
         if conn:
-            conn.close()
+            cursor.close()
+            connection_pool.putconn(conn)
 
 if __name__ == '__main__':
     app.run(debug=True)
