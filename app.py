@@ -583,8 +583,7 @@ def verify_user(email, password):
     finally:
         if conn:
             cursor.close()
-            connection_pool.putconn(conn)
-
+            conn.close()
 
 def insert_registro_bitacora(respuestas, id_proyecto, fotos=None, videos=None):
     """
