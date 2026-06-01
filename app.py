@@ -37,6 +37,7 @@ from fpdf import FPDF
 import io
 from tempfile import NamedTemporaryFile
 from supabase import create_client
+import time
 
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -869,6 +870,29 @@ def registro():
 
 @app.route('/login', methods=['POST'])
 def login():
+    t0 = time.time()
+    email = request.form.get('email')
+    password = request.form.get('password')
+    
+    t1 = time.time()
+    user_id = verify_user(email, password)
+    print(f"verify_user tardó: {time.time() - t1:.2f}s")
+    
+    if user_id:
+        session['user_id'] = user_id
+        t2 = time.time()
+        conn_rol = psycopg2.connect(POSTGRES_CONFIG)
+        cursor_rol = conn_rol.cursor()
+        cursor_rol.execute(
+            "SELECT rol, empresa_id FROM usuario WHERE user_id = %s", 
+            (user_id,)
+        )
+        print(f"Query rol tardó: {time.time() - t2:.2f}s")
+        # ... resto del código
+    
+    print(f"Login total tardó: {time.time() - t0:.2f}s")
+
+
     email = request.form.get('email')
     password = request.form.get('password')
     
