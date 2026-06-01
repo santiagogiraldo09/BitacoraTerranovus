@@ -564,26 +564,31 @@ def create_user(nombre, apellido, email, password, cargo, rol, empresa):
             connection_pool.putconn(conn)
 
 def verify_user(email, password):
+    conn = None
     try:
-        conn = psycopg2.connect(POSTGRES_CONFIG)
+        conn = connection_pool.getconn()
         cursor = conn.cursor()
-        
+        # Sin SET empresa_id porque aún no hay sesión
         cursor.execute(
-            "SELECT user_id, password FROM usuario WHERE email = %s",
+            "SELECT user_id, password, rol, empresa_id, name FROM usuario WHERE email = %s",
             (email,)
         )
-        
         user = cursor.fetchone()
         if user and check_password_hash(user[1], password):
-            return user[0]  # Devuelve el ID del usuario
+            return {
+                'user_id':    user[0],
+                'rol':        user[2],
+                'empresa_id': user[3],
+                'name':       user[4]
+            }
         return None
-    except psycopg2.Error as e:
+    except Exception as e:
         print(f"Error al verificar usuario: {e}")
         return None
     finally:
         if conn:
             cursor.close()
-            conn.close()
+            connection_pool.putconn(conn)
 
 def insert_registro_bitacora(respuestas, id_proyecto, fotos=None, videos=None):
     """
@@ -905,33 +910,21 @@ def login():
         return jsonify({'error': 'Por favor ingrese ambos campos'}), 400
 
     t1 = time.time()
-    user_id = verify_user(email, password)
+    usuario = verify_user(email, password)
     print(f"verify_user tardó: {time.time() - t1:.2f}s")
 
-    if user_id:
-        session['user_id'] = user_id
-        t2 = time.time()
-
-        conn_rol = psycopg2.connect(POSTGRES_CONFIG)
-        cursor_rol = conn_rol.cursor()
-        cursor_rol.execute(
-            "SELECT rol, empresa_id, name FROM usuario WHERE user_id = %s",
-            (user_id,)
-        )
-        fila = cursor_rol.fetchone()
-        session['user_rol']   = fila[0] if fila else 'viewer'
-        session['empresa_id'] = fila[1] if fila else 1
-        session['user_name']  = fila[2] if fila else 'Usuario'
-        cursor_rol.close()
-        conn_rol.close()
-        print(f"Query rol tardó: {time.time() - t2:.2f}s")
+    if usuario:
+        session['user_id']    = usuario['user_id']
+        session['user_rol']   = usuario['rol']
+        session['empresa_id'] = usuario['empresa_id']
+        session['user_name']  = usuario['name']
 
         try:
             conn, cursor = get_db_connection()
             cursor.execute("""
                 UPDATE usuario SET estado = 'activo' 
                 WHERE user_id = %s AND estado = 'pendiente'
-            """, (user_id,))
+            """, (usuario['user_id'],))
             conn.commit()
             cursor.close()
             connection_pool.putconn(conn)
@@ -941,7 +934,6 @@ def login():
         print(f"Login total tardó: {time.time() - t0:.2f}s")
         return redirect(url_for('registros'))
     else:
-        print(f"Login fallido tardó: {time.time() - t0:.2f}s")
         return jsonify({'error': 'Credenciales incorrectas'}), 401
         
 """
