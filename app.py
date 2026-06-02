@@ -1474,7 +1474,7 @@ def guardar_contacto():
         data = request.json
         #conn, cursor = get_db_connection()
         with db_connection() as (conn, cursor):
-        empresa_id = session.get('empresa_id')
+            empresa_id = session.get('empresa_id')
 
             cursor.execute("""
                 INSERT INTO contactos 
@@ -1761,7 +1761,7 @@ def add_project():
             data = request.json
             #conn, cursor = get_db_connection()
             with db_connection() as (conn, cursor):
-            empresa_id = session.get('empresa_id', 1)
+                empresa_id = session.get('empresa_id', 1)
 
                 cursor.execute("""
                     INSERT INTO proyectos (
