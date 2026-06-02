@@ -384,6 +384,11 @@
                 body: JSON.stringify(payload)
             });
             const result = await response.json();
+            if (response.status === 401) {
+                // Sesión expirada → redirigir al login
+                window.location.href = '/';
+                return;
+            }
             if (response.ok) {
                 const btnGuardar = document.querySelector('.btn-guardar');
                 if (btnGuardar) {
