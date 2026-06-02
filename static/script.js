@@ -1177,31 +1177,26 @@ function setupVoiceButtons() {
 function startVoiceRecognition(inputField, recordBtn, stopBtn) {
     const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
     currentRecognition = recognition;
-
-    recognition.lang            = 'es-CO';
-    recognition.interimResults  = false;
-    recognition.continuous      = false;
-    recognition.maxAlternatives = 1;
+    
+    recognition.lang = 'es-ES';
+    recognition.interimResults = false;
+    recognition.continuous = true; // Permite hablar por más tiempo hasta darle stop
 
     recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
+        const transcript = event.results[event.results.length - 1][0].transcript;
         inputField.value += (inputField.value ? ' ' : '') + transcript;
     };
 
     recognition.onend = () => {
-        const isStop = stopBtn.style.display !== 'none';
-        if (isStop) {
-            stopBtn.style.display   = 'none';
-            recordBtn.style.display = 'inline-block';
-            currentRecognition      = null;
-        }
+        // Al terminar (por error o silencio largo), restauramos los botones
+        stopBtn.style.display = 'none';
+        recordBtn.style.display = 'inline-block';
+        currentRecognition = null;
     };
 
     recognition.onerror = (event) => {
         console.error("Error de voz:", event.error);
-        stopBtn.style.display   = 'none';
-        recordBtn.style.display = 'inline-block';
-        currentRecognition      = null;
+        stopBtn.click(); // Forzamos el stop visual
     };
 
     recognition.start();
