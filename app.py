@@ -725,59 +725,59 @@ def get_user_projects(user_id):
     try:
         with db_connection() as (conn, cursor):
         
-        cursor.execute("""
-            SELECT 
-                p.id, 
-                p.nombre_proyecto, 
-                p.fecha_inicio, 
-                p.cliente, 
-                p.user_id,
-                p.estado,
-                COUNT(c.id) as total_registros
-            FROM proyectos p
-            INNER JOIN proyecto_usuarios pu ON pu.id_proyecto = p.id
-            LEFT JOIN contactos c ON c.id_proyecto = p.id
-            WHERE pu.user_id = %s 
-            GROUP BY p.id, p.nombre_proyecto, 
-                    p.fecha_inicio, p.cliente, p.user_id, p.estado
-            ORDER BY p.fecha_inicio DESC
-        """, (user_id,)
-        )
+            cursor.execute("""
+                SELECT 
+                    p.id, 
+                    p.nombre_proyecto, 
+                    p.fecha_inicio, 
+                    p.cliente, 
+                    p.user_id,
+                    p.estado,
+                    COUNT(c.id) as total_registros
+                FROM proyectos p
+                INNER JOIN proyecto_usuarios pu ON pu.id_proyecto = p.id
+                LEFT JOIN contactos c ON c.id_proyecto = p.id
+                WHERE pu.user_id = %s 
+                GROUP BY p.id, p.nombre_proyecto, 
+                        p.fecha_inicio, p.cliente, p.user_id, p.estado
+                ORDER BY p.fecha_inicio DESC
+            """, (user_id,)
+            )
 
-        '''
-        cursor.execute("""
-            SELECT 
-                p.id, 
-                p.nombre_proyecto, 
-                p.fecha_inicio, 
-                p.cliente, 
-                p.user_id,
-                p.estado,
-                COUNT(r.id) as total_registros
-            FROM proyectos p
-            INNER JOIN proyecto_usuarios pu ON pu.id_proyecto = p.id
-            LEFT JOIN registros r ON r.id_proyecto = p.id
-            WHERE pu.user_id = %s 
-            GROUP BY p.id, p.nombre_proyecto, 
-                    p.fecha_inicio, p.cliente, p.user_id, p.estado
-            ORDER BY p.fecha_inicio DESC
-        """, (user_id,)
-        )
-        '''
-        
-        projects = []
-        for row in cursor.fetchall():
-            projects.append({
-                'id_proyecto':      row[0],
-                'name':             row[1],
-                'fecha_inicio':     row[2].strftime('%Y-%m-%d'),
-                'cliente':          row[3],
-                'user_id':          row[4],
-                'estado':           row[5] or 'En Curso',
-                'total_registros':  row[6],
-            })
-        
-        return projects
+            '''
+            cursor.execute("""
+                SELECT 
+                    p.id, 
+                    p.nombre_proyecto, 
+                    p.fecha_inicio, 
+                    p.cliente, 
+                    p.user_id,
+                    p.estado,
+                    COUNT(r.id) as total_registros
+                FROM proyectos p
+                INNER JOIN proyecto_usuarios pu ON pu.id_proyecto = p.id
+                LEFT JOIN registros r ON r.id_proyecto = p.id
+                WHERE pu.user_id = %s 
+                GROUP BY p.id, p.nombre_proyecto, 
+                        p.fecha_inicio, p.cliente, p.user_id, p.estado
+                ORDER BY p.fecha_inicio DESC
+            """, (user_id,)
+            )
+            '''
+            
+            projects = []
+            for row in cursor.fetchall():
+                projects.append({
+                    'id_proyecto':      row[0],
+                    'name':             row[1],
+                    'fecha_inicio':     row[2].strftime('%Y-%m-%d'),
+                    'cliente':          row[3],
+                    'user_id':          row[4],
+                    'estado':           row[5] or 'En Curso',
+                    'total_registros':  row[6],
+                })
+            
+            return projects
     except Exception as e:
         print(f"Error al obtener proyectos: {e}")
         return []
@@ -1338,129 +1338,129 @@ def historialregistro(id_proyecto):
         #conn, cursor = get_db_connection()
         with db_connection() as (conn, cursor):
 
-        # 1. Info del proyecto (Usar comillas dobles para la tabla)
-        cursor.execute('SELECT nombre_proyecto, cliente FROM proyectos WHERE id = %s', (id_proyecto,))
-        proyecto_info = cursor.fetchone()
+            # 1. Info del proyecto (Usar comillas dobles para la tabla)
+            cursor.execute('SELECT nombre_proyecto, cliente FROM proyectos WHERE id = %s', (id_proyecto,))
+            proyecto_info = cursor.fetchone()
 
-        if not proyecto_info:
-            return redirect(url_for('history'))
+            if not proyecto_info:
+                return redirect(url_for('history'))
 
-        # 2. Consultar registros de la nueva tabla Terranovus
-        cursor.execute("""
-            SELECT c.id, c.nombre, c.empresa, c.cargo,
-                c.telefono, c.email, c.ciudad, c.notas,
-                c.created_at,
-                u.name, u.apellido, u.cargo as user_cargo
-            FROM contactos c
-            LEFT JOIN usuario u ON u.user_id = c.user_id
-            WHERE c.id_proyecto = %s
-            ORDER BY c.created_at DESC
-        """, (id_proyecto,))
-
-        registros_rows = cursor.fetchall()
-        reportes_completos = []
-
-        for r_row in registros_rows:
-            id_c, nombre, empresa, cargo, telefono, email, ciudad, notas, created_at, u_name, u_apellido, u_cargo = r_row
-
-            u_name    = u_name or ''
-            u_apellido = u_apellido or ''
-            iniciales = (u_name[0] + u_apellido[0]).upper() if u_name and u_apellido else '??'
-
-            if created_at:
-                colombia_tz    = pytz.timezone('America/Bogota')
-                created_at_col = created_at.replace(tzinfo=timezone.utc).astimezone(colombia_tz)
-                hora           = created_at_col.strftime('%I:%M %p')
-                fecha_str      = created_at_col.strftime('%d/%m/%Y')
-            else:
-                hora      = None
-                fecha_str = 'S/F'
-
-            # Fotos del contacto
+            # 2. Consultar registros de la nueva tabla Terranovus
             cursor.execute("""
-                SELECT imagen_url, descripcion
-                FROM contacto_imagenes
-                WHERE contacto_id = %s
-            """, (id_c,))
+                SELECT c.id, c.nombre, c.empresa, c.cargo,
+                    c.telefono, c.email, c.ciudad, c.notas,
+                    c.created_at,
+                    u.name, u.apellido, u.cargo as user_cargo
+                FROM contactos c
+                LEFT JOIN usuario u ON u.user_id = c.user_id
+                WHERE c.id_proyecto = %s
+                ORDER BY c.created_at DESC
+            """, (id_proyecto,))
 
-            fotos = []
-            for f in cursor.fetchall():
-                if f[0]:
-                    fotos.append({'url': f[0], 'base64': None, 'desc': f[1] or ''})
+            registros_rows = cursor.fetchall()
+            reportes_completos = []
 
-            reportes_completos.append({
-                'id_registro':       id_c,
-                'actividad':         nombre,
-                'descripcion':       f"{empresa or ''} · {cargo or ''}".strip(' ·'),
-                'estado':            ciudad or '',
-                'avance':            None,
-                'fecha': fecha_str,
-                'hora':  hora,
-                #'fecha':             created_at.strftime('%d/%m/%Y') if created_at else 'S/F',
-                #'hora':              created_at.strftime('%I:%M %p') if created_at else None,
-                'usuario_nombre':    f"{u_name} {u_apellido}".strip() or 'Sin asignar',
-                'usuario_cargo':     u_cargo or '',
-                'usuario_iniciales': iniciales,
-                'fotos':             fotos,
-                'telefono':          telefono or '',
-                'email':             email or '',
-                'notas':             notas or ''
-            })
+            for r_row in registros_rows:
+                id_c, nombre, empresa, cargo, telefono, email, ciudad, notas, created_at, u_name, u_apellido, u_cargo = r_row
+
+                u_name    = u_name or ''
+                u_apellido = u_apellido or ''
+                iniciales = (u_name[0] + u_apellido[0]).upper() if u_name and u_apellido else '??'
+
+                if created_at:
+                    colombia_tz    = pytz.timezone('America/Bogota')
+                    created_at_col = created_at.replace(tzinfo=timezone.utc).astimezone(colombia_tz)
+                    hora           = created_at_col.strftime('%I:%M %p')
+                    fecha_str      = created_at_col.strftime('%d/%m/%Y')
+                else:
+                    hora      = None
+                    fecha_str = 'S/F'
+
+                # Fotos del contacto
+                cursor.execute("""
+                    SELECT imagen_url, descripcion
+                    FROM contacto_imagenes
+                    WHERE contacto_id = %s
+                """, (id_c,))
+
+                fotos = []
+                for f in cursor.fetchall():
+                    if f[0]:
+                        fotos.append({'url': f[0], 'base64': None, 'desc': f[1] or ''})
+
+                reportes_completos.append({
+                    'id_registro':       id_c,
+                    'actividad':         nombre,
+                    'descripcion':       f"{empresa or ''} · {cargo or ''}".strip(' ·'),
+                    'estado':            ciudad or '',
+                    'avance':            None,
+                    'fecha': fecha_str,
+                    'hora':  hora,
+                    #'fecha':             created_at.strftime('%d/%m/%Y') if created_at else 'S/F',
+                    #'hora':              created_at.strftime('%I:%M %p') if created_at else None,
+                    'usuario_nombre':    f"{u_name} {u_apellido}".strip() or 'Sin asignar',
+                    'usuario_cargo':     u_cargo or '',
+                    'usuario_iniciales': iniciales,
+                    'fotos':             fotos,
+                    'telefono':          telefono or '',
+                    'email':             email or '',
+                    'notas':             notas or ''
+                })
 
 
-        '''
-        cursor.execute("""
-            SELECT r.id, r.fecha, r.actividad, r.descripcion_actividad, 
-                r.estado, r.porcentaje_avance,
-                u.name, u.apellido, u.cargo
-            FROM registros r
-            LEFT JOIN usuario u ON u.user_id = r.user_id
-            WHERE r.id_proyecto = %s 
-            ORDER BY r.fecha DESC, r.id DESC
-        """, (id_proyecto,))
-        
-        registros_rows = cursor.fetchall()
-        reportes_completos = []
-
-        for r_row in registros_rows:
-            id_reg, fecha_dt, act, desc, est, avan, nombre, apellido, cargo = r_row
-            
-            # 3. Consultar fotos asociadas a este registro
-            cursor.execute("""
-                SELECT imagen_url, description 
-                FROM fotos_registro
-                WHERE id_registro = %s
-            """, (id_reg,))
-            fotos_raw = cursor.fetchall()
-
-            fotos = []
-            for f in fotos_raw:
-                url  = f[0]
-                desc = f[1] or ''
-                if url:
-                    fotos.append({'url': url, 'base64': None, 'desc': desc})
-                #elif b64:
-                    #img_str = b64.split(',')[1] if ',' in b64 else b64
-                    #fotos.append({'url': None, 'base64': img_str, 'desc': desc})
-
-            reportes_completos.append({
-                'id_registro':       id_reg,
-                'fecha':             fecha_dt.strftime('%d/%m/%Y') if fecha_dt else "S/F",
-                'actividad':         act,
-                'descripcion':       desc,
-                'estado':            est,
-                'avance':            avan,
-                'usuario_nombre':    f"{nombre or ''} {apellido or ''}".strip() or 'Sin asignar',
-                'usuario_cargo':     cargo or '',
-                'usuario_iniciales': ((nombre or '')[0] + (apellido or '')[0]).upper() if nombre and apellido else '??',
-                'fotos':             fotos
-            })
             '''
+            cursor.execute("""
+                SELECT r.id, r.fecha, r.actividad, r.descripcion_actividad, 
+                    r.estado, r.porcentaje_avance,
+                    u.name, u.apellido, u.cargo
+                FROM registros r
+                LEFT JOIN usuario u ON u.user_id = r.user_id
+                WHERE r.id_proyecto = %s 
+                ORDER BY r.fecha DESC, r.id DESC
+            """, (id_proyecto,))
+            
+            registros_rows = cursor.fetchall()
+            reportes_completos = []
 
-        return render_template('historialRegistro.html', 
-                               proyecto=proyecto_info, 
-                               reportes=reportes_completos, 
-                               id_proyecto=id_proyecto)
+            for r_row in registros_rows:
+                id_reg, fecha_dt, act, desc, est, avan, nombre, apellido, cargo = r_row
+                
+                # 3. Consultar fotos asociadas a este registro
+                cursor.execute("""
+                    SELECT imagen_url, description 
+                    FROM fotos_registro
+                    WHERE id_registro = %s
+                """, (id_reg,))
+                fotos_raw = cursor.fetchall()
+
+                fotos = []
+                for f in fotos_raw:
+                    url  = f[0]
+                    desc = f[1] or ''
+                    if url:
+                        fotos.append({'url': url, 'base64': None, 'desc': desc})
+                    #elif b64:
+                        #img_str = b64.split(',')[1] if ',' in b64 else b64
+                        #fotos.append({'url': None, 'base64': img_str, 'desc': desc})
+
+                reportes_completos.append({
+                    'id_registro':       id_reg,
+                    'fecha':             fecha_dt.strftime('%d/%m/%Y') if fecha_dt else "S/F",
+                    'actividad':         act,
+                    'descripcion':       desc,
+                    'estado':            est,
+                    'avance':            avan,
+                    'usuario_nombre':    f"{nombre or ''} {apellido or ''}".strip() or 'Sin asignar',
+                    'usuario_cargo':     cargo or '',
+                    'usuario_iniciales': ((nombre or '')[0] + (apellido or '')[0]).upper() if nombre and apellido else '??',
+                    'fotos':             fotos
+                })
+                '''
+
+            return render_template('historialRegistro.html', 
+                                proyecto=proyecto_info, 
+                                reportes=reportes_completos, 
+                                id_proyecto=id_proyecto)
     except Exception as e:
         print(f"Error en historialregistro: {e}")
         return redirect(url_for('history'))
@@ -1476,32 +1476,32 @@ def guardar_contacto():
         with db_connection() as (conn, cursor):
         empresa_id = session.get('empresa_id')
 
-        cursor.execute("""
-            INSERT INTO contactos 
-                (empresa_id, user_id, id_proyecto, nombre, empresa, cargo, 
-                telefono, email, ciudad, notas)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id
-        """, (
-            empresa_id, session['user_id'],
-            data.get('id_proyecto'),
-            data.get('nombre'), data.get('empresa'), data.get('cargo'),
-            data.get('telefono'), data.get('email'),
-            data.get('ciudad'), data.get('notas')
-        ))
-
-        contacto_id = cursor.fetchone()[0]
-
-        for img in data.get('imagenes', []):
             cursor.execute("""
-                INSERT INTO contacto_imagenes 
-                    (contacto_id, empresa_id, imagen_url, descripcion)
-                VALUES (%s, %s, %s, %s)
-            """, (contacto_id, empresa_id, img.get('url'), img.get('descripcion')))
+                INSERT INTO contactos 
+                    (empresa_id, user_id, id_proyecto, nombre, empresa, cargo, 
+                    telefono, email, ciudad, notas)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                empresa_id, session['user_id'],
+                data.get('id_proyecto'),
+                data.get('nombre'), data.get('empresa'), data.get('cargo'),
+                data.get('telefono'), data.get('email'),
+                data.get('ciudad'), data.get('notas')
+            ))
 
-        conn.commit()
-        conn.close()
-        return jsonify({"status": "success", "message": "Contacto guardado"}), 201
+            contacto_id = cursor.fetchone()[0]
+
+            for img in data.get('imagenes', []):
+                cursor.execute("""
+                    INSERT INTO contacto_imagenes 
+                        (contacto_id, empresa_id, imagen_url, descripcion)
+                    VALUES (%s, %s, %s, %s)
+                """, (contacto_id, empresa_id, img.get('url'), img.get('descripcion')))
+
+            conn.commit()
+            conn.close()
+            return jsonify({"status": "success", "message": "Contacto guardado"}), 201
 
     except Exception as e:
         print(f"Error guardando contacto: {e}")
@@ -1518,72 +1518,72 @@ def detalleContacto(id_contacto):
         #conn, cursor = get_db_connection()
         with db_connection() as (conn, cursor):
 
-        cursor.execute("""
-            SELECT 
-                c.id, c.nombre, c.empresa, c.cargo,
-                c.telefono, c.email, c.ciudad, c.notas,
-                c.created_at,
-                u.name, u.apellido, u.cargo as user_cargo
-            FROM contactos c
-            LEFT JOIN usuario u ON u.user_id = c.user_id
-            WHERE c.id = %s
-        """, (id_contacto,))
- 
-        row = cursor.fetchone()
-        if not row:
-            return redirect(url_for('registros'))
- 
-        created_at = row[8]
-        #temporal
-        print(f"created_at raw: {created_at}")
-        print(f"created_at tzinfo: {created_at.tzinfo if created_at else 'None'}")
-        nombre     = row[9] or ''
-        apellido   = row[10] or ''
-        iniciales  = (nombre[0] + apellido[0]).upper() if nombre and apellido else '??'
+            cursor.execute("""
+                SELECT 
+                    c.id, c.nombre, c.empresa, c.cargo,
+                    c.telefono, c.email, c.ciudad, c.notas,
+                    c.created_at,
+                    u.name, u.apellido, u.cargo as user_cargo
+                FROM contactos c
+                LEFT JOIN usuario u ON u.user_id = c.user_id
+                WHERE c.id = %s
+            """, (id_contacto,))
+    
+            row = cursor.fetchone()
+            if not row:
+                return redirect(url_for('registros'))
+    
+            created_at = row[8]
+            #temporal
+            print(f"created_at raw: {created_at}")
+            print(f"created_at tzinfo: {created_at.tzinfo if created_at else 'None'}")
+            nombre     = row[9] or ''
+            apellido   = row[10] or ''
+            iniciales  = (nombre[0] + apellido[0]).upper() if nombre and apellido else '??'
 
-        # Convertir UTC a Colombia
-        if created_at:
-            colombia_tz    = pytz.timezone('America/Bogota')
-            created_at_col = created_at.replace(tzinfo=timezone.utc).astimezone(colombia_tz)
-            fecha_str      = created_at_col.strftime('%d %b %Y')
-            created_texto  = created_at_col.strftime('%d %b %Y - %H:%M')
-        else:
-            fecha_str     = ''
-            created_texto = ''
- 
-        contacto = {
-            'id':                id_contacto,
-            'nombre':            row[1],
-            'empresa':           row[2] or '',
-            'cargo':             row[3] or '',
-            'telefono':          row[4] or '',
-            'email':             row[5] or '',
-            'ciudad':            row[6] or '',
-            'notas':             row[7] or '',
-            'fecha':            fecha_str,
-            'created_at_texto': created_texto,
-            #'fecha':             created_at.strftime('%d %b %Y') if created_at else '',
-            #'created_at_texto':  created_at.strftime('%d %b %Y - %H:%M') if created_at else '',
-            'usuario_nombre':    f"{nombre} {apellido}".strip() or 'Sin asignar',
-            'usuario_cargo':     row[11] or '',
-            'usuario_iniciales': iniciales,
-            'imagenes':          []
-        }
- 
-        cursor.execute("""
-            SELECT imagen_url, descripcion
-            FROM contacto_imagenes
-            WHERE contacto_id = %s
-        """, (id_contacto,))
- 
-        for img_row in cursor.fetchall():
-            if img_row[0]:
-                contacto['imagenes'].append({
-                    'url':  img_row[0],
-                    'desc': img_row[1] or ''
-                })
- 
-        return render_template('detalleContacto.html', contacto=contacto)
+            # Convertir UTC a Colombia
+            if created_at:
+                colombia_tz    = pytz.timezone('America/Bogota')
+                created_at_col = created_at.replace(tzinfo=timezone.utc).astimezone(colombia_tz)
+                fecha_str      = created_at_col.strftime('%d %b %Y')
+                created_texto  = created_at_col.strftime('%d %b %Y - %H:%M')
+            else:
+                fecha_str     = ''
+                created_texto = ''
+    
+            contacto = {
+                'id':                id_contacto,
+                'nombre':            row[1],
+                'empresa':           row[2] or '',
+                'cargo':             row[3] or '',
+                'telefono':          row[4] or '',
+                'email':             row[5] or '',
+                'ciudad':            row[6] or '',
+                'notas':             row[7] or '',
+                'fecha':            fecha_str,
+                'created_at_texto': created_texto,
+                #'fecha':             created_at.strftime('%d %b %Y') if created_at else '',
+                #'created_at_texto':  created_at.strftime('%d %b %Y - %H:%M') if created_at else '',
+                'usuario_nombre':    f"{nombre} {apellido}".strip() or 'Sin asignar',
+                'usuario_cargo':     row[11] or '',
+                'usuario_iniciales': iniciales,
+                'imagenes':          []
+            }
+    
+            cursor.execute("""
+                SELECT imagen_url, descripcion
+                FROM contacto_imagenes
+                WHERE contacto_id = %s
+            """, (id_contacto,))
+    
+            for img_row in cursor.fetchall():
+                if img_row[0]:
+                    contacto['imagenes'].append({
+                        'url':  img_row[0],
+                        'desc': img_row[1] or ''
+                    })
+    
+            return render_template('detalleContacto.html', contacto=contacto)
  
     except Exception as e:
         print(f"Error en detalleContacto: {e}")
@@ -1763,39 +1763,39 @@ def add_project():
             with db_connection() as (conn, cursor):
             empresa_id = session.get('empresa_id', 1)
 
-            cursor.execute("""
-                INSERT INTO proyectos (
-                    nombre_proyecto, fecha_inicio, fecha_fin, cliente, contratista, 
-                    orden_de_trabajo, ubicacion, user_id, empresa_id
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) 
-                RETURNING id
-            """, (
-                data.get('project-name'), data.get('start-date'), data.get('end-date'),
-                data.get('cliente'), data.get('contratista'), data.get('orden-trabajo'),
-                data.get('location'), session['user_id'], empresa_id
-            ))
-
-            nuevo_id = cursor.fetchone()[0]
-
-            # Insertar miembros seleccionados en proyecto_usuarios
-            miembros = data.get('miembros', [])
-
-            # Si no se seleccionó ningún miembro, asignar al creador
-            if not miembros:
-                miembros = [session['user_id']]
-
-            for user_id in miembros:
                 cursor.execute("""
-                    INSERT INTO proyecto_usuarios (id_proyecto, user_id, empresa_id)
-                    VALUES (%s, %s, %s)
-                """, (nuevo_id, user_id, empresa_id)
-            )
+                    INSERT INTO proyectos (
+                        nombre_proyecto, fecha_inicio, fecha_fin, cliente, contratista, 
+                        orden_de_trabajo, ubicacion, user_id, empresa_id
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) 
+                    RETURNING id
+                """, (
+                    data.get('project-name'), data.get('start-date'), data.get('end-date'),
+                    data.get('cliente'), data.get('contratista'), data.get('orden-trabajo'),
+                    data.get('location'), session['user_id'], empresa_id
+                ))
 
-            conn.commit()
-            cursor.close()
-            conn.close()
+                nuevo_id = cursor.fetchone()[0]
 
-            return jsonify({"status": "success", "message": "Proyecto registrado exitosamente"}), 201
+                # Insertar miembros seleccionados en proyecto_usuarios
+                miembros = data.get('miembros', [])
+
+                # Si no se seleccionó ningún miembro, asignar al creador
+                if not miembros:
+                    miembros = [session['user_id']]
+
+                for user_id in miembros:
+                    cursor.execute("""
+                        INSERT INTO proyecto_usuarios (id_proyecto, user_id, empresa_id)
+                        VALUES (%s, %s, %s)
+                    """, (nuevo_id, user_id, empresa_id)
+                )
+
+                conn.commit()
+                cursor.close()
+                conn.close()
+
+                return jsonify({"status": "success", "message": "Proyecto registrado exitosamente"}), 201
 
         except Exception as e:
             print(f"Error en BD: {str(e)}")
