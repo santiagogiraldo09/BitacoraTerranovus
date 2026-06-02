@@ -1471,11 +1471,10 @@ def guardar_contacto():
     if 'user_id' not in session:
         return jsonify({"error": "No autorizado"}), 401
     try:
-        data = request.json
-        #conn, cursor = get_db_connection()
-        with db_connection() as (conn, cursor):
-            empresa_id = session.get('empresa_id')
+        data       = request.json
+        empresa_id = session.get('empresa_id')
 
+        with db_connection() as (conn, cursor):
             cursor.execute("""
                 INSERT INTO contactos 
                     (empresa_id, user_id, id_proyecto, nombre, empresa, cargo, 
@@ -1499,9 +1498,7 @@ def guardar_contacto():
                     VALUES (%s, %s, %s, %s)
                 """, (contacto_id, empresa_id, img.get('url'), img.get('descripcion')))
 
-            conn.commit()
-            conn.close()
-            return jsonify({"status": "success", "message": "Contacto guardado"}), 201
+        return jsonify({"status": "success", "message": "Contacto guardado"}), 201
 
     except Exception as e:
         print(f"Error guardando contacto: {e}")
@@ -1755,14 +1752,13 @@ def guardar_reporte_terranovus():
 def add_project():
     if 'user_id' not in session:
         return jsonify({"error": "No autorizado"}), 401
-    
+
     if request.method == 'POST':
         try:
-            data = request.json
-            #conn, cursor = get_db_connection()
-            with db_connection() as (conn, cursor):
-                empresa_id = session.get('empresa_id', 1)
+            data       = request.json
+            empresa_id = session.get('empresa_id', 1)
 
+            with db_connection() as (conn, cursor):
                 cursor.execute("""
                     INSERT INTO proyectos (
                         nombre_proyecto, fecha_inicio, fecha_fin, cliente, contratista, 
@@ -1777,49 +1773,39 @@ def add_project():
 
                 nuevo_id = cursor.fetchone()[0]
 
-                # Insertar miembros seleccionados en proyecto_usuarios
                 miembros = data.get('miembros', [])
-
-                # Si no se seleccionó ningún miembro, asignar al creador
                 if not miembros:
                     miembros = [session['user_id']]
 
-                for user_id in miembros:
+                for uid in miembros:
                     cursor.execute("""
                         INSERT INTO proyecto_usuarios (id_proyecto, user_id, empresa_id)
                         VALUES (%s, %s, %s)
-                    """, (nuevo_id, user_id, empresa_id)
-                )
+                    """, (nuevo_id, uid, empresa_id))
 
-                conn.commit()
-                cursor.close()
-                conn.close()
-
-                return jsonify({"status": "success", "message": "Proyecto registrado exitosamente"}), 201
+            return jsonify({"status": "success", "message": "Proyecto registrado exitosamente"}), 201
 
         except Exception as e:
             print(f"Error en BD: {str(e)}")
             return jsonify({"status": "error", "error": str(e)}), 500
 
-    # GET — cargar usuarios disponibles para mostrar en el equipo
+    # GET
     usuarios = []
     try:
-        conn, cursor = get_db_connection()
-        cursor.execute("""
-            SELECT user_id, name, apellido, cargo 
-            FROM usuario 
-            WHERE estado = 'activo'
-            ORDER BY name ASC
-        """)
-        for row in cursor.fetchall():
-            usuarios.append({
-                'user_id':  row[0],
-                'name':     row[1],
-                'apellido': row[2],
-                'cargo':    row[3] or 'Sin cargo'
-            })
-        cursor.close()
-        conn.close()
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT user_id, name, apellido, cargo 
+                FROM usuario 
+                WHERE estado = 'activo'
+                ORDER BY name ASC
+            """)
+            for row in cursor.fetchall():
+                usuarios.append({
+                    'user_id':  row[0],
+                    'name':     row[1],
+                    'apellido': row[2],
+                    'cargo':    row[3] or 'Sin cargo'
+                })
     except Exception as e:
         print(f"Error al cargar usuarios: {e}")
 
