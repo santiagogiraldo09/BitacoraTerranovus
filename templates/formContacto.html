@@ -471,7 +471,8 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', setupVoz);
+    //document.addEventListener('DOMContentLoaded', setupVoz);
+    window.addEventListener('load', setupVoz);
 </script>
 <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>

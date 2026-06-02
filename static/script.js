@@ -31,6 +31,9 @@ var recordedChunks = [];
 //          INICIALIZACIÓN DE EVENTOS
 // =================================================================
 document.addEventListener('DOMContentLoaded', () => {
+    if (document.querySelector('.dynamic-item-box')) {
+        setupVoiceButtons();
+    }
     // Listener para el botón de activar cámara
     /*
     document.getElementById('activate-camera-btn').addEventListener('click', () => {
