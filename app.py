@@ -40,6 +40,7 @@ from supabase import create_client
 from psycopg2 import pool as pg_pool
 import time
 from datetime import timezone
+from contextlib import contextmanager
 
 connection_pool = None
 
@@ -94,13 +95,35 @@ SHAREPOINT_PASSWORD = "Latumbanuncamuere3"
 app = Flask(__name__,template_folder='templates')
 def init_pool():
     global connection_pool
-    connection_pool = pg_pool.SimpleConnectionPool(
+    connection_pool = pg_pool.ThreadedConnectionPool(
         minconn=2,
-        maxconn=5,
+        maxconn=10,
         dsn=os.environ.get('DATABASE_URL')
     )
 
 init_pool()
+
+@contextmanager
+def db_connection():
+    conn = None
+    try:
+        conn = connection_pool.getconn()
+        cursor = conn.cursor()
+        empresa_id = session.get('empresa_id', 1)
+        cursor.execute("SET app.empresa_id = %s", (empresa_id,))
+        yield conn, cursor
+        conn.commit()
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        raise e
+    finally:
+        if conn:
+            try:
+                cursor.close()
+            except:
+                pass
+            connection_pool.putconn(conn)
 app.secret_key = secrets.token_hex(16)  # Clave secreta para sesiones
 #app.secret_key = '78787878tyg8987652vgdfdf3445'
 CORS(app)
@@ -686,6 +709,7 @@ def get_db_connection():
     cursor = conn.cursor()
     empresa_id = session.get('empresa_id', 1)
     cursor.execute("SET app.empresa_id = %s", (empresa_id,))
+    print(f"[POOL] Conexiones en uso: {len(connection_pool._used)}")
     return conn, cursor
 
 '''
@@ -698,9 +722,8 @@ def get_db_connection():
 '''
 
 def get_user_projects(user_id):
-    conn = None
     try:
-        conn, cursor = get_db_connection()
+        with db_connection() as (conn, cursor):
         
         cursor.execute("""
             SELECT 
@@ -755,13 +778,9 @@ def get_user_projects(user_id):
             })
         
         return projects
-    except psycopg2.Error as e:
+    except Exception as e:
         print(f"Error al obtener proyectos: {e}")
         return []
-    finally:
-        if conn:
-            cursor.close()
-            connection_pool.putconn(conn)
 
 # Función para subir archivos a Azure Blob Storage
 def upload_to_blob(file_name, data, content_type):
@@ -1314,9 +1333,10 @@ def historialregistro(id_proyecto):
     if 'user_id' not in session:
         return redirect(url_for('principalscreen'))
     
-    conn = None
+    #conn = None
     try:
-        conn, cursor = get_db_connection()
+        #conn, cursor = get_db_connection()
+        with db_connection() as (conn, cursor):
 
         # 1. Info del proyecto (Usar comillas dobles para la tabla)
         cursor.execute('SELECT nombre_proyecto, cliente FROM proyectos WHERE id = %s', (id_proyecto,))
@@ -1444,10 +1464,6 @@ def historialregistro(id_proyecto):
     except Exception as e:
         print(f"Error en historialregistro: {e}")
         return redirect(url_for('history'))
-    finally:
-        if conn:
-            cursor.close()
-            connection_pool.putconn(conn)
 
 
 @app.route('/guardar_contacto', methods=['POST'])
@@ -1456,7 +1472,8 @@ def guardar_contacto():
         return jsonify({"error": "No autorizado"}), 401
     try:
         data = request.json
-        conn, cursor = get_db_connection()
+        #conn, cursor = get_db_connection()
+        with db_connection() as (conn, cursor):
         empresa_id = session.get('empresa_id')
 
         cursor.execute("""
@@ -1498,8 +1515,9 @@ def detalleContacto(id_contacto):
  
     conn = None
     try:
-        conn, cursor = get_db_connection()
- 
+        #conn, cursor = get_db_connection()
+        with db_connection() as (conn, cursor):
+
         cursor.execute("""
             SELECT 
                 c.id, c.nombre, c.empresa, c.cargo,
@@ -1570,10 +1588,6 @@ def detalleContacto(id_contacto):
     except Exception as e:
         print(f"Error en detalleContacto: {e}")
         return redirect(url_for('registros'))
-    finally:
-        if conn:
-            cursor.close()
-            connection_pool.putconn(conn)
 
 
 @app.route('/formContacto')
@@ -1745,7 +1759,8 @@ def add_project():
     if request.method == 'POST':
         try:
             data = request.json
-            conn, cursor = get_db_connection()
+            #conn, cursor = get_db_connection()
+            with db_connection() as (conn, cursor):
             empresa_id = session.get('empresa_id', 1)
 
             cursor.execute("""
