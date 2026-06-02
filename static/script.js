@@ -34,35 +34,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (document.querySelector('.dynamic-item-box')) {
         setupVoiceButtons();
     }
-    // Listener para el botón de activar cámara
-    /*
-    document.getElementById('activate-camera-btn').addEventListener('click', () => {
-        startCamera();
-        document.getElementById('activate-camera-btn').style.display = 'none';
-    });
-    */
 
-    // Listeners para los controles de la cámara
-    //document.getElementById('start-record-btn').addEventListener('click', startVideoRecording);
     const startRecordBtn = document.getElementById('start-record-btn');
     if (startRecordBtn) startRecordBtn.addEventListener('click', startVideoRecording);
-    //document.getElementById('stop-record-btn').addEventListener('click', stopVideoRecording);
+    
     const stopRecordBtn = document.getElementById('stop-record-btn');
     if (stopRecordBtn) stopRecordBtn.addEventListener('click', stopVideoRecording);
 
-    // Listeners para adjuntar archivos
-    /*
-    document.getElementById('file-input').addEventListener('change', handleFileUpload);
-    document.getElementById('video-file-input').addEventListener('change', handleVideoUpload);
-    */
-
-    // Listeners para grabación de audio por campo
-    document.querySelectorAll('.record-btn').forEach(button => {
-        button.addEventListener('click', () => startFieldRecording(button));
-    });
-    document.querySelectorAll('.stop-btn').forEach(button => {
-        button.addEventListener('click', stopFieldRecording);
-    });
+    // Solo agregar startFieldRecording si estamos en index.html
+    if (document.querySelector('.dynamic-item-box')) {
+        document.querySelectorAll('.record-btn').forEach(button => {
+            button.addEventListener('click', () => startFieldRecording(button));
+        });
+        document.querySelectorAll('.stop-btn').forEach(button => {
+            button.addEventListener('click', stopFieldRecording);
+        });
+    }
 });
 
 // ===== IDENTIDAD VISUAL - PREVIEW INMEDIATO ESTO ES LO NUEVO=====
