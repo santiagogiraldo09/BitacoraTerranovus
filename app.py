@@ -41,6 +41,7 @@ from psycopg2 import pool as pg_pool
 import time
 from datetime import timezone
 from contextlib import contextmanager
+from datetime import timedelta
 
 connection_pool = None
 
@@ -93,6 +94,14 @@ SHAREPOINT_PASSWORD = "Latumbanuncamuere3"
 #load_dotenv('config/settings.env')  # Ruta relativa al archivo .env
 
 app = Flask(__name__,template_folder='templates')
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=12)
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+@app.before_request
+def make_session_permanent():
+    session.permanent = True
 def init_pool():
     global connection_pool
     connection_pool = pg_pool.ThreadedConnectionPool(
@@ -124,7 +133,8 @@ def db_connection():
             except:
                 pass
             connection_pool.putconn(conn)
-app.secret_key = secrets.token_hex(16)  # Clave secreta para sesiones
+#app.secret_key = secrets.token_hex(16)  # Clave secreta para sesiones
+app.secret_key = os.environ.get('SECRET_KEY', 'bitacora-iac-2026-fallback')
 #app.secret_key = '78787878tyg8987652vgdfdf3445'
 CORS(app)
 
