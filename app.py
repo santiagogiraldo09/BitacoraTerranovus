@@ -959,6 +959,28 @@ def login():
         return redirect(url_for('registros'))
     else:
         return jsonify({'error': 'Credenciales incorrectas'}), 401
+
+
+@app.route('/check-session')
+def check_session():
+    if 'user_id' not in session:
+        return jsonify({'redirect': '/'})
+    
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute(
+                "SELECT estado FROM usuario WHERE user_id = %s",
+                (session['user_id'],)
+            )
+            row = cursor.fetchone()
+            estado = row[0] if row else 'activo'
+
+        if estado == 'pendiente':
+            return jsonify({'redirect': '/cambiar-password'})
+        return jsonify({'redirect': '/registros'})
+
+    except Exception as e:
+        return jsonify({'redirect': '/registros'})
         
 """
 @app.route('/index')

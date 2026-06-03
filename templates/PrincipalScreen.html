@@ -134,13 +134,17 @@
             try {
                 const response = await fetch('/login', {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    redirect: 'manual'
                 });
 
-                const data = await response.json().catch(() => null);
-                if (response.ok || response.redirected) {
-                    window.location.href = '/registros';
+                if (response.type === 'opaqueredirect' || response.redirected) {
+                    // Verificar a dónde redirigir
+                    const checkResponse = await fetch('/check-session');
+                    const data = await checkResponse.json();
+                    window.location.href = data.redirect;
                 } else {
+                    const data = await response.json().catch(() => null);
                     mostrarToast('Correo o contraseña incorrectos', 'error');
                 }
             } catch (err) {
