@@ -355,7 +355,7 @@
                 if (data.success) {
                     fb.textContent = `✅ ${data.mensaje}`;
                     fb.className   = 'invite-feedback success';
-                    setTimeout(() => cerrarInviteModal(), 2500);
+                    setTimeout(() => cerrarInviteModal(), 3500);
                 } else {
                     fb.textContent = data.error || 'Error al enviar.';
                     fb.className   = 'invite-feedback error';
