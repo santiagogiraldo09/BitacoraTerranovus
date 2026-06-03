@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cambiar Contraseña — Bitácora IAC</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='PrincipalScreen.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        .change-card {
+            background: white;
+            border-radius: 16px;
+            padding: 32px 24px;
+            max-width: 400px;
+            width: 100%;
+            margin: 40px auto;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
+        .change-title {
+            font-family: 'Sora', sans-serif;
+            font-size: 22px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 8px;
+        }
+        .change-subtitle {
+            font-size: 14px;
+            color: #6b7280;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-bottom: 16px;
+        }
+        .field label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+        .field input {
+            padding: 12px 14px;
+            border: 1.5px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'DM Sans', sans-serif;
+            outline: none;
+            width: 100%;
+        }
+        .field input:focus {
+            border-color: #FFAF33;
+            box-shadow: 0 0 0 3px rgba(255,175,51,0.12);
+        }
+        .btn-cambiar {
+            width: 100%;
+            padding: 14px;
+            background: #FFAF33;
+            color: white;
+            font-family: 'Sora', sans-serif;
+            font-size: 15px;
+            font-weight: 700;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            margin-top: 8px;
+            transition: background 0.2s;
+        }
+        .btn-cambiar:hover { background: #e09a1f; }
+        .mensaje {
+            margin-top: 12px;
+            font-size: 13px;
+            text-align: center;
+            font-weight: 500;
+        }
+        .mensaje.error   { color: #ef4444; }
+        .mensaje.success { color: #22c55e; }
+    </style>
+</head>
+<body style="background:#f3f4f6; min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 16px;">
+
+    <img src="{{ url_for('static', filename='logo.png') }}" alt="IAC" style="width:80px; margin-bottom:16px; border-radius:12px;">
+
+    <div class="change-card">
+        <h1 class="change-title">Bienvenido a Bitácora</h1>
+        <p class="change-subtitle">
+            Estás usando una contraseña temporal. Por seguridad, crea una contraseña personal antes de continuar.
+        </p>
+
+        <div class="field">
+            <label>Nueva contraseña</label>
+            <input type="password" id="password-nuevo" placeholder="Mínimo 8 caracteres">
+        </div>
+        <div class="field">
+            <label>Confirmar contraseña</label>
+            <input type="password" id="password-confirm" placeholder="Repite la contraseña">
+        </div>
+
+        <button class="btn-cambiar" onclick="cambiarPassword()">
+            Guardar y continuar
+        </button>
+        <div class="mensaje" id="mensaje"></div>
+    </div>
+
+<script>
+async function cambiarPassword() {
+    const nuevo   = document.getElementById('password-nuevo').value;
+    const confirm = document.getElementById('password-confirm').value;
+    const msg     = document.getElementById('mensaje');
+
+    if (!nuevo || !confirm) {
+        msg.textContent = 'Completa ambos campos.';
+        msg.className   = 'mensaje error';
+        return;
+    }
+
+    if (nuevo !== confirm) {
+        msg.textContent = 'Las contraseñas no coinciden.';
+        msg.className   = 'mensaje error';
+        return;
+    }
+
+    if (nuevo.length < 8) {
+        msg.textContent = 'La contraseña debe tener al menos 8 caracteres.';
+        msg.className   = 'mensaje error';
+        return;
+    }
+
+    try {
+        const response = await fetch('/cambiar-password', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+                password_nuevo:   nuevo,
+                password_confirm: confirm
+            })
+        });
+        const data = await response.json();
+        if (data.success) {
+            msg.textContent = '✅ Contraseña guardada. Redirigiendo...';
+            msg.className   = 'mensaje success';
+            setTimeout(() => window.location.href = '/registros', 1500);
+        } else {
+            msg.textContent = data.error || 'Error al guardar.';
+            msg.className   = 'mensaje error';
+        }
+    } catch (e) {
+        msg.textContent = 'Error de conexión.';
+        msg.className   = 'mensaje error';
+    }
+}
+</script>
+</body>
+</html>

@@ -604,7 +604,7 @@ def verify_user(email, password):
         cursor = conn.cursor()
         # Sin SET empresa_id porque aún no hay sesión
         cursor.execute(
-            "SELECT user_id, password, rol, empresa_id, name FROM usuario WHERE email = %s",
+            "SELECT user_id, password, rol, empresa_id, name, estado FROM usuario WHERE email = %s",
             (email,)
         )
         user = cursor.fetchone()
@@ -613,7 +613,8 @@ def verify_user(email, password):
                 'user_id':    user[0],
                 'rol':        user[2],
                 'empresa_id': user[3],
-                'name':       user[4]
+                'name':       user[4],
+                'estado':     user[5]
             }
         return None
     except Exception as e:
@@ -949,19 +950,12 @@ def login():
         session['empresa_id'] = usuario['empresa_id']
         session['user_name']  = usuario['name']
 
-        try:
-            conn, cursor = get_db_connection()
-            cursor.execute("""
-                UPDATE usuario SET estado = 'activo' 
-                WHERE user_id = %s AND estado = 'pendiente'
-            """, (usuario['user_id'],))
-            conn.commit()
-            cursor.close()
-            connection_pool.putconn(conn)
-        except Exception as e:
-            print(f"Error actualizando estado: {e}")
-
         print(f"Login total tardó: {time.time() - t0:.2f}s")
+
+        # Si es pendiente, redirigir a cambiar contraseña
+        if usuario.get('estado') == 'pendiente':
+            return redirect(url_for('cambiar_password_page'))
+
         return redirect(url_for('registros'))
     else:
         return jsonify({'error': 'Credenciales incorrectas'}), 401
@@ -1203,6 +1197,42 @@ def get_form_definitions():
         'status': response.status_code,
         'body': response.json()
     })
+
+
+@app.route('/cambiar-password', methods=['GET'])
+def cambiar_password_page():
+    if 'user_id' not in session:
+        return redirect(url_for('principalscreen'))
+    return render_template('cambiarPassword.html')
+
+@app.route('/cambiar-password', methods=['POST'])
+def cambiar_password():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    data             = request.get_json()
+    password_nuevo   = data.get('password_nuevo')
+    password_confirm = data.get('password_confirm')
+
+    if password_nuevo != password_confirm:
+        return jsonify({'error': 'Las contraseñas no coinciden'}), 400
+
+    if len(password_nuevo) < 8:
+        return jsonify({'error': 'La contraseña debe tener al menos 8 caracteres'}), 400
+
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                UPDATE usuario 
+                SET password = %s, estado = 'activo'
+                WHERE user_id = %s
+            """, (generate_password_hash(password_nuevo), session['user_id']))
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        print(f"Error cambiando contraseña: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/get-form-detail')
 def get_form_detail():
