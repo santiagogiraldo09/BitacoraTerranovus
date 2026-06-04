@@ -238,7 +238,7 @@ def invitar_empresa():
 
             <!-- Header -->
             <div style="background:#0f0f0f;padding:32px 40px;text-align:center;">
-                <img src="https://bitacoraiac.onrender.com/static/logo.png"
+                <img src="https://bitacoraiac.onrender.com/static/LogoBlancoIAC.png"
                      style="height:52px;border-radius:10px;margin-bottom:16px;" alt="IAC">
                 <h1 style="color:#FFAF33;font-size:22px;margin:0;font-weight:800;letter-spacing:-0.5px;">
                     Bitácora IAC
