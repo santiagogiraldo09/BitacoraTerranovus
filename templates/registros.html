@@ -214,6 +214,35 @@
             <div class="invite-feedback" id="invite-feedback"></div>
         </div>
     </div>
+
+    <div class="invite-overlay" id="empresa-overlay">
+        <div class="invite-modal">
+            <div class="invite-header">
+                <h3><i class="fas fa-building"></i> Invitar Nueva Empresa</h3>
+                <button class="invite-close" onclick="cerrarModalEmpresa()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <p class="invite-subtitle">
+                Se generará un enlace de registro y se enviará automáticamente al correo del cliente.
+            </p>
+
+            <div class="invite-field">
+                <label>Correo del cliente *</label>
+                <input type="email" id="empresa-email" placeholder="contacto@empresa.com">
+            </div>
+            <div class="invite-field">
+                <label>Nombre del contacto (opcional)</label>
+                <input type="text" id="empresa-contacto" placeholder="Nombre de quien recibirá el correo">
+            </div>
+
+            <button class="send-invite-btn" id="send-empresa-btn" onclick="enviarInvitacionEmpresa()">
+                <i class="fas fa-paper-plane"></i> Enviar invitación
+            </button>
+            <div class="invite-feedback" id="empresa-feedback"></div>
+        </div>
+    </div>
+
     {% endif %}
 
     <script>
@@ -256,6 +285,70 @@
             });
             document.getElementById('resultsCount').textContent = `RESULTADOS (${visibles})`;
         }
+
+        // ==== MODAL REGISTRO EMPRESA ====
+        function abrirModalEmpresa() {
+            document.getElementById('empresa-overlay').classList.add('active');
+            document.getElementById('empresa-feedback').textContent = '';
+            document.getElementById('empresa-email').value = '';
+            document.getElementById('empresa-contacto').value = '';
+        }
+
+        function cerrarModalEmpresa() {
+            document.getElementById('empresa-overlay').classList.remove('active');
+            document.getElementById('empresa-feedback').textContent = '';
+        }
+
+        async function enviarInvitacionEmpresa() {
+            const email    = document.getElementById('empresa-email').value.trim();
+            const contacto = document.getElementById('empresa-contacto').value.trim();
+            const fb       = document.getElementById('empresa-feedback');
+            const btn      = document.getElementById('send-empresa-btn');
+
+            if (!email) {
+                fb.textContent = 'El correo es obligatorio.';
+                fb.className   = 'invite-feedback error';
+                return;
+            }
+
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                fb.textContent = 'Ingresa un correo válido.';
+                fb.className   = 'invite-feedback error';
+                return;
+            }
+
+            btn.disabled  = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+
+            try {
+                const res  = await fetch('/invitar-empresa', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ email, contacto })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    fb.textContent = `✅ Invitación enviada a ${email}`;
+                    fb.className   = 'invite-feedback success';
+                    setTimeout(() => cerrarModalEmpresa(), 4000);
+                } else {
+                    fb.textContent = data.error || 'Error al enviar.';
+                    fb.className   = 'invite-feedback error';
+                }
+            } catch (err) {
+                fb.textContent = 'Error de conexión.';
+                fb.className   = 'invite-feedback error';
+            } finally {
+                btn.disabled  = false;
+                btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar invitación';
+            }
+        }
+
+        document.getElementById('empresa-overlay').addEventListener('click', function(e) {
+            if (e.target === this) cerrarModalEmpresa();
+        });
 
         // ===== MODAL INVITACIÓN =====
         let emailCounter = 1;

@@ -203,6 +203,132 @@ def upload_foto():
         print(f"Error subiendo foto: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/invitar-empresa', methods=['POST'])
+def invitar_empresa():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    if session.get('empresa_id') != 1:
+        return jsonify({'error': 'No tienes permisos'}), 403
+
+    data     = request.get_json()
+    email    = data.get('email', '').strip()
+    contacto = data.get('contacto', '').strip() or 'Cliente'
+
+    if not email:
+        return jsonify({'error': 'El correo es obligatorio'}), 400
+
+    try:
+        token     = secrets.token_urlsafe(32)
+        expira_en = datetime.now(timezone.utc) + timedelta(days=7)
+        link      = f"https://bitacoraiac.onrender.com/registroEmpresa?token={token}"
+
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                INSERT INTO tokens_registro (token, email, expira_en)
+                VALUES (%s, %s, %s)
+            """, (token, email, expira_en))
+
+        msg      = Message(
+            subject='Invitación para registrar tu empresa en Bitácora IAC',
+            recipients=[email]
+        )
+        msg.html = f"""
+        <div style="font-family:'DM Sans',Arial,sans-serif;max-width:560px;margin:auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
+
+            <!-- Header -->
+            <div style="background:#0f0f0f;padding:32px 40px;text-align:center;">
+                <img src="https://bitacoraiac.onrender.com/static/logo.png"
+                     style="height:52px;border-radius:10px;margin-bottom:16px;" alt="IAC">
+                <h1 style="color:#FFAF33;font-size:22px;margin:0;font-weight:800;letter-spacing:-0.5px;">
+                    Bitácora IAC
+                </h1>
+                <p style="color:#9ca3af;font-size:13px;margin:8px 0 0;">
+                    Plataforma de gestión de proyectos en campo
+                </p>
+            </div>
+
+            <!-- Cuerpo -->
+            <div style="padding:40px;">
+                <p style="font-size:16px;color:#1a1a1a;margin:0 0 8px;">
+                    Hola, <strong>{contacto}</strong>
+                </p>
+                <p style="font-size:15px;color:#4b5563;line-height:1.6;margin:0 0 28px;">
+                    <strong>IAC — Ingeniería Asistida por Computador</strong> te ha invitado a registrar
+                    tu empresa en <strong>Bitácora IAC</strong>, la plataforma para gestión de
+                    actividades y contactos en campo.
+                </p>
+
+                <!-- Pasos -->
+                <div style="background:#f9fafb;border-radius:12px;padding:24px;margin-bottom:28px;">
+                    <p style="font-size:13px;font-weight:700;color:#6b7280;letter-spacing:0.05em;margin:0 0 16px;">
+                        ¿QUÉ INCLUYE TU CUENTA?
+                    </p>
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                        <div style="width:32px;height:32px;border-radius:8px;background:#fff8ee;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <span style="color:#FFAF33;font-size:16px;">🏢</span>
+                        </div>
+                        <span style="font-size:14px;color:#374151;">Espacio exclusivo para tu empresa</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                        <div style="width:32px;height:32px;border-radius:8px;background:#fff8ee;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <span style="color:#FFAF33;font-size:16px;">👥</span>
+                        </div>
+                        <span style="font-size:14px;color:#374151;">Invita a todo tu equipo de trabajo</span>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:12px;">
+                        <div style="width:32px;height:32px;border-radius:8px;background:#fff8ee;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <span style="color:#FFAF33;font-size:16px;">🎙️</span>
+                        </div>
+                        <span style="font-size:14px;color:#374151;">Registro por voz y captura de evidencias</span>
+                    </div>
+                </div>
+
+                <!-- Botón CTA -->
+                <div style="text-align:center;margin-bottom:28px;">
+                    <a href="{link}"
+                       style="display:inline-block;background:#FFAF33;color:#ffffff;
+                              padding:16px 40px;border-radius:10px;text-decoration:none;
+                              font-size:16px;font-weight:700;letter-spacing:0.02em;">
+                        Registrar mi empresa →
+                    </a>
+                </div>
+
+                <!-- Nota de expiración -->
+                <div style="background:#fff8ee;border:1px solid #fed7aa;border-radius:8px;padding:14px 16px;margin-bottom:24px;">
+                    <p style="font-size:13px;color:#92400e;margin:0;">
+                        ⏳ <strong>Este enlace expira en 7 días.</strong>
+                        Si necesitas uno nuevo, contacta a IAC.
+                    </p>
+                </div>
+
+                <p style="font-size:12px;color:#9ca3af;line-height:1.5;margin:0;">
+                    Si no esperabas este correo, puedes ignorarlo de forma segura.
+                    El enlace solo funciona una vez y expira automáticamente.
+                </p>
+            </div>
+
+            <!-- Footer -->
+            <div style="background:#f9fafb;padding:24px 40px;border-top:1px solid #e5e7eb;text-align:center;">
+                <p style="font-size:12px;color:#6b7280;margin:0;">
+                    © 2026 IAC — Ingeniería Asistida por Computador
+                </p>
+                <p style="font-size:12px;color:#9ca3af;margin:6px 0 0;">
+                    <a href="https://iac.com.co" style="color:#FFAF33;text-decoration:none;">iac.com.co</a>
+                </p>
+            </div>
+
+        </div>
+        """
+        mail.send(msg)
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        print(f"Error enviando invitación empresa: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/invitar-usuarios', methods=['POST'])
 def invitar_usuarios():
     if 'user_id' not in session:
