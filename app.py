@@ -42,6 +42,11 @@ import time
 from datetime import timezone
 from contextlib import contextmanager
 from datetime import timedelta
+import secrets
+import unicodedata
+import re
+from datetime import datetime, timedelta, timezone
+
 
 connection_pool = None
 
@@ -313,6 +318,194 @@ def invitar_usuarios():
         if conn:
             cursor.close()
             connection_pool.putconn(conn)
+
+# ── Utilidad: generar slug ──────────────────────────────────────
+def generar_slug(nombre_empresa):
+    # Normalizar: quitar tildes, minúsculas, reemplazar espacios
+    nfkd = unicodedata.normalize('NFD', nombre_empresa)
+    sin_tildes = ''.join(c for c in nfkd if not unicodedata.combining(c))
+    slug = sin_tildes.lower()
+    slug = re.sub(r'[^a-z0-9\s-]', '', slug)
+    slug = re.sub(r'\s+', '-', slug.strip())
+    return slug
+ 
+ 
+# ── Ruta GET: mostrar formulario ────────────────────────────────
+@app.route('/registroEmpresa', methods=['GET'])
+def registro_page():
+    token = request.args.get('token', '')
+ 
+    if not token:
+        return render_template('registroEmpresa.html', token_valido=False, token='', email_sugerido='')
+ 
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT id, email, usado, expira_en
+                FROM tokens_registro
+                WHERE token = %s
+            """, (token,))
+            row = cursor.fetchone()
+ 
+        if not row:
+            return render_template('registroEmpresa.html', token_valido=False, token='', email_sugerido='')
+ 
+        _, email_sugerido, usado, expira_en = row
+ 
+        if usado:
+            return render_template('registroEmpresa.html', token_valido=False, token='', email_sugerido='')
+ 
+        # Verificar expiración
+        ahora = datetime.now(timezone.utc)
+        if expira_en.tzinfo is None:
+            expira_en = expira_en.replace(tzinfo=timezone.utc)
+ 
+        if ahora > expira_en:
+            return render_template('registroEmpresa.html', token_valido=False, token='', email_sugerido='')
+ 
+        return render_template('registroEmpresa.html',
+                               token_valido=True,
+                               token=token,
+                               email_sugerido=email_sugerido or '')
+ 
+    except Exception as e:
+        print(f"Error validando token: {e}")
+        return render_template('registroEmpresa.html', token_valido=False, token='', email_sugerido='')
+ 
+ 
+# ── Ruta POST: procesar registro ────────────────────────────────
+@app.route('/registroEmpresa', methods=['POST'])
+def registro_post():
+    data     = request.get_json()
+    token    = data.get('token', '')
+    nombre   = data.get('nombre', '').strip()
+    apellido = data.get('apellido', '').strip()
+    email    = data.get('email', '').strip()
+    password = data.get('password', '')
+    cargo    = data.get('cargo', '').strip()
+    empresa  = data.get('empresa', '').strip()
+ 
+    if not all([token, nombre, apellido, email, password, empresa]):
+        return jsonify({'error': 'Faltan campos obligatorios'}), 400
+ 
+    if len(password) < 8:
+        return jsonify({'error': 'La contraseña debe tener al menos 8 caracteres'}), 400
+ 
+    try:
+        with db_connection() as (conn, cursor):
+ 
+            # 1. Validar token
+            cursor.execute("""
+                SELECT id, usado, expira_en
+                FROM tokens_registro
+                WHERE token = %s
+            """, (token,))
+            row = cursor.fetchone()
+ 
+            if not row:
+                return jsonify({'error': 'Token inválido'}), 400
+ 
+            token_id, usado, expira_en = row
+ 
+            if usado:
+                return jsonify({'error': 'Este enlace ya fue utilizado'}), 400
+ 
+            ahora = datetime.now(timezone.utc)
+            if expira_en.tzinfo is None:
+                expira_en = expira_en.replace(tzinfo=timezone.utc)
+ 
+            if ahora > expira_en:
+                return jsonify({'error': 'Este enlace ha expirado'}), 400
+ 
+            # 2. Verificar que el email no exista
+            cursor.execute(
+                "SELECT user_id FROM usuario WHERE email = %s", (email,)
+            )
+            if cursor.fetchone():
+                return jsonify({'error': 'Este correo ya está registrado'}), 400
+ 
+            # 3. Generar slug único para la empresa
+            slug_base = generar_slug(empresa)
+            slug      = slug_base
+            contador  = 1
+            while True:
+                cursor.execute(
+                    "SELECT id FROM empresas WHERE slug = %s", (slug,)
+                )
+                if not cursor.fetchone():
+                    break
+                slug = f"{slug_base}-{contador}"
+                contador += 1
+ 
+            # 4. Crear empresa
+            cursor.execute("""
+                INSERT INTO empresas (nombre, slug)
+                VALUES (%s, %s)
+                RETURNING id
+            """, (empresa, slug))
+            empresa_id = cursor.fetchone()[0]
+ 
+            # 5. Crear usuario admin
+            hashed = generate_password_hash(password)
+            cursor.execute("""
+                INSERT INTO usuario
+                    (name, apellido, email, password, cargo, rol, empresa_id, estado)
+                VALUES (%s, %s, %s, %s, %s, 'admin', %s, 'activo')
+            """, (nombre, apellido, email, hashed, cargo or 'Administrador', empresa_id))
+ 
+            # 6. Marcar token como usado
+            cursor.execute("""
+                UPDATE tokens_registro
+                SET usado = TRUE
+                WHERE id = %s
+            """, (token_id,))
+ 
+        return jsonify({'success': True})
+ 
+    except Exception as e:
+        print(f"Error en registro: {e}")
+        return jsonify({'error': str(e)}), 500
+ 
+ 
+# ── Ruta: generar token de invitación (solo admins IAC) ─────────
+@app.route('/generar-token-registro', methods=['POST'])
+def generar_token_registro():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+ 
+    # Solo el admin de IAC (empresa_id = 1) puede generar tokens
+    if session.get('empresa_id') != 1:
+        return jsonify({'error': 'No tienes permisos para esta acción'}), 403
+ 
+    data  = request.get_json()
+    email = data.get('email', '').strip()
+ 
+    if not email:
+        return jsonify({'error': 'El correo es obligatorio'}), 400
+ 
+    try:
+        token     = secrets.token_urlsafe(32)
+        expira_en = datetime.now(timezone.utc) + timedelta(days=7)
+ 
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                INSERT INTO tokens_registro (token, email, expira_en)
+                VALUES (%s, %s, %s)
+            """, (token, email, expira_en))
+ 
+        link = f"https://bitacoraiac.onrender.com/registroEmpresa?token={token}"
+ 
+        return jsonify({
+            'success': True,
+            'token':   token,
+            'link':    link,
+            'expira':  expira_en.strftime('%d/%m/%Y %H:%M')
+        })
+ 
+    except Exception as e:
+        print(f"Error generando token: {e}")
+        return jsonify({'error': str(e)}), 500
+
 
 # ========================================
 # OBTENER TOKEN DE BENTLEY
