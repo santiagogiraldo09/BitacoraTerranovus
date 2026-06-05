@@ -876,3 +876,26 @@ button { font-family: inherit; cursor: pointer; }
 
     .cfg-toast { bottom: 80px; }
 }
+
+.btn-back {
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: var(--texto);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 8px;
+    transition: background 0.2s;
+}
+.btn-back:hover { background: var(--gris-fondo); }
+
+.page-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 24px;
+}
+
+.page-title-row .page-title {
+    margin-bottom: 0;
+}

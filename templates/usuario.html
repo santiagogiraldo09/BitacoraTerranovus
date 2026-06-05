@@ -47,12 +47,20 @@
 
         <!-- Header móvil -->
         <div class="mobile-header">
+            <button class="btn-back" onclick="window.location.href='{{ url_for('registros') }}'">
+                <i class="fas fa-chevron-left"></i>
+            </button>
             <img src="{{ url_for('static', filename='logo.png') }}" alt="IAC" class="mobile-logo">
             <span class="mobile-title">Configuración</span>
         </div>
 
         <!-- Título desktop -->
-        <h1 class="page-title">Configuración</h1>
+        <div class="page-title-row">
+            <button class="btn-back" onclick="window.location.href='{{ url_for('registros') }}'">
+                <i class="fas fa-chevron-left"></i>
+            </button>
+            <h1 class="page-title">Configuración</h1>
+        </div>
 
         <!-- ── TARJETA IDENTIDAD VISUAL ── -->
         <div class="cfg-card">
