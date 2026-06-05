@@ -1710,7 +1710,17 @@ def configuracion():
                 'estado': row[5] or 'pendiente', 'foto': None
             })
         
-        return render_template('configuracion.html', miembros=miembros)
+        cursor.execute("""
+            SELECT url FROM empresa_logos
+            WHERE empresa_id = %s
+            ORDER BY created_at DESC
+            LIMIT 1
+        """, (session.get('empresa_id'),))
+        logo_row = cursor.fetchone()
+        logo_actual = logo_row[0] if logo_row else None
+
+        return render_template('configuracion.html', miembros=miembros, logo_actual=logo_actual)
+        #return render_template('configuracion.html', miembros=miembros)
     except Exception as e:
         print(f"Error en usuario: {e}")
         return render_template('configuracion.html', miembros=[])
@@ -2372,6 +2382,68 @@ def eliminar_usuario(user_id):
         if conn:
             cursor.close()
             connection_pool.putconn(conn)
+
+
+@app.route('/subir-logo', methods=['POST'])
+def subir_logo():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    data = request.get_json()
+    file_data = data.get('imagen')
+    empresa_id = session.get('empresa_id')
+
+    try:
+        if ',' in file_data:
+            header, b64 = file_data.split(',', 1)
+            ext = 'png' if 'png' in header else 'jpg'
+        else:
+            b64, ext = file_data, 'jpg'
+
+        imagen_bytes = base64.b64decode(b64)
+        nombre_archivo = f"{uuid.uuid4()}.{ext}"
+        ruta = f"logos/{empresa_id}/{nombre_archivo}"
+
+        supabase_client.storage.from_('fotos-bitacora').upload(
+            ruta,
+            imagen_bytes,
+            {"content-type": f"image/{ext}"}
+        )
+
+        url_publica = f"{SUPABASE_URL}/storage/v1/object/public/fotos-bitacora/{ruta}"
+
+        # Guardar en BD
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                INSERT INTO empresa_logos (empresa_id, url, creado_por)
+                VALUES (%s, %s, %s)
+            """, (empresa_id, url_publica, session['user_id']))
+
+        return jsonify({'url': url_publica}), 200
+
+    except Exception as e:
+        print(f"Error subiendo logo: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/logos-empresa', methods=['GET'])
+def logos_empresa():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT id, url, created_at
+                FROM empresa_logos
+                WHERE empresa_id = %s
+                ORDER BY created_at DESC
+            """, (session.get('empresa_id'),))
+            logos = [{'id': r[0], 'url': r[1], 'fecha': r[2].strftime('%d/%m/%Y') if r[2] else ''} 
+                     for r in cursor.fetchall()]
+        return jsonify({'logos': logos}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500 
+
 
 @app.route('/eliminar-proyecto', methods=['POST'])
 def eliminar_proyecto():

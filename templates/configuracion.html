@@ -72,16 +72,37 @@
 
             <div class="logo-preview-wrapper">
                 <div class="logo-preview-circle">
-                    <img id="logo-preview-img" src="{{ url_for('static', filename='logo.png') }}" alt="Logo actual">
-                    <label for="logo_empresa" class="logo-camera-btn" title="Cambiar logo">
+                    <img id="logo-preview-img" 
+                        src="{{ logo_actual or url_for('static', filename='logo.png') }}" 
+                        alt="Logo actual">
+                    <label for="logo_empresa" class="logo-camera-btn" title="Subir nuevo logo">
                         <i class="fas fa-camera"></i>
                     </label>
                 </div>
                 <input type="file" id="logo_empresa" name="logo_empresa" accept="image/*" style="display:none">
                 <p class="logo-label">Logo de la Empresa</p>
                 <span class="update-link" onclick="document.getElementById('logo_empresa').click()">
-                    Actualizar imagen
+                    Subir nueva imagen
                 </span>
+                <span class="update-link" onclick="abrirGaleria()" style="margin-left:12px;">
+                    <i class="fas fa-images"></i> Elegir imagen subida
+                </span>
+            </div>
+
+            <!-- Modal galería de logos -->
+            <div class="invite-overlay" id="galeria-overlay">
+                <div class="invite-modal">
+                    <div class="invite-header">
+                        <h3><i class="fas fa-images"></i> Logos subidos</h3>
+                        <button class="invite-close" onclick="cerrarGaleria()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <p class="invite-subtitle">Selecciona un logo previamente subido.</p>
+                    <div id="galeria-logos" class="galeria-logos">
+                        <p style="color:var(--gris-texto); text-align:center;">Cargando...</p>
+                    </div>
+                </div>
             </div>
 
             <div class="cfg-inner-divider"></div>
@@ -234,17 +255,69 @@
         localStorage.setItem('color_secundario', this.value);
     });
 
-    // ── Logo preview ──
-    document.getElementById('logo_empresa').addEventListener('change', function() {
+    // Subir logo nuevo
+    document.getElementById('logo_empresa').addEventListener('change', async function() {
         const file = this.files[0];
         if (!file) return;
         const reader = new FileReader();
-        reader.onload = e => {
-            document.getElementById('logo-preview-img').src = e.target.result;
-            localStorage.setItem('app_logo', e.target.result);
+        reader.onload = async e => {
+            const base64 = e.target.result;
+            document.getElementById('logo-preview-img').src = base64;
+            try {
+                const res  = await fetch('/subir-logo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ imagen: base64 })
+                });
+                const data = await res.json();
+                if (data.url) {
+                    window._logoUrl = data.url;
+                    mostrarToast('✅ Logo subido correctamente');
+                } else {
+                    mostrarToast('❌ Error al subir logo', true);
+                }
+            } catch {
+                mostrarToast('❌ Error de conexión', true);
+            }
         };
         reader.readAsDataURL(file);
     });
+
+    // Galería
+    async function abrirGaleria() {
+        document.getElementById('galeria-overlay').classList.add('active');
+        const contenedor = document.getElementById('galeria-logos');
+        contenedor.innerHTML = '<p style="color:var(--gris-texto);text-align:center;">Cargando...</p>';
+        try {
+            const res  = await fetch('/logos-empresa');
+            const data = await res.json();
+            if (!data.logos || data.logos.length === 0) {
+                contenedor.innerHTML = '<p style="color:var(--gris-texto);text-align:center;">No hay logos subidos aún.</p>';
+                return;
+            }
+            contenedor.innerHTML = '';
+            data.logos.forEach(logo => {
+                const div = document.createElement('div');
+                div.className = 'galeria-logo-item';
+                div.innerHTML = `<img src="${logo.url}" alt="Logo">`;
+                div.onclick = () => seleccionarLogo(logo.url);
+                contenedor.appendChild(div);
+            });
+        } catch {
+            contenedor.innerHTML = '<p style="color:var(--gris-texto);text-align:center;">Error al cargar logos.</p>';
+        }
+    }
+
+    function cerrarGaleria() {
+        document.getElementById('galeria-overlay').classList.remove('active');
+    }
+
+    function seleccionarLogo(url) {
+        document.getElementById('logo-preview-img').src = url;
+        window._logoUrl = url;
+        cerrarGaleria();
+        mostrarToast('✅ Logo seleccionado');
+    }
 
     function guardarCambios() {
         const logo      = localStorage.getItem('app_logo') || '';
