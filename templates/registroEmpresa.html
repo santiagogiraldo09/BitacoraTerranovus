@@ -200,7 +200,7 @@ async function registrar() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando cuenta...';
 
     try {
-        const response = await fetch('/registro', {
+        const response = await fetch('/registroEmpresa', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body:    JSON.stringify({ token: TOKEN, nombre, apellido, email, password, cargo, empresa })
