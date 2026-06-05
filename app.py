@@ -577,7 +577,15 @@ def registro_post():
                 INSERT INTO usuario
                     (name, apellido, email, password, cargo, rol, empresa_id, estado)
                 VALUES (%s, %s, %s, %s, %s, 'admin', %s, 'activo')
+                RETURNING user_id
             """, (nombre, apellido, email, hashed, cargo or 'Administrador', empresa_id))
+
+            nuevo_user_id = cursor.fetchone()[0]
+
+            session['user_id']    = nuevo_user_id
+            session['user_rol']   = 'admin'
+            session['empresa_id'] = empresa_id
+            session['user_name']  = nombre
  
             # 6. Marcar token como usado
             cursor.execute("""
@@ -585,7 +593,12 @@ def registro_post():
                 SET usado = TRUE
                 WHERE id = %s
             """, (token_id,))
- 
+
+        # Login automático después del registro
+        session['user_id']    = cursor.lastrowid if hasattr(cursor, 'lastrowid') else None
+        session['user_rol']   = 'admin'
+        session['empresa_id'] = empresa_id
+        session['user_name']  = nombre
         return jsonify({'success': True})
  
     except Exception as e:

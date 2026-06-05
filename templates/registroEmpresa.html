@@ -209,7 +209,7 @@ async function registrar() {
 
         if (data.success) {
             mostrarMensaje('✅ Cuenta creada. Redirigiendo...', 'success');
-            setTimeout(() => window.location.href = '/', 2000);
+            setTimeout(() => window.location.href = '/registros', 2000);
         } else {
             mostrarMensaje(data.error || 'Error al crear la cuenta.', 'error');
             btn.disabled  = false;
