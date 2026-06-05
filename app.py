@@ -2194,8 +2194,9 @@ def add_project():
                 SELECT user_id, name, apellido, cargo 
                 FROM usuario 
                 WHERE estado = 'activo'
+                AND empresa_id = %s
                 ORDER BY name ASC
-            """)
+            """, (session.get('empresa_id'),))
             for row in cursor.fetchall():
                 usuarios.append({
                     'user_id':  row[0],
