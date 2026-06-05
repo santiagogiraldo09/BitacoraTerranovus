@@ -36,10 +36,6 @@
                     <i class="fas fa-cog"></i>
                     <span>Configuración</span>
                 </a>
-                <button class="nav-item" onclick="abrirInviteModal()" style="background:none; border:none; width:100%; text-align:left; cursor:pointer;">
-                    <i class="fas fa-user-plus"></i>
-                    <span>Invitar</span>
-                </button>
                 {% if session.get('empresa_id') == 1 %}
                 <a href="#" class="nav-item" onclick="event.preventDefault(); abrirModalEmpresa()">
                     <i class="fas fa-building"></i>
@@ -165,12 +161,7 @@
             <i class="fas fa-folder-open"></i>
             <span>Proyectos</span>
         </a>
-        {% if session.get('user_rol') == 'admin' %}
-        <button class="bottom-nav-item" onclick="abrirInviteModal()">
-            <i class="fas fa-user-plus"></i>
-            <span>Invitar</span>
-        </button>
-        
+        {% if session.get('user_rol') == 'admin' %}     
         <a href="{{ url_for('configuracion') }}" class="bottom-nav-item">
             <i class="fas fa-cog"></i>
             <span>Configuración</span>
