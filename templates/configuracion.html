@@ -47,7 +47,7 @@
 
         <!-- Header móvil -->
         <div class="mobile-header">
-            <button class="btn-back" onclick="window.location.href='{{ url_for('registros') }}'">
+            <button class="btn-back" onclick="window.location.href='{{ url_for('configuracion') }}'">
                 <i class="fas fa-chevron-left"></i>
             </button>
             <img src="{{ url_for('static', filename='logo.png') }}" alt="IAC" class="mobile-logo">
@@ -56,7 +56,7 @@
 
         <!-- Título desktop -->
         <div class="page-title-row">
-            <button class="btn-back" onclick="window.location.href='{{ url_for('registros') }}'">
+            <button class="btn-back" onclick="window.location.href='{{ url_for('configuracion') }}'">
                 <i class="fas fa-chevron-left"></i>
             </button>
             <h1 class="page-title">Configuración</h1>
@@ -117,7 +117,7 @@
                     </p>
                 </div>
                 <button class="crear-usuario-btn" onclick="abrirInviteModal()">
-                    <i class="fas fa-user-plus"></i> Crear usuario
+                    <i class="fas fa-user-plus"></i> Invitar usuario
                 </button>
             </div>
 
@@ -201,12 +201,12 @@
                 <i class="fas fa-times"></i>
             </button>
         </div>
-        <p class="invite-subtitle">Completa los datos de cada persona a invitar.</p>
+        <p class="invite-subtitle">Completa los datos de cada usuario a invitar.</p>
 
         <div id="invite-persons-list"></div>
 
         <button type="button" class="btn-agregar-persona" onclick="agregarPersona()">
-            <i class="fas fa-plus"></i> Agregar otra persona
+            <i class="fas fa-plus"></i> Agregar otro usuario
         </button>
 
         <p class="invite-feedback" id="invite-feedback"></p>
