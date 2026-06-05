@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Configuración — Bitácora IAC</title>
     <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
-    <link rel="stylesheet" href="{{ url_for('static', filename='usuario.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='configuracion.css') }}">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
@@ -24,7 +24,7 @@
                 <i class="fas fa-folder-open"></i>
                 <span>Proyectos</span>
             </a>
-            <a href="{{ url_for('usuario') }}" class="sidebar-nav-item active">
+            <a href="{{ url_for('configuracion') }}" class="sidebar-nav-item active">
                 <i class="fas fa-cog"></i>
                 <span>Configuración</span>
             </a>
@@ -186,7 +186,7 @@
         <i class="fas fa-folder-open"></i>
         <span>Proyectos</span>
     </a>
-    <a href="{{ url_for('usuario') }}" class="nav-item active">
+    <a href="{{ url_for('configuracion') }}" class="nav-item active">
         <i class="fas fa-user"></i>
         <span>Perfil</span>
     </a>

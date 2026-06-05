@@ -1684,8 +1684,8 @@ def history():
     # pero asegúrate de que el HTML lo use correctamente.
     return render_template('history.html', db_projects=db_projects)
 
-@app.route('/usuario')
-def usuario():
+@app.route('/configuracion')
+def configuracion():
     if 'user_id' not in session:
         return redirect(url_for('principalscreen'))
     if session.get('user_rol') != 'admin':
@@ -1710,10 +1710,10 @@ def usuario():
                 'estado': row[5] or 'pendiente', 'foto': None
             })
         
-        return render_template('usuario.html', miembros=miembros)
+        return render_template('configuracion.html', miembros=miembros)
     except Exception as e:
         print(f"Error en usuario: {e}")
-        return render_template('usuario.html', miembros=[])
+        return render_template('configuracion.html', miembros=[])
     finally:
         if conn:
             cursor.close()

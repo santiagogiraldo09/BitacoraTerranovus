@@ -32,7 +32,7 @@
                     <span>Historial</span>
                 </a> -->
                 {% if session.get('user_rol') == 'admin' %}
-                <a href="{{ url_for('usuario') }}" class="nav-item">
+                <a href="{{ url_for('configuracion') }}" class="nav-item">
                     <i class="fas fa-cog"></i>
                     <span>Configuración</span>
                 </a>
@@ -171,7 +171,7 @@
             <span>Invitar</span>
         </button>
         
-        <a href="{{ url_for('usuario') }}" class="bottom-nav-item">
+        <a href="{{ url_for('configuracion') }}" class="bottom-nav-item">
             <i class="fas fa-cog"></i>
             <span>Configuración</span>
         </a>
