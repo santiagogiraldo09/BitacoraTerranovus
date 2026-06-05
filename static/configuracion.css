@@ -863,7 +863,7 @@ button { font-family: inherit; cursor: pointer; }
 @media screen and (max-width: 768px) {
     .sidebar     { display: none; }
     .bottom-nav  { display: flex; }
-    .page-title-row { display: none; }
+    .page-title-row .btn-back { display: none; }
 
     .main-content {
         margin-left: 0;
