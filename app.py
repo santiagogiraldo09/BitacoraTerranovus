@@ -892,7 +892,7 @@ def guardar_formulario():
             'error': str(e)
         }), 500
 
-
+'''
 def create_user(nombre, apellido, email, password, cargo, rol, empresa):
     try:
         conn, cursor = get_db_connection()
@@ -915,6 +915,7 @@ def create_user(nombre, apellido, email, password, cargo, rol, empresa):
         if conn:
             cursor.close()
             connection_pool.putconn(conn)
+'''
 
 def verify_user(email, password):
     conn = None
@@ -1225,6 +1226,7 @@ def paginaprincipal():
         print(f"Error: {e}")
         return redirect(url_for('history'))
 
+'''
 @app.route('/registro', methods=['GET', 'POST'])
 def registro():
     if request.method == 'POST':
@@ -1249,6 +1251,7 @@ def registro():
             flash('Error al registrar el usuario', 'error')
     
     return render_template('registro.html')
+'''
 
 @app.route('/login', methods=['POST'])
 def login():
