@@ -1698,9 +1698,9 @@ def configuracion():
         cursor.execute("""
             SELECT user_id, name, apellido, email, rol, estado
             FROM usuario
-            WHERE empresa = (SELECT empresa FROM usuario WHERE user_id = %s)
+            WHERE empresa_id = %s
             ORDER BY name ASC
-        """, (session['user_id'],))
+        """, (session.get('empresa_id'),))
         
         miembros = []
         for row in cursor.fetchall():
@@ -2353,10 +2353,10 @@ def eliminar_usuario(user_id):
 
         # Verificar que el usuario pertenece a la misma empresa
         cursor.execute("""
-            SELECT u.user_id FROM usuario u
-            WHERE u.user_id = %s
-            AND u.empresa = (SELECT empresa FROM usuario WHERE user_id = %s)
-        """, (user_id, session['user_id']))
+            SELECT user_id FROM usuario
+            WHERE user_id = %s
+            AND empresa_id = %s
+        """, (user_id, session.get('empresa_id')))
 
         if not cursor.fetchone():
             return jsonify({'success': False, 'error': 'Usuario no encontrado en tu organización'})

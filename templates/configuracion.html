@@ -152,9 +152,11 @@
                                 <button class="icon-btn" onclick="verOpciones({{ m.user_id }})">
                                     <i class="fas fa-ellipsis-h"></i>
                                 </button>
+                                {% if m.user_id != session.get('user_id') %}
                                 <button class="icon-btn danger" onclick="eliminarUsuario({{ m.user_id }}, '{{ m.nombre }}')">
                                     <i class="fas fa-trash"></i>
                                 </button>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
