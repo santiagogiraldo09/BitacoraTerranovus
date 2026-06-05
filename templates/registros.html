@@ -33,7 +33,7 @@
                 </a> -->
                 {% if session.get('user_rol') == 'admin' %}
                 <a href="{{ url_for('usuario') }}" class="nav-item">
-                    <i class="fas fa-users"></i>
+                    <i class="fas fa-cog"></i>
                     <span>Configuración</span>
                 </a>
                 <button class="nav-item" onclick="abrirInviteModal()" style="background:none; border:none; width:100%; text-align:left; cursor:pointer;">
@@ -41,10 +41,10 @@
                     <span>Invitar</span>
                 </button>
                 {% if session.get('empresa_id') == 1 %}
-                <button class="nav-item btn-nav-accion" onclick="abrirModalEmpresa()">
+                <a href="#" class="nav-item" onclick="event.preventDefault(); abrirModalEmpresa()">
                     <i class="fas fa-building"></i>
                     <span>Nueva Empresa</span>
-                </button>
+                </a>
                 {% endif %}
                 {% endif %}
             </nav>
@@ -172,7 +172,7 @@
         </button>
         
         <a href="{{ url_for('usuario') }}" class="bottom-nav-item">
-            <i class="fas fa-users"></i>
+            <i class="fas fa-cog"></i>
             <span>Configuración</span>
         </a>
         {% if session.get('empresa_id') == 1 %}
