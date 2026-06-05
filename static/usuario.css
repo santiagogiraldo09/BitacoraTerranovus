@@ -31,7 +31,7 @@ body, html {
 /* ── CONTENEDOR PRINCIPAL ── */
 .main-container {
     width: 100%;
-    max-width: 430px;
+    max-width: 720px;
     height: 100vh;
     margin: 0 auto;
     background: #ffffff;
@@ -39,6 +39,16 @@ body, html {
     flex-direction: column;
     overflow: hidden;
     position: relative;
+}
+
+@media (min-width: 768px) {
+    body { background: var(--bg); }
+    .main-container {
+        height: calc(100vh - 40px);
+        margin: 20px auto;
+        border-radius: var(--radius-lg);
+        box-shadow: 0 4px 32px rgba(0,0,0,0.10);
+    }
 }
 
 /* ── HEADER ── */
@@ -546,11 +556,39 @@ body, html {
     border-radius: 20px 20px 0 0;
     padding: 24px 20px 36px;
     animation: slideUp 0.28s ease;
+    max-height: 90vh;
+    overflow-y: auto;
 }
 
 @keyframes slideUp {
     from { transform: translateY(100%); }
     to   { transform: translateY(0); }
+}
+
+@media (min-width: 768px) {
+    .invite-overlay {
+        align-items: center;
+    }
+    .invite-modal {
+        border-radius: var(--radius-lg);
+        max-width: 520px;
+        animation: fadeInScale 0.22s ease;
+    }
+    @keyframes fadeInScale {
+        from { opacity: 0; transform: scale(0.95); }
+        to   { opacity: 1; transform: scale(1); }
+    }
+}
+
+/* Grid de campos dentro del modal */
+.invite-fields-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 12px;
+}
+
+.invite-fields-grid .invite-field.full-width {
+    grid-column: 1 / -1;
 }
 
 .invite-header {
@@ -664,6 +702,96 @@ body, html {
 
 .invite-feedback.success { color: var(--success); }
 .invite-feedback.error   { color: var(--danger); }
+
+/* ── Filas de persona en modal de invitación ── */
+.persona-row {
+    background: var(--bg);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    margin-bottom: 12px;
+    border: 1px solid var(--border);
+}
+
+.persona-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.persona-num {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text-mid);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.remove-persona-btn {
+    background: #fee;
+    border: none;
+    border-radius: 50%;
+    width: 26px;
+    height: 26px;
+    cursor: pointer;
+    color: var(--danger);
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.persona-fields-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 12px;
+}
+
+.persona-fields-grid .invite-field.full-width {
+    grid-column: 1 / -1;
+}
+
+.invite-field label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-soft);
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.invite-field input,
+.invite-field select {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    color: var(--text-dark);
+    background: white;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.invite-field input:focus,
+.invite-field select:focus { border-color: var(--color-primario); }
+
+.btn-agregar-persona {
+    width: 100%;
+    background: transparent;
+    border: 1.5px dashed var(--color-primario);
+    color: var(--color-primario);
+    border-radius: var(--radius-sm);
+    padding: 9px;
+    font-size: 13px;
+    cursor: pointer;
+    margin-bottom: 14px;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.btn-agregar-persona:hover { background: #FFF8E1; }
 
 /* ── TOAST ── */
 .cfg-toast {
