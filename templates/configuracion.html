@@ -343,7 +343,10 @@
         })
         .then(r => r.json())
         .then(data => {
-            if (data.success) mostrarToast('✅ Configuración guardada');
+            if (data.success) {
+                mostrarToast('✅ Configuración guardada');
+                document.querySelector('.sidebar-logo-img').src = window._logoUrl || document.getElementById('logo-preview-img').src;
+            }
             else mostrarToast('❌ Error al guardar', true);
         })
         .catch(() => mostrarToast('❌ Error de conexión', true));
