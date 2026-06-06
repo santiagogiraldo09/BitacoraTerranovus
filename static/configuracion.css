@@ -938,3 +938,22 @@ button { font-family: inherit; cursor: pointer; }
     text-align: center;
     margin-top: 4px;
 }
+
+.galeria-upload-row {
+    margin-bottom: 16px;
+}
+
+.btn-subir-logo {
+    width: 100%;
+    background: var(--naranja-light);
+    border: 1.5px dashed var(--naranja);
+    color: var(--naranja);
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-subir-logo:hover { background: #ffe8b0; }

@@ -75,19 +75,13 @@
                     <img id="logo-preview-img" 
                         src="{{ logo_actual or url_for('static', filename='logo.png') }}" 
                         alt="Logo actual">
-                    <label for="logo_empresa" class="logo-camera-btn" title="Subir nuevo logo">
-                        <i class="fas fa-camera"></i>
-                    </label>
                 </div>
-                <input type="file" id="logo_empresa" name="logo_empresa" accept="image/*" style="display:none">
                 <p class="logo-label">Logo de la Empresa</p>
-                <span class="update-link" onclick="document.getElementById('logo_empresa').click()">
-                    Subir nueva imagen
-                </span>
-                <span class="update-link" onclick="abrirGaleria()" style="margin-left:12px;">
-                    <i class="fas fa-images"></i> Elegir imagen subida
+                <span class="update-link" onclick="abrirGaleria()">
+                    <i class="fas fa-images"></i> Seleccionar logo
                 </span>
             </div>
+            <input type="file" id="logo_empresa" name="logo_empresa" accept="image/*" style="display:none">
 
             <!-- Modal galería de logos -->
             <div class="invite-overlay" id="galeria-overlay">
@@ -99,6 +93,11 @@
                         </button>
                     </div>
                     <p class="invite-subtitle">Selecciona un logo previamente subido.</p>
+                    <div class="galeria-upload-row">
+                        <button class="btn-subir-logo" onclick="document.getElementById('logo_empresa').click()">
+                            <i class="fas fa-upload"></i> Subir nuevo logo
+                        </button>
+                    </div>
                     <div id="galeria-logos" class="galeria-logos">
                         <p style="color:var(--gris-texto); text-align:center;">Cargando...</p>
                     </div>
@@ -273,6 +272,8 @@
                 if (data.url) {
                     window._logoUrl = data.url;
                     mostrarToast('✅ Logo subido correctamente');
+                    agregarLogoAGaleria(data.url);
+                    seleccionarLogo(data.url);
                 } else {
                     mostrarToast('❌ Error al subir logo', true);
                 }
@@ -317,6 +318,17 @@
         window._logoUrl = url;
         cerrarGaleria();
         mostrarToast('✅ Logo seleccionado');
+    }
+
+    function agregarLogoAGaleria(url) {
+        const contenedor = document.getElementById('galeria-logos');
+        const noLogos = contenedor.querySelector('p');
+        if (noLogos) noLogos.remove();
+        const div = document.createElement('div');
+        div.className = 'galeria-logo-item';
+        div.innerHTML = `<img src="${url}" alt="Logo">`;
+        div.onclick = () => seleccionarLogo(url);
+        contenedor.insertBefore(div, contenedor.firstChild);
     }
 
     function guardarCambios() {
