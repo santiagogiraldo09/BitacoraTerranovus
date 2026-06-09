@@ -294,4 +294,4 @@ button { font-family: inherit; cursor: pointer; border: none; }
 }
 
 .pag-btn:hover  { border-color: var(--color-primario); color: var(--color-primario); }
-.pag-active     { background: var(--color-primario); color: white; border-color: var(--color-primario); }
+.pag-active     { background: white; color: var(--naranja); border-color: var(--naranja); }
