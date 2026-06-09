@@ -254,6 +254,18 @@
         localStorage.setItem('color_secundario', this.value);
     });
 
+    document.addEventListener('DOMContentLoaded', function() {
+        const primario   = "{{ color_primario }}";
+        const secundario = "{{ color_secundario }}";
+        document.documentElement.style.setProperty('--naranja', primario);
+        document.getElementById('color_primario').value  = primario;
+        document.getElementById('color_secundario').value = secundario;
+        document.getElementById('swatch-primario').style.background  = primario;
+        document.getElementById('swatch-secundario').style.background = secundario;
+        document.getElementById('hex-primario').textContent   = primario.toUpperCase();
+        document.getElementById('hex-secundario').textContent = secundario.toUpperCase();
+    });
+
     // Subir logo nuevo
     document.getElementById('logo_empresa').addEventListener('change', async function() {
         const file = this.files[0];
@@ -331,10 +343,13 @@
         contenedor.insertBefore(div, contenedor.firstChild);
     }
 
-    function guardarCambios() {
-        const logo      = localStorage.getItem('app_logo') || '';
-        const primario  = localStorage.getItem('color_primario') || '#FBAF33';
-        const secundario = localStorage.getItem('color_secundario') || '#E3E3E3';
+    function guardarCambios() {       
+        //const logo      = localStorage.getItem('app_logo') || '';
+        const logo = window._logoUrl || localStorage.getItem('app_logo') || '';
+        //const primario  = localStorage.getItem('color_primario') || '#FBAF33';
+        //const secundario = localStorage.getItem('color_secundario') || '#E3E3E3';
+        const primario   = document.getElementById('color_primario').value;
+        const secundario = document.getElementById('color_secundario').value;
 
         fetch('/guardar-configuracion', {
             method: 'POST',
