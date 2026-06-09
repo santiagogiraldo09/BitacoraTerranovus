@@ -255,6 +255,7 @@
     });
 
     document.addEventListener('DOMContentLoaded', function() {
+        window._logoUrl = "{{ logo_actual or '' }}";
         const primario   = "{{ color_primario }}";
         const secundario = "{{ color_secundario }}";
         document.documentElement.style.setProperty('--naranja', primario);
