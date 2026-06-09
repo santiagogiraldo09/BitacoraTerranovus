@@ -1925,11 +1925,22 @@ def historialregistro(id_proyecto):
                     'fotos':             fotos
                 })
                 '''
+            cursor.execute("""
+                SELECT color_primario, color_secundario
+                FROM empresas
+                WHERE id = %s
+            """, (session.get('empresa_id'),))
+            empresa_row      = cursor.fetchone()
+            color_primario   = empresa_row[0] if empresa_row else '#FFAF33'
+            color_secundario = empresa_row[1] if empresa_row else '#E3E3E3'
 
-            return render_template('historialRegistro.html', 
-                                proyecto=proyecto_info, 
-                                reportes=reportes_completos, 
-                                id_proyecto=id_proyecto)
+            return render_template('historialRegistro.html',
+                proyecto=proyecto_info,
+                reportes=reportes_completos,
+                id_proyecto=id_proyecto,
+                color_primario=color_primario,
+                color_secundario=color_secundario
+            )
     except Exception as e:
         print(f"Error en historialregistro: {e}")
         return redirect(url_for('history'))
