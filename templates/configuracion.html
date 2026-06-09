@@ -17,7 +17,7 @@
     <!-- SIDEBAR (solo desktop) -->
     <aside class="sidebar">
         <div class="sidebar-logo">
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="IAC Logo" class="sidebar-logo-img">
+            <img src="{{ logo_actual or url_for('static', filename='logo.png') }}" alt="IAC Logo" class="sidebar-logo-img">
         </div>
         <nav class="sidebar-nav">
             <a href="{{ url_for('registros') }}" class="sidebar-nav-item">
@@ -50,7 +50,8 @@
             <button class="btn-back" onclick="window.location.href='{{ url_for('registros') }}'">
                 <i class="fas fa-chevron-left"></i>
             </button>
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="IAC" class="mobile-logo">
+            <!--<img src="{{ url_for('static', filename='logo.png') }}" alt="IAC" class="mobile-logo">-->
+            <img src="{{ logo_actual or url_for('static', filename='logo.png') }}" alt="IAC" class="mobile-logo">
             <span class="mobile-title">Configuración</span>
         </div>
 
@@ -362,6 +363,7 @@
             if (data.success) {
                 mostrarToast('✅ Configuración guardada');
                 document.querySelector('.sidebar-logo-img').src = window._logoUrl || document.getElementById('logo-preview-img').src;
+                document.querySelector('.mobile-logo').src = window._logoUrl || document.getElementById('logo-preview-img').src;
             }
             else mostrarToast('❌ Error al guardar', true);
         })
