@@ -109,18 +109,18 @@
             <p class="palette-title">Paleta de Colores</p>
             <div class="color-row">
                 <label class="color-card" for="color_primario">
-                    <input type="color" id="color_primario" value="#FBAF33" class="color-input-hidden">
-                    <span class="color-swatch" id="swatch-primario" style="background:#FBAF33"></span>
+                    <input type="color" id="color_primario" value="{{ color_primario }}">
+                    <span class="color-swatch" id="swatch-primario" style="background:{{ color_primario }}"></span>
                     <div class="color-info">
-                        <span class="color-hex" id="hex-primario">#FBAF33</span>
+                        <span class="color-hex" id="hex-primario">{{ color_primario }}</span>
                         <span class="color-role">Primario</span>
                     </div>
                 </label>
                 <label class="color-card" for="color_secundario">
-                    <input type="color" id="color_secundario" value="#E3E3E3" class="color-input-hidden">
-                    <span class="color-swatch" id="swatch-secundario" style="background:#E3E3E3"></span>
+                    <input type="color" id="color_secundario" value="{{ color_secundario }}">
+                    <span class="color-swatch" id="swatch-secundario" style="background:{{ color_secundario }}"></span>
                     <div class="color-info">
-                        <span class="color-hex" id="hex-secundario">#E3E3E3</span>
+                        <span class="color-hex" id="hex-secundario">{{ color_secundario }}</span>
                         <span class="color-role">Secundario</span>
                     </div>
                 </label>

@@ -841,6 +841,36 @@ def subir_attachments_synchro(token, fotos, videos):
         return 0
 
 
+@app.route('/guardar-configuracion', methods=['POST'])
+def guardar_configuracion():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    conn = None
+    try:
+        data             = request.get_json()
+        color_primario   = data.get('color_primario', '#FBAF33')
+        color_secundario = data.get('color_secundario', '#E3E3E3')
+        logo             = data.get('logo', '')
+
+        conn, cursor = get_db_connection()
+        cursor.execute("""
+            UPDATE empresas
+            SET color_primario   = %s,
+                color_secundario = %s,
+                logo_url         = %s
+            WHERE id = %s
+        """, (color_primario, color_secundario, logo, session.get('empresa_id')))
+        conn.commit()
+
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"Error guardando configuración: {e}")
+        return jsonify({'error': str(e)}), 500
+    finally:
+        if conn:
+            cursor.close()
+            connection_pool.putconn(conn)
+
 @app.route('/guardar-formulario', methods=['POST'])
 def guardar_formulario():
     """Recibe datos del frontend y los envía a Synchro"""
@@ -1719,7 +1749,22 @@ def configuracion():
         logo_row = cursor.fetchone()
         logo_actual = logo_row[0] if logo_row else None
 
-        return render_template('configuracion.html', miembros=miembros, logo_actual=logo_actual)
+        cursor.execute("""
+            SELECT logo_url, color_primario, color_secundario
+            FROM empresas
+            WHERE id = %s
+        """, (session.get('empresa_id'),))
+        empresa_row = cursor.fetchone()
+        logo_actual      = empresa_row[0] if empresa_row else None
+        color_primario   = empresa_row[1] if empresa_row else '#FBAF33'
+        color_secundario = empresa_row[2] if empresa_row else '#E3E3E3'
+
+        return render_template('configuracion.html', 
+            miembros=miembros,
+            logo_actual=logo_actual,
+            color_primario=color_primario,
+            color_secundario=color_secundario
+        )
         #return render_template('configuracion.html', miembros=miembros)
     except Exception as e:
         print(f"Error en usuario: {e}")
