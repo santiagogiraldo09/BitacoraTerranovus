@@ -1816,11 +1816,14 @@ def historialregistro(id_proyecto):
             per_page = 10
             offset   = (page - 1) * per_page
 
+            print(f"PAGE: {page}, PER_PAGE: {per_page}, OFFSET: {offset}, TOTAL: ", end='')
+
             # Total de registros
             cursor.execute("""
                 SELECT COUNT(*) FROM contactos WHERE id_proyecto = %s
             """, (id_proyecto,))
             total     = cursor.fetchone()[0]
+            print(total)
             paginas   = (total + per_page - 1) // per_page
 
             # Consulta paginada
