@@ -1698,8 +1698,25 @@ def registros():
     #blob_projects = get_projects_from_blob()  # Tu función existente
     
     # Combinar proyectos (o usar solo los de PostgreSQL)
-    return render_template('registros.html', 
-                         db_projects=db_projects)
+    conn, cursor = get_db_connection()
+    cursor.execute("""
+        SELECT logo_url, color_primario, color_secundario
+        FROM empresas
+        WHERE id = %s
+    """, (session.get('empresa_id'),))
+    empresa_row = cursor.fetchone()
+    logo_actual      = empresa_row[0] if empresa_row else None
+    color_primario   = empresa_row[1] if empresa_row else '#FFAF33'
+    color_secundario = empresa_row[2] if empresa_row else '#E3E3E3'
+    cursor.close()
+    connection_pool.putconn(conn)
+
+    return render_template('registros.html',
+        db_projects=db_projects,
+        logo_actual=logo_actual,
+        color_primario=color_primario,
+        color_secundario=color_secundario
+    )
 
 # Ruta para la vista "history"
 @app.route('/history')
