@@ -1801,61 +1801,76 @@ def inventario():
 def historialregistro(id_proyecto):
     if 'user_id' not in session:
         return redirect(url_for('principalscreen'))
-    
-    #conn = None
+
     try:
-        #conn, cursor = get_db_connection()
         with db_connection() as (conn, cursor):
 
-            # 1. Info del proyecto (Usar comillas dobles para la tabla)
+            # Info del proyecto
             cursor.execute('SELECT nombre_proyecto, cliente FROM proyectos WHERE id = %s', (id_proyecto,))
             proyecto_info = cursor.fetchone()
-
             if not proyecto_info:
                 return redirect(url_for('history'))
 
-            # 2. Consultar registros de la nueva tabla Terranovus
+            # Paginación
+            page     = request.args.get('page', 1, type=int)
+            per_page = 10
+            offset   = (page - 1) * per_page
+
+            # Total de registros
+            cursor.execute("""
+                SELECT COUNT(*) FROM contactos WHERE id_proyecto = %s
+            """, (id_proyecto,))
+            total     = cursor.fetchone()[0]
+            paginas   = (total + per_page - 1) // per_page
+
+            # Consulta paginada
             cursor.execute("""
                 SELECT c.id, c.nombre, c.empresa, c.cargo,
-                    c.telefono, c.email, c.ciudad, c.notas,
-                    c.created_at,
-                    u.name, u.apellido, u.cargo as user_cargo
+                       c.telefono, c.email, c.ciudad, c.notas,
+                       c.created_at,
+                       u.name, u.apellido, u.cargo as user_cargo
                 FROM contactos c
                 LEFT JOIN usuario u ON u.user_id = c.user_id
                 WHERE c.id_proyecto = %s
                 ORDER BY c.created_at DESC
-            """, (id_proyecto,))
+                LIMIT %s OFFSET %s
+            """, (id_proyecto, per_page, offset))
 
             registros_rows = cursor.fetchall()
+            ids_contactos  = [r[0] for r in registros_rows]
+
+            # Una sola consulta para todas las fotos
+            fotos_por_contacto = {}
+            if ids_contactos:
+                cursor.execute("""
+                    SELECT contacto_id, imagen_url, descripcion
+                    FROM contacto_imagenes
+                    WHERE contacto_id = ANY(%s)
+                """, (ids_contactos,))
+                for f in cursor.fetchall():
+                    cid, url, desc = f
+                    if cid not in fotos_por_contacto:
+                        fotos_por_contacto[cid] = []
+                    if url:
+                        fotos_por_contacto[cid].append({'url': url, 'base64': None, 'desc': desc or ''})
+
             reportes_completos = []
+            colombia_tz = pytz.timezone('America/Bogota')
 
             for r_row in registros_rows:
                 id_c, nombre, empresa, cargo, telefono, email, ciudad, notas, created_at, u_name, u_apellido, u_cargo = r_row
 
-                u_name    = u_name or ''
+                u_name     = u_name or ''
                 u_apellido = u_apellido or ''
-                iniciales = (u_name[0] + u_apellido[0]).upper() if u_name and u_apellido else '??'
+                iniciales  = (u_name[0] + u_apellido[0]).upper() if u_name and u_apellido else '??'
 
                 if created_at:
-                    colombia_tz    = pytz.timezone('America/Bogota')
                     created_at_col = created_at.replace(tzinfo=timezone.utc).astimezone(colombia_tz)
-                    hora           = created_at_col.strftime('%I:%M %p')
-                    fecha_str      = created_at_col.strftime('%d/%m/%Y')
+                    hora      = created_at_col.strftime('%I:%M %p')
+                    fecha_str = created_at_col.strftime('%d/%m/%Y')
                 else:
                     hora      = None
                     fecha_str = 'S/F'
-
-                # Fotos del contacto
-                cursor.execute("""
-                    SELECT imagen_url, descripcion
-                    FROM contacto_imagenes
-                    WHERE contacto_id = %s
-                """, (id_c,))
-
-                fotos = []
-                for f in cursor.fetchall():
-                    if f[0]:
-                        fotos.append({'url': f[0], 'base64': None, 'desc': f[1] or ''})
 
                 reportes_completos.append({
                     'id_registro':       id_c,
@@ -1863,72 +1878,21 @@ def historialregistro(id_proyecto):
                     'descripcion':       f"{empresa or ''} · {cargo or ''}".strip(' ·'),
                     'estado':            ciudad or '',
                     'avance':            None,
-                    'fecha': fecha_str,
-                    'hora':  hora,
-                    #'fecha':             created_at.strftime('%d/%m/%Y') if created_at else 'S/F',
-                    #'hora':              created_at.strftime('%I:%M %p') if created_at else None,
+                    'fecha':             fecha_str,
+                    'hora':              hora,
                     'usuario_nombre':    f"{u_name} {u_apellido}".strip() or 'Sin asignar',
                     'usuario_cargo':     u_cargo or '',
                     'usuario_iniciales': iniciales,
-                    'fotos':             fotos,
+                    'fotos':             fotos_por_contacto.get(id_c, []),
                     'telefono':          telefono or '',
                     'email':             email or '',
                     'notas':             notas or ''
                 })
 
-
-            '''
-            cursor.execute("""
-                SELECT r.id, r.fecha, r.actividad, r.descripcion_actividad, 
-                    r.estado, r.porcentaje_avance,
-                    u.name, u.apellido, u.cargo
-                FROM registros r
-                LEFT JOIN usuario u ON u.user_id = r.user_id
-                WHERE r.id_proyecto = %s 
-                ORDER BY r.fecha DESC, r.id DESC
-            """, (id_proyecto,))
-            
-            registros_rows = cursor.fetchall()
-            reportes_completos = []
-
-            for r_row in registros_rows:
-                id_reg, fecha_dt, act, desc, est, avan, nombre, apellido, cargo = r_row
-                
-                # 3. Consultar fotos asociadas a este registro
-                cursor.execute("""
-                    SELECT imagen_url, description 
-                    FROM fotos_registro
-                    WHERE id_registro = %s
-                """, (id_reg,))
-                fotos_raw = cursor.fetchall()
-
-                fotos = []
-                for f in fotos_raw:
-                    url  = f[0]
-                    desc = f[1] or ''
-                    if url:
-                        fotos.append({'url': url, 'base64': None, 'desc': desc})
-                    #elif b64:
-                        #img_str = b64.split(',')[1] if ',' in b64 else b64
-                        #fotos.append({'url': None, 'base64': img_str, 'desc': desc})
-
-                reportes_completos.append({
-                    'id_registro':       id_reg,
-                    'fecha':             fecha_dt.strftime('%d/%m/%Y') if fecha_dt else "S/F",
-                    'actividad':         act,
-                    'descripcion':       desc,
-                    'estado':            est,
-                    'avance':            avan,
-                    'usuario_nombre':    f"{nombre or ''} {apellido or ''}".strip() or 'Sin asignar',
-                    'usuario_cargo':     cargo or '',
-                    'usuario_iniciales': ((nombre or '')[0] + (apellido or '')[0]).upper() if nombre and apellido else '??',
-                    'fotos':             fotos
-                })
-                '''
+            # Colores de empresa
             cursor.execute("""
                 SELECT color_primario, color_secundario
-                FROM empresas
-                WHERE id = %s
+                FROM empresas WHERE id = %s
             """, (session.get('empresa_id'),))
             empresa_row      = cursor.fetchone()
             color_primario   = empresa_row[0] if empresa_row else '#FFAF33'
@@ -1939,12 +1903,14 @@ def historialregistro(id_proyecto):
                 reportes=reportes_completos,
                 id_proyecto=id_proyecto,
                 color_primario=color_primario,
-                color_secundario=color_secundario
+                color_secundario=color_secundario,
+                page=page,
+                paginas=paginas,
+                total=total
             )
     except Exception as e:
         print(f"Error en historialregistro: {e}")
         return redirect(url_for('history'))
-
 
 @app.route('/guardar_contacto', methods=['POST'])
 def guardar_contacto():

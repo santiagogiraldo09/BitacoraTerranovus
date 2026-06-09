@@ -268,3 +268,30 @@ button { font-family: inherit; cursor: pointer; border: none; }
     .card-meta { flex-direction: column; gap: 8px; }
     .btn-row { flex-direction: column; }
 }
+
+.paginacion {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    padding: 16px 0;
+}
+
+.pag-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-mid);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.pag-btn:hover  { border-color: var(--color-primario); color: var(--color-primario); }
+.pag-active     { background: var(--color-primario); color: white; border-color: var(--color-primario); }
