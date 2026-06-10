@@ -101,8 +101,7 @@
                     {% for proyecto in db_projects %}
                     <div class="project-card"
                          data-name="{{ proyecto.name | lower }}"
-                         data-estado="{{ proyecto.estado | lower }}"
-                         onclick="redirectToProjectDetails('{{ proyecto.name }}', '{{ proyecto.id_proyecto }}')">
+                         data-estado="{{ proyecto.estado | lower }}">
 
                         <div class="card-top">
                             <h3 class="card-title">{{ proyecto.name }}</h3>
@@ -110,11 +109,6 @@
                                 {{ proyecto.estado }}
                             </span>
                         </div>
-
-                        <p class="card-client">
-                            <i class="fas fa-building"></i>
-                            {{ proyecto.cliente }}
-                        </p>
 
                         <div class="card-meta">
                             <div class="meta-item">
@@ -134,7 +128,12 @@
                         </div>
 
                         <div class="card-footer">
-                            <span class="ver-detalles">Ver Detalles <i class="fas fa-chevron-right"></i></span>
+                            <span class="ver-detalles" onclick="redirectToProjectDetails('{{ proyecto.name }}', '{{ proyecto.id_proyecto }}')">
+                                Ver Detalles <i class="fas fa-chevron-right"></i>
+                            </span>
+                            <span class="ver-detalles" onclick="redirectToFormularios('{{ proyecto.id_proyecto }}')">
+                                Formularios <i class="fas fa-chevron-right"></i>
+                            </span>
                         </div>
                     </div>
                     {% endfor %}
