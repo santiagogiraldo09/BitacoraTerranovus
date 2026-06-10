@@ -253,16 +253,6 @@ function transcribeAudio(audioBlob) {
 // LÓGICA DE CÁMARA Y ARCHIVOS (Copiada de script.js)
 // ==================================================================
 
-safeAddListener('start-camera', 'click', () => {
-    startCamera("environment");
-
-    const btn = document.getElementById('start-camera');
-    const controls = document.getElementById('camera-controls');
-
-    if (btn) btn.style.display = 'none';
-    if (controls) controls.style.display = 'block';
-});
-
 function startCamera(facingMode = "environment") {
     const video = document.getElementById('videoElement');
     const cameraContainer = document.getElementById('camera-container');
