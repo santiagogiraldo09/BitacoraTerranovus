@@ -202,7 +202,7 @@ body {
     background: #f9fafb;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    padding-right: 70px;
+    padding-right: 80px;
     padding: 0 16px;
     font-size: 15px;
     color: var(--text-main);
@@ -212,7 +212,7 @@ body {
 
 /* Espacio extra a la derecha si el input lleva botones de voz */
 .input-with-icon .field-input {
-    padding-right: 48px;
+    padding-right: 80px;
 }
 
 /* Select custom adjustments */
@@ -268,17 +268,23 @@ textarea.field-input {
 .record-btn, .stop-btn {
     position: absolute;
     right: 8px;
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
     top: 50%;
     transform: translateY(-50%);
+
+    width: 36px;
+    height: 36px;
+
+    border-radius: 10px;
     border: none;
-    display: inline-flex;
+
+    display: flex; /* 🔥 mejor que inline-flex */
     align-items: center;
     justify-content: center;
+
     cursor: pointer;
     transition: all 0.2s;
+
+    z-index: 2; /* 🔥 asegura que quede sobre el input */
 }
 
 input[type="date"] {
