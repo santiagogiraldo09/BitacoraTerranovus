@@ -150,16 +150,13 @@
                 </div>
             </div>
             <form id="export-form" method="POST">
-                <input type="hidden" name="project_id" value="{{ proyecto[2] | default('') }}">
-                <button type="submit" formaction="/exportar-proyectos-pdf" class="btn-exportar">
-                    Exportar informe
-                </button>
+                <input type="hidden" name="id_proyecto" value="{{ id_proyecto }}">
                 <div class="btn-row">
-                    <button type="submit" formaction="/exportar-proyectos-pdf" class="btn-secondary">
+                    <button type="submit" formaction="/exportar-contactos-pdf" class="btn-secondary">
                         <i class="fas fa-file-pdf"></i> Descargar PDF
                     </button>
-                    <button type="submit" formaction="/exportar-proyectos-excel" class="btn-secondary">
-                        <i class="fas fa-file-csv"></i> Descargar CSV
+                    <button type="submit" formaction="/exportar-contactos-excel" class="btn-secondary">
+                        <i class="fas fa-file-excel"></i> Descargar Excel
                     </button>
                 </div>
             </form>

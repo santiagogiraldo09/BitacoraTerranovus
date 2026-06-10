@@ -2983,5 +2983,354 @@ def exportar_proyectos_excel():
             cursor.close()
             connection_pool.putconn(conn)
 
+@app.route('/exportar-contactos-pdf', methods=['POST'])
+def exportar_contactos_pdf():
+    if 'user_id' not in session:
+        return redirect(url_for('principalscreen'))
+
+    id_proyecto = request.form.get('id_proyecto')
+    if not id_proyecto:
+        return "No se especificó proyecto", 400
+
+    conn = None
+    try:
+        conn, cursor = get_db_connection()
+
+        # Info del proyecto
+        cursor.execute("""
+            SELECT nombre_proyecto, cliente, contratista, orden_de_trabajo, ubicacion
+            FROM proyectos WHERE id = %s
+        """, (id_proyecto,))
+        proyecto = cursor.fetchone()
+        if not proyecto:
+            return "Proyecto no encontrado", 404
+        nombre_proy, cliente, contratista, ot, ubicacion = proyecto
+
+        # Info de empresa (logo y colores)
+        cursor.execute("""
+            SELECT logo_url, color_primario
+            FROM empresas WHERE id = %s
+        """, (session.get('empresa_id'),))
+        empresa_row  = cursor.fetchone()
+        logo_url     = empresa_row[0] if empresa_row else None
+        color_hex    = empresa_row[1] if empresa_row else '#FFAF33'
+
+        # Convertir color hex a RGB
+        color_hex = color_hex.lstrip('#')
+        cr, cg, cb = tuple(int(color_hex[i:i+2], 16) for i in (0, 2, 4))
+
+        # Todos los contactos del proyecto
+        cursor.execute("""
+            SELECT c.id, c.nombre, c.empresa, c.cargo,
+                   c.telefono, c.email, c.ciudad, c.notas,
+                   c.created_at, u.name, u.apellido
+            FROM contactos c
+            LEFT JOIN usuario u ON u.user_id = c.user_id
+            WHERE c.id_proyecto = %s
+            ORDER BY c.created_at DESC
+        """, (id_proyecto,))
+        contactos = cursor.fetchall()
+
+        # Fotos en una sola consulta
+        ids_contactos = [c[0] for c in contactos]
+        fotos_por_contacto = {}
+        if ids_contactos:
+            cursor.execute("""
+                SELECT contacto_id, imagen_url
+                FROM contacto_imagenes
+                WHERE contacto_id = ANY(%s)
+            """, (ids_contactos,))
+            for f in cursor.fetchall():
+                cid, url = f
+                if cid not in fotos_por_contacto:
+                    fotos_por_contacto[cid] = []
+                if url:
+                    fotos_por_contacto[cid].append(url)
+
+        # Construir PDF
+        pdf = FPDF()
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.add_page()
+
+        # Logo
+        if logo_url:
+            try:
+                resp = requests.get(logo_url, timeout=5)
+                if resp.status_code == 200:
+                    tmp_logo = NamedTemporaryFile(delete=False, suffix='.png')
+                    tmp_logo.write(resp.content)
+                    tmp_logo.close()
+                    pdf.image(tmp_logo.name, x=10, y=10, h=18)
+                    os.unlink(tmp_logo.name)
+            except:
+                pass
+
+        # Encabezado
+        pdf.set_fill_color(cr, cg, cb)
+        pdf.set_text_color(255, 255, 255)
+        pdf.set_font("Arial", 'B', 14)
+        pdf.set_xy(10, 10)
+        pdf.cell(190, 12, "REPORTE DE CONTACTOS CAPTURADOS", ln=True, align='C', fill=True)
+        pdf.set_text_color(0, 0, 0)
+        pdf.ln(4)
+
+        # Info del proyecto
+        pdf.set_fill_color(245, 245, 245)
+        pdf.set_font("Arial", 'B', 9)
+        pdf.cell(30, 7, "PROYECTO:", border=1, fill=True)
+        pdf.set_font("Arial", '', 9)
+        pdf.cell(75, 7, nombre_proy or '', border=1)
+        pdf.set_font("Arial", 'B', 9)
+        pdf.cell(30, 7, "CLIENTE:", border=1, fill=True)
+        pdf.set_font("Arial", '', 9)
+        pdf.cell(55, 7, cliente or '', border=1, ln=True)
+
+        pdf.set_font("Arial", 'B', 9)
+        pdf.cell(30, 7, "CONTRATISTA:", border=1, fill=True)
+        pdf.set_font("Arial", '', 9)
+        pdf.cell(75, 7, contratista or '', border=1)
+        pdf.set_font("Arial", 'B', 9)
+        pdf.cell(30, 7, "UBICACIÓN:", border=1, fill=True)
+        pdf.set_font("Arial", '', 9)
+        pdf.cell(55, 7, ubicacion or '', border=1, ln=True)
+        pdf.ln(8)
+
+        # Contactos
+        colombia_tz = pytz.timezone('America/Bogota')
+        for contacto in contactos:
+            id_c, nombre, empresa, cargo, telefono, email, ciudad, notas, created_at, u_name, u_apellido = contacto
+
+            if created_at:
+                created_at_col = created_at.replace(tzinfo=timezone.utc).astimezone(colombia_tz)
+                fecha_str = created_at_col.strftime('%d/%m/%Y %I:%M %p')
+            else:
+                fecha_str = 'S/F'
+
+            # Encabezado del contacto
+            pdf.set_fill_color(cr, cg, cb)
+            pdf.set_text_color(255, 255, 255)
+            pdf.set_font("Arial", 'B', 10)
+            pdf.cell(190, 7, f"  {nombre or 'Sin nombre'}  —  {fecha_str}", ln=True, fill=True)
+            pdf.set_text_color(0, 0, 0)
+
+            # Datos del contacto
+            pdf.set_fill_color(250, 250, 250)
+            pdf.set_font("Arial", '', 9)
+            pdf.cell(40, 6, "Empresa:", fill=True, border='L')
+            pdf.cell(55, 6, empresa or '', border='R')
+            pdf.cell(35, 6, "Cargo:", fill=True, border='L')
+            pdf.cell(60, 6, cargo or '', border='R', ln=True)
+
+            pdf.cell(40, 6, "Teléfono:", fill=True, border='L')
+            pdf.cell(55, 6, telefono or '', border='R')
+            pdf.cell(35, 6, "Email:", fill=True, border='L')
+            pdf.cell(60, 6, email or '', border='R', ln=True)
+
+            pdf.cell(40, 6, "Ciudad:", fill=True, border='L')
+            pdf.cell(150, 6, ciudad or '', border='R', ln=True)
+
+            if notas:
+                pdf.set_font("Arial", 'I', 9)
+                pdf.multi_cell(190, 5, f"Notas: {notas}", border='LRB')
+                pdf.set_x(10)
+
+            # Registrado por
+            registrado = f"{u_name or ''} {u_apellido or ''}".strip() or 'Sin asignar'
+            pdf.set_font("Arial", '', 8)
+            pdf.set_text_color(100, 100, 100)
+            pdf.cell(190, 5, f"  Registrado por: {registrado}", ln=True)
+            pdf.set_text_color(0, 0, 0)
+
+            # Fotos
+            fotos = fotos_por_contacto.get(id_c, [])
+            if fotos:
+                pdf.set_font("Arial", 'B', 8)
+                pdf.cell(190, 5, "  Evidencia fotográfica:", ln=True)
+                x_foto = 10
+                for foto_url in fotos[:3]:
+                    try:
+                        resp = requests.get(foto_url, timeout=5)
+                        if resp.status_code == 200:
+                            tmp = NamedTemporaryFile(delete=False, suffix='.jpg')
+                            tmp.write(resp.content)
+                            tmp.close()
+                            pdf.image(tmp.name, x=x_foto, y=pdf.get_y(), h=30)
+                            os.unlink(tmp.name)
+                            x_foto += 35
+                    except:
+                        pass
+                if fotos:
+                    pdf.ln(32)
+
+            pdf.ln(4)
+
+        # Pie de página
+        pdf.set_y(-15)
+        pdf.set_font("Arial", 'I', 8)
+        pdf.set_text_color(150, 150, 150)
+        pdf.cell(0, 10, f"Generado por Bitácora IAC — {datetime.now().strftime('%d/%m/%Y %H:%M')}", align='C')
+
+        output = io.BytesIO()
+        pdf.output(output)
+        output.seek(0)
+
+        return send_file(output,
+                         download_name=f"contactos_{nombre_proy or id_proyecto}.pdf",
+                         as_attachment=True,
+                         mimetype='application/pdf')
+    except Exception as e:
+        print(f"Error exportando PDF: {e}")
+        traceback.print_exc()
+        return "Error interno al exportar", 500
+    finally:
+        if conn:
+            cursor.close()
+            connection_pool.putconn(conn)
+
+
+@app.route('/exportar-contactos-excel', methods=['POST'])
+def exportar_contactos_excel():
+    if 'user_id' not in session:
+        return redirect(url_for('principalscreen'))
+
+    id_proyecto = request.form.get('id_proyecto')
+    if not id_proyecto:
+        return "No se especificó proyecto", 400
+
+    conn = None
+    try:
+        conn, cursor = get_db_connection()
+
+        # Info del proyecto
+        cursor.execute("""
+            SELECT nombre_proyecto, cliente, contratista, orden_de_trabajo, ubicacion
+            FROM proyectos WHERE id = %s
+        """, (id_proyecto,))
+        proyecto = cursor.fetchone()
+        if not proyecto:
+            return "Proyecto no encontrado", 404
+        nombre_proy, cliente, contratista, ot, ubicacion = proyecto
+
+        # Todos los contactos
+        cursor.execute("""
+            SELECT c.id, c.nombre, c.empresa, c.cargo,
+                   c.telefono, c.email, c.ciudad, c.notas,
+                   c.created_at, u.name, u.apellido
+            FROM contactos c
+            LEFT JOIN usuario u ON u.user_id = c.user_id
+            WHERE c.id_proyecto = %s
+            ORDER BY c.created_at DESC
+        """, (id_proyecto,))
+        contactos = cursor.fetchall()
+
+        # Fotos en una sola consulta
+        ids_contactos = [c[0] for c in contactos]
+        fotos_por_contacto = {}
+        if ids_contactos:
+            cursor.execute("""
+                SELECT contacto_id, imagen_url
+                FROM contacto_imagenes
+                WHERE contacto_id = ANY(%s)
+            """, (ids_contactos,))
+            for f in cursor.fetchall():
+                cid, url = f
+                if cid not in fotos_por_contacto:
+                    fotos_por_contacto[cid] = []
+                if url:
+                    fotos_por_contacto[cid].append(url)
+
+        # Construir Excel
+        wb = Workbook()
+        ws = wb.active
+        ws.title = (nombre_proy or 'Contactos')[:30]
+
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from openpyxl.utils import get_column_letter
+
+        # Info del proyecto
+        ws.append(["Proyecto:", nombre_proy])
+        ws.append(["Cliente:", cliente])
+        ws.append(["Contratista:", contratista])
+        ws.append(["Orden de Trabajo:", ot])
+        ws.append(["Ubicación:", ubicacion])
+        ws.append([])
+
+        # Encabezados
+        headers = ["#", "Nombre", "Empresa", "Cargo", "Teléfono",
+                   "Email", "Ciudad", "Notas", "Fecha", "Registrado por", "Fotos"]
+        ws.append(headers)
+
+        header_row = ws.max_row
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=header_row, column=col)
+            cell.font      = Font(bold=True, color="FFFFFF")
+            cell.fill      = PatternFill("solid", fgColor="FFAF33")
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        colombia_tz = pytz.timezone('America/Bogota')
+        row_index   = header_row + 1
+
+        for i, contacto in enumerate(contactos, 1):
+            id_c, nombre, empresa, cargo, telefono, email, ciudad, notas, created_at, u_name, u_apellido = contacto
+
+            if created_at:
+                created_at_col = created_at.replace(tzinfo=timezone.utc).astimezone(colombia_tz)
+                fecha_str = created_at_col.strftime('%d/%m/%Y %I:%M %p')
+            else:
+                fecha_str = 'S/F'
+
+            registrado = f"{u_name or ''} {u_apellido or ''}".strip() or 'Sin asignar'
+
+            ws.append([
+                i, nombre or '', empresa or '', cargo or '',
+                telefono or '', email or '', ciudad or '',
+                notas or '', fecha_str, registrado, ''
+            ])
+
+            ws.row_dimensions[row_index].height = 80
+
+            # Fotos
+            fotos = fotos_por_contacto.get(id_c, [])
+            col_foto = 11
+            for foto_url in fotos[:3]:
+                try:
+                    resp = requests.get(foto_url, timeout=5)
+                    if resp.status_code == 200:
+                        img     = Image.open(io.BytesIO(resp.content))
+                        img.thumbnail((100, 100))
+                        img_io  = io.BytesIO()
+                        img.save(img_io, format='PNG')
+                        img_io.seek(0)
+                        img_excel        = ExcelImage(img_io)
+                        img_excel.anchor = f"{get_column_letter(col_foto)}{row_index}"
+                        ws.add_image(img_excel)
+                        col_foto += 1
+                except Exception as e:
+                    print(f"Error foto contacto {id_c}: {e}")
+
+            row_index += 1
+
+        # Anchos de columna
+        anchos = [5, 20, 20, 18, 15, 25, 15, 30, 18, 20, 15]
+        for i, ancho in enumerate(anchos, 1):
+            ws.column_dimensions[get_column_letter(i)].width = ancho
+
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        return send_file(output,
+                         download_name=f"contactos_{nombre_proy or id_proyecto}.xlsx",
+                         as_attachment=True,
+                         mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    except Exception as e:
+        print(f"Error exportando Excel: {e}")
+        traceback.print_exc()
+        return "Error interno al exportar", 500
+    finally:
+        if conn:
+            cursor.close()
+            connection_pool.putconn(conn)
+
 if __name__ == '__main__':
     app.run(debug=True)
