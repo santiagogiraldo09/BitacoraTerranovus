@@ -3110,7 +3110,7 @@ def exportar_contactos_pdf():
             pdf.set_fill_color(cr, cg, cb)
             pdf.set_text_color(255, 255, 255)
             pdf.set_font("Arial", 'B', 10)
-            pdf.cell(190, 7, f"  {nombre or 'Sin nombre'}  —  {fecha_str}", ln=True, fill=True)
+            pdf.cell(190, 7, f"  {nombre or 'Sin nombre'}  -  {fecha_str}", ln=True, fill=True)
             pdf.set_text_color(0, 0, 0)
 
             # Datos del contacto
