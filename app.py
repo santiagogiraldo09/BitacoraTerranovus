@@ -92,7 +92,7 @@ SHAREPOINT_SITE_URL = "https://iacsas.sharepoint.com/sites/Pruebasproyectossanti
 LIST_NAME = "Proyectos"  # Nombre de la biblioteca
 LIST_NAME_REGISTROS = "RegistrosBitacora"
 SHAREPOINT_USER = "santiago.giraldo@iac.com.co"
-SHAREPOINT_PASSWORD = "Latumbanuncamuere3"
+SHAREPOINT_PASSWORD = "rwrwerwer"
 
 
 # Cargar variables de entorno
