@@ -2990,7 +2990,7 @@ def exportar_contactos_pdf():
 
     id_proyecto = request.form.get('id_proyecto')
     if not id_proyecto:
-        return "No se especificó proyecto", 400
+        return "No se especifico proyecto", 400
 
     conn = None
     try:
@@ -3011,9 +3011,9 @@ def exportar_contactos_pdf():
             SELECT logo_url, color_primario
             FROM empresas WHERE id = %s
         """, (session.get('empresa_id'),))
-        empresa_row  = cursor.fetchone()
-        logo_url     = empresa_row[0] if empresa_row else None
-        color_hex    = empresa_row[1] if empresa_row else '#FFAF33'
+        empresa_row = cursor.fetchone()
+        logo_url    = empresa_row[0] if empresa_row else None
+        color_hex   = empresa_row[1] if empresa_row else '#FFAF33'
 
         # Convertir color hex a RGB
         color_hex = color_hex.lstrip('#')
@@ -3052,7 +3052,11 @@ def exportar_contactos_pdf():
         pdf.set_auto_page_break(auto=True, margin=15)
         pdf.add_page()
 
-        # Logo
+        # ── ENCABEZADO TIPO TABLA ──
+        y_enc = pdf.get_y()
+
+        # Celda logo (40mm)
+        pdf.rect(10, y_enc, 40, 22)
         if logo_url:
             try:
                 resp = requests.get(logo_url, timeout=5)
@@ -3060,42 +3064,42 @@ def exportar_contactos_pdf():
                     tmp_logo = NamedTemporaryFile(delete=False, suffix='.png')
                     tmp_logo.write(resp.content)
                     tmp_logo.close()
-                    pdf.image(tmp_logo.name, x=10, y=10, h=18)
+                    pdf.image(tmp_logo.name, x=12, y=y_enc + 2, h=18)
                     os.unlink(tmp_logo.name)
             except:
                 pass
 
-        # Encabezado
+        # Celda titulo (150mm)
         pdf.set_fill_color(cr, cg, cb)
         pdf.set_text_color(255, 255, 255)
         pdf.set_font("Arial", 'B', 14)
-        pdf.set_xy(10, 10)
-        pdf.cell(190, 12, "REPORTE DE CONTACTOS CAPTURADOS", ln=True, align='C', fill=True)
+        pdf.set_xy(50, y_enc)
+        pdf.cell(150, 22, "REPORTE DE CONTACTOS CAPTURADOS", border=1, ln=True, align='C', fill=True)
         pdf.set_text_color(0, 0, 0)
-        pdf.ln(4)
 
-        # Info del proyecto
+        # Filas info proyecto
+        pdf.set_font("Arial", 'B', 9)
         pdf.set_fill_color(245, 245, 245)
-        pdf.set_font("Arial", 'B', 9)
-        pdf.cell(30, 7, "PROYECTO:", border=1, fill=True)
+        pdf.cell(30, 8, "PROYECTO:", border=1, fill=True)
         pdf.set_font("Arial", '', 9)
-        pdf.cell(75, 7, nombre_proy or '', border=1)
+        pdf.cell(75, 8, nombre_proy or '', border=1)
         pdf.set_font("Arial", 'B', 9)
-        pdf.cell(30, 7, "CLIENTE:", border=1, fill=True)
+        pdf.cell(30, 8, "CLIENTE:", border=1, fill=True)
         pdf.set_font("Arial", '', 9)
-        pdf.cell(55, 7, cliente or '', border=1, ln=True)
+        pdf.cell(55, 8, cliente or '', border=1, ln=True)
 
         pdf.set_font("Arial", 'B', 9)
-        pdf.cell(30, 7, "CONTRATISTA:", border=1, fill=True)
+        pdf.cell(30, 8, "CONTRATISTA:", border=1, fill=True)
         pdf.set_font("Arial", '', 9)
-        pdf.cell(75, 7, contratista or '', border=1)
+        pdf.cell(75, 8, contratista or '', border=1)
         pdf.set_font("Arial", 'B', 9)
-        pdf.cell(30, 7, "UBICACIÓN:", border=1, fill=True)
+        pdf.cell(30, 8, "UBICACION:", border=1, fill=True)
         pdf.set_font("Arial", '', 9)
-        pdf.cell(55, 7, ubicacion or '', border=1, ln=True)
+        pdf.cell(55, 8, ubicacion or '', border=1, ln=True)
+
         pdf.ln(8)
 
-        # Contactos
+        # ── CONTACTOS ──
         colombia_tz = pytz.timezone('America/Bogota')
         for contacto in contactos:
             id_c, nombre, empresa, cargo, telefono, email, ciudad, notas, created_at, u_name, u_apellido = contacto
@@ -3121,7 +3125,7 @@ def exportar_contactos_pdf():
             pdf.cell(35, 6, "Cargo:", fill=True, border='L')
             pdf.cell(60, 6, cargo or '', border='R', ln=True)
 
-            pdf.cell(40, 6, "Teléfono:", fill=True, border='L')
+            pdf.cell(40, 6, "Telefono:", fill=True, border='L')
             pdf.cell(55, 6, telefono or '', border='R')
             pdf.cell(35, 6, "Email:", fill=True, border='L')
             pdf.cell(60, 6, email or '', border='R', ln=True)
@@ -3145,7 +3149,7 @@ def exportar_contactos_pdf():
             fotos = fotos_por_contacto.get(id_c, [])
             if fotos:
                 pdf.set_font("Arial", 'B', 8)
-                pdf.cell(190, 5, "  Evidencia fotográfica:", ln=True)
+                pdf.cell(190, 5, "  Evidencia fotografica:", ln=True)
                 x_foto = 10
                 for foto_url in fotos[:3]:
                     try:
@@ -3164,7 +3168,7 @@ def exportar_contactos_pdf():
 
             pdf.ln(4)
 
-        # Pie de página
+        # Pie de pagina
         pdf.set_y(-15)
         pdf.set_font("Arial", 'I', 8)
         pdf.set_text_color(150, 150, 150)
