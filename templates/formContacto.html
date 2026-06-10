@@ -470,13 +470,7 @@
     }
 
     function volverAlHistorial() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const projectId = urlParams.get('project_id');
-        if (projectId) {
-            window.location.href = `/historialRegistro/${projectId}`;
-        } else {
-            window.location.href = '/registros';
-        }
+        window.location.href = '/registros';
     }
 
     //document.addEventListener('DOMContentLoaded', setupVoz);
