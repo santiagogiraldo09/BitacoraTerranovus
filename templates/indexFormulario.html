@@ -188,7 +188,8 @@
             <div class="field-group form-group">
                 <label class="field-label">Condiciones del Material</label>
                 <div class="input-with-icon">
-                    <select class="field-input form-input"
+                    <select id="condiciones-material"
+                            class="field-input form-input"
                             data-api-name="Condiciones__x0020__del__x0020__Mate">
 
                         <option value="Bueno">Bueno</option>
@@ -196,12 +197,14 @@
                         <option value="Malo">Malo</option>
                     </select>
 
-                    <button class="record-btn" type="button">
+                    <button class="record-btn" type="button" data-target="condiciones-material">
                         <i class="fas fa-microphone"></i>
                     </button>
+
                     <button class="stop-btn" type="button" style="display:none;">
                         <i class="fas fa-stop"></i>
                     </button>
+                    
                 </div>
             </div>
         </div>
