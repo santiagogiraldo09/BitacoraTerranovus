@@ -131,9 +131,19 @@
                             <span class="ver-detalles" onclick="redirectToProjectDetails('{{ proyecto.name }}', '{{ proyecto.id_proyecto }}')">
                                 Ver Detalles <i class="fas fa-chevron-right"></i>
                             </span>
-                            <span class="ver-detalles" onclick="redirectToFormularios('{{ proyecto.id_proyecto }}')">
-                                Formularios <i class="fas fa-chevron-right"></i>
-                            </span>
+                            <div class="formularios-wrapper">
+                                <span class="ver-detalles" onclick="toggleFormularios(event, '{{ proyecto.id_proyecto }}')">
+                                    Formularios <i class="fas fa-chevron-down"></i>
+                                </span>
+                                <div class="formularios-dropdown" id="formularios-{{ proyecto.id_proyecto }}">
+                                    <a class="dropdown-item" onclick="redirectToProjectDetails('{{ proyecto.name }}', '{{ proyecto.id_proyecto }}')">
+                                        <i class="fas fa-address-book"></i> Registro de Contactos
+                                    </a>
+                                    <a class="dropdown-item" onclick="redirectToSynchro('{{ proyecto.id_proyecto }}')">
+                                        <i class="fas fa-tasks"></i> Synchro Control
+                                    </a>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     {% endfor %}
@@ -492,6 +502,26 @@
 
             aplicarColorPrimario(primario);
         })();
+
+        function toggleFormularios(event, projectId) {
+            event.stopPropagation();
+            const dropdown = document.getElementById(`formularios-${projectId}`);
+            const isOpen   = dropdown.classList.contains('open');
+            // Cerrar todos los dropdowns abiertos
+            document.querySelectorAll('.formularios-dropdown.open')
+                    .forEach(d => d.classList.remove('open'));
+            if (!isOpen) dropdown.classList.add('open');
+        }
+
+        function redirectToSynchro(projectId) {
+            window.location.href = `/synchro?project_id=${projectId}`;
+        }
+
+        // Cerrar dropdown al hacer clic fuera
+        document.addEventListener('click', function() {
+            document.querySelectorAll('.formularios-dropdown.open')
+                    .forEach(d => d.classList.remove('open'));
+        });
     </script>
 </body>
 </html>
