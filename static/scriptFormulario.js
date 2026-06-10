@@ -253,10 +253,14 @@ function transcribeAudio(audioBlob) {
 // LÓGICA DE CÁMARA Y ARCHIVOS (Copiada de script.js)
 // ==================================================================
 
-document.getElementById('start-camera').addEventListener('click', () => {
+safeAddListener('start-camera', 'click', () => {
     startCamera("environment");
-    document.getElementById('start-camera').style.display = 'none';
-    document.getElementById('camera-controls').style.display = 'block';
+
+    const btn = document.getElementById('start-camera');
+    const controls = document.getElementById('camera-controls');
+
+    if (btn) btn.style.display = 'none';
+    if (controls) controls.style.display = 'block';
 });
 
 function startCamera(facingMode = "environment") {
@@ -288,88 +292,6 @@ function startCamera(facingMode = "environment") {
     });
 }
 
-// Tomar foto
-document.getElementById('take-photo').addEventListener('click', () => {
-    const canvas = document.getElementById('photoCanvas');
-    const video = document.getElementById('videoElement');
-    if (video.readyState !== 4) return;
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-    
-    const fotoBase64 = canvas.toDataURL('image/jpeg', 0.7);
-    capturedPhotos.push(fotoBase64);
-    addPhotoThumbnail(fotoBase64, capturedPhotos.length - 1);
-});
-
-// Grabar video
-document.getElementById('start-record-btn').addEventListener('click', () => {
-    if (!currentStream) {
-        alert("La cámara no está activa.");
-        return;
-    }
-    videoChunks = [];
-    videoMediaRecorder = new MediaRecorder(currentStream, { mimeType: 'video/webm' });
-
-    videoMediaRecorder.ondataavailable = event => {
-        if (event.data.size > 0) videoChunks.push(event.data);
-    };
-
-    videoMediaRecorder.onstop = () => {
-        const videoBlob = new Blob(videoChunks, { type: 'video/webm' });
-        const reader = new FileReader();
-        reader.readAsDataURL(videoBlob);
-        reader.onloadend = () => {
-            const videoBase64 = reader.result;
-            capturedVideos.push(videoBase64);
-            addVideoThumbnail(videoBase64, capturedVideos.length - 1);
-        };
-    };
-
-    videoMediaRecorder.start();
-    document.getElementById('start-record-btn').style.display = 'none';
-    document.getElementById('stop-record-btn').style.display = 'inline-block';
-});
-
-// Detener video
-document.getElementById('stop-record-btn').addEventListener('click', () => {
-    if (videoMediaRecorder && videoMediaRecorder.state === 'recording') {
-        videoMediaRecorder.stop();
-    }
-    document.getElementById('start-record-btn').style.display = 'inline-block';
-    document.getElementById('stop-record-btn').style.display = 'none';
-});
-
-// Adjuntar foto
-document.getElementById('file-input').addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const base64 = e.target.result;
-            capturedPhotos.push(base64);
-            addPhotoThumbnail(base64, capturedPhotos.length - 1);
-        };
-        reader.readAsDataURL(file);
-    }
-    event.target.value = ''; // Reset
-});
-
-// Adjuntar video
-document.getElementById('video-file-input').addEventListener('change', (event) => {
-    const file = event.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const videoBase64 = e.target.result;
-            capturedVideos.push(videoBase64);
-            addVideoThumbnail(videoBase64, capturedVideos.length - 1);
-        };
-        reader.readAsDataURL(file);
-    }
-    event.target.value = ''; // Reset
-});
 
 // Funciones de miniaturas (thumbnails)
 function addPhotoThumbnail(base64String, index) {
