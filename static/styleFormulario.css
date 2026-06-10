@@ -202,6 +202,7 @@ body {
     background: #f9fafb;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
+    padding-right: 70px;
     padding: 0 16px;
     font-size: 15px;
     color: var(--text-main);
@@ -266,16 +267,27 @@ textarea.field-input {
 /* ── Botones de Dictado por Voz ── */
 .record-btn, .stop-btn {
     position: absolute;
-    right: 6px;
+    right: 8px;
     width: 36px;
     height: 36px;
     border-radius: 10px;
+    top: 50%;
+    transform: translateY(-50%);
     border: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: all 0.2s;
+}
+
+input[type="date"] {
+    padding-right: 90px; /* calendario + micrófono */
+}
+
+select.field-input {
+    appearance: none;
+    padding-right: 70px;
 }
 
 .record-btn {
