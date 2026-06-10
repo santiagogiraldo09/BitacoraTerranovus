@@ -3168,7 +3168,7 @@ def exportar_contactos_pdf():
         pdf.set_y(-15)
         pdf.set_font("Arial", 'I', 8)
         pdf.set_text_color(150, 150, 150)
-        pdf.cell(0, 10, f"Generado por Bitácora IAC — {datetime.now().strftime('%d/%m/%Y %H:%M')}", align='C')
+        pdf.cell(0, 10, f"Generado por Bitacora IAC - {datetime.now().strftime('%d/%m/%Y %H:%M')}", align='C')
 
         output = io.BytesIO()
         pdf.output(output)
