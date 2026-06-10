@@ -208,7 +208,54 @@ function transcribeAudio(audioBlob) {
             if (data.text) {
                 
                 // --- INICIO DE LA CORRECCIÓN ---
-                let transcript = data.text;
+                let transcript = data.text.toLowerCase().trim();
+
+                // 🔥 Manejo para SELECT (ej: condiciones del material)
+                if (currentTargetInput.tagName === 'SELECT') {
+                    const options = Array.from(currentTargetInput.options);
+
+                    const match = options.find(opt =>
+                        transcript.includes(opt.value.toLowerCase())
+                    );
+
+                    if (match) {
+                        currentTargetInput.value = match.value;
+                    } else {
+                        alert("No se reconoció una opción válida (Bueno, Regular, Malo)");
+                    }
+
+                    return; // 🔥 salimos porque ya asignamos valor
+                }
+
+                // 🔥 Manejo para fechas por voz
+                if (currentTargetInput.type === 'date') {
+
+                    const meses = {
+                        enero: 0, febrero: 1, marzo: 2, abril: 3,
+                        mayo: 4, junio: 5, julio: 6, agosto: 7,
+                        septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11
+                    };
+
+                    const match = transcript.match(/(\d{1,2}) de (\w+) de (\d{4})/);
+
+                    if (match) {
+                        const dia = parseInt(match[1]);
+                        const mes = meses[match[2]];
+                        const año = parseInt(match[3]);
+
+                        if (mes !== undefined) {
+                            const fecha = new Date(año, mes, dia);
+
+                            // formato YYYY-MM-DD
+                            const iso = fecha.toISOString().split('T')[0];
+                            currentTargetInput.value = iso;
+                            return;
+                        }
+                    }
+
+                    alert("Formato de fecha no reconocido. Ej: 15 de octubre de 2025");
+                    return;
+                }
 
                 // Verificamos si el campo de destino es de tipo "number"
                 if (currentTargetInput.type === 'number') {
