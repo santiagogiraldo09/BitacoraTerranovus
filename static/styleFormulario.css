@@ -1,4 +1,4 @@
-/* ── Reset y Variables Globales con Identidad Naranja ── */
+/* ── Reset y Variables Globales ── */
 * {
     box-sizing: border-box;
     margin: 0;
@@ -8,20 +8,17 @@
 }
 
 :root {
-    --bg-global: #f8f9fa;
+    --bg-global: #f6f8fa;
     --bg-card: #ffffff;
-    --text-main: #111111;
-    --text-muted: #555555;
-    
-    /* Paleta Naranja Corporativa del Formulario de Contactos */
-    --primary: #ff6b00;
-    --primary-light: #ff8533;
-    --primary-dark: #e56000;
-    --primary-alpha: rgba(255, 107, 0, 0.08);
-    
+    --text-main: #1a1a1a;
+    --text-muted: #666666;
+    --primary: #1a1a1a;
+    --primary-light: #333333;
     --accent-danger: #df2121;
     --border-color: #e5e7eb;
+    --border-focus: #1a1a1a;
     --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.06);
     --radius-lg: 16px;
     --radius-md: 12px;
     --radius-sm: 8px;
@@ -35,10 +32,10 @@ body {
     min-height: 100vh;
 }
 
-/* Contenedor Principal Adaptable (Responsive Completo) */
+/* Container principal simulando App Móvil / Layout Responsivo */
 .page-wrapper {
     width: 100%;
-    max-width: 100%;
+    max-width: 600px;
     background: var(--bg-global);
     display: flex;
     flex-direction: column;
@@ -47,33 +44,21 @@ body {
     overflow: hidden;
 }
 
-/* Maximizador de ancho interno para pantallas grandes */
-.form-container, .header-container, .actions-container, .nav-container {
-    width: 100%;
-    max-width: 600px;
-    margin: 0 auto;
-    display: flex;
-    width: 100%;
-}
-
-/* ── Header Fijo, Fluido y Responsive ── */
+/* ── Header Fijo ── */
 .page-header {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     height: 64px;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border-bottom: 2px solid var(--primary); /* Línea de identidad superior */
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
     padding: 0 16px;
     z-index: 100;
-}
-
-.header-container {
-    align-items: center;
-    height: 100%;
 }
 
 .btn-back {
@@ -119,11 +104,7 @@ body {
 .content-scroll {
     flex: 1;
     overflow-y: auto;
-    padding: 84px 16px 148px 16px; /* Evita colisión con Header y Bottom Actions */
-}
-
-.form-container {
-    flex-direction: column;
+    padding: 80px 16px 140px 16px; /* Ajuste para no colisionar con header y bottom actions */
 }
 
 /* ── Secciones y Tarjetas ── */
@@ -133,7 +114,7 @@ body {
     padding: 20px;
     margin-bottom: 16px;
     box-shadow: var(--shadow-sm);
-    border: 1px solid rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(0, 0, 0, 0.02);
 }
 
 .section-header {
@@ -146,12 +127,12 @@ body {
 .section-icon {
     width: 36px;
     height: 36px;
-    background: var(--primary-alpha);
+    background: #f0f2f5;
     border-radius: var(--radius-md);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--primary); /* Icono principal en color Naranja */
+    color: var(--text-main);
     font-size: 16px;
 }
 
@@ -166,14 +147,18 @@ body {
     margin-bottom: 16px;
 }
 
+.field-group:last-child {
+    margin-bottom: 0;
+}
+
 .field-label {
     display: block;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     color: var(--text-muted);
     margin-bottom: 6px;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.3px;
 }
 
 .input-with-icon {
@@ -196,25 +181,25 @@ body {
     outline: none;
 }
 
+/* Espacio extra a la derecha si el input lleva botones de voz */
 .input-with-icon .field-input {
     padding-right: 48px;
 }
 
-/* Ajuste select inputs */
+/* Select custom adjustments */
 select.field-input {
     appearance: none;
     -webkit-appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23555555' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 16px center;
     background-size: 16px;
 }
 
-/* Enfoque o focus con acento naranja */
 .field-input:focus {
     background: #ffffff;
-    border-color: var(--primary);
-    box-shadow: 0 0 0 3px rgba(255, 107, 0, 0.15);
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
 }
 
 /* Textareas */
@@ -228,7 +213,7 @@ textarea.field-input {
     resize: none;
 }
 
-/* Estado Readonly (Datos Iniciales) */
+/* Estado Readonly para Datos del Proyecto */
 .field-readonly {
     background: #f3f4f6;
     border-color: var(--border-color);
@@ -243,17 +228,11 @@ textarea.field-input {
     font-size: 14px;
 }
 
-/* Grillas de Campos Flexibles */
+/* Grillas de 2 columnas */
 .fields-grid-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 12px;
-}
-
-@media (max-width: 400px) {
-    .fields-grid-2 {
-        grid-template-columns: 1fr; /* Colapsa en pantallas extremadamente pequeñas */
-    }
 }
 
 /* ── Botones de Dictado por Voz ── */
@@ -278,7 +257,6 @@ textarea.field-input {
 
 .record-btn:hover {
     background: #e4e6e9;
-    color: var(--primary);
 }
 
 .stop-btn {
@@ -293,15 +271,15 @@ textarea.field-input {
     100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(223, 33, 33, 0); }
 }
 
+/* Ajuste específico de voz dentro de Textareas */
 .textarea-group .record-btn, .textarea-group .stop-btn {
     top: 6px;
 }
 
-/* ── Bloques Dinámicos (Ítems de Materiales) ── */
+/* ── Bloques Dinámicos (Filas Añadidas) ── */
 .dynamic-item-box {
     background: #f9fafb;
     border: 1px solid var(--border-color);
-    border-left: 3px solid var(--primary); /* Acento naranja en cada bloque insertado */
     border-radius: var(--radius-md);
     padding: 16px;
     margin-bottom: 16px;
@@ -326,7 +304,7 @@ textarea.field-input {
 .fila-num {
     font-size: 13px;
     font-weight: 600;
-    color: var(--primary);
+    color: var(--text-main);
     display: flex;
     align-items: center;
     gap: 6px;
@@ -351,7 +329,7 @@ textarea.field-input {
     color: var(--accent-danger);
 }
 
-/* Botón Añadir Fila Extensible */
+/* Botón Añadir Fila */
 .btn-add-row {
     width: 100%;
     height: 48px;
@@ -371,9 +349,9 @@ textarea.field-input {
 }
 
 .btn-add-row:hover {
-    border-color: var(--primary);
-    color: var(--primary);
-    background: var(--primary-alpha);
+    border-color: var(--text-main);
+    color: var(--text-main);
+    background: #fafafa;
 }
 
 /* Nota de Formulario */
@@ -388,26 +366,22 @@ textarea.field-input {
     gap: 6px;
 }
 
-/* ── Botones de Acción Inferiores (Responsivos y Ajustados) ── */
+/* ── Botones de Acción Inferiores (Fijos) ── */
 .bottom-actions {
     position: absolute;
-    bottom: 64px; /* Renderizado sobre la barra de navegación */
+    bottom: 64px; /* Renderizado justo arriba de la bottom nav */
     left: 0;
     right: 0;
     height: 76px;
-    background: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-top: 1px solid var(--border-color);
     padding: 0 16px;
-    z-index: 90;
     display: flex;
     align-items: center;
-}
-
-.actions-container {
-    align-items: center;
     gap: 12px;
+    z-index: 90;
 }
 
 .btn-guardar, .btn-cancelar {
@@ -425,15 +399,15 @@ textarea.field-input {
 }
 
 .btn-guardar {
-    flex: 1.8;
-    background: var(--primary); /* Botón de guardado naranja */
+    flex: 1.7;
+    background: var(--primary);
     color: white;
-    box-shadow: 0 4px 12px rgba(255, 107, 0, 0.2);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 .btn-guardar:active {
-    background: var(--primary-dark);
-    transform: scale(0.99);
+    background: var(--primary-light);
+    transform: scale(0.98);
 }
 
 .btn-cancelar {
@@ -446,7 +420,7 @@ textarea.field-input {
     background: #d8dbdf;
 }
 
-/* ── Navbar Inferior (Alineación Completa de Pantalla) ── */
+/* ── Navbar Inferior Fijo ── */
 .bottom-nav {
     position: absolute;
     bottom: 0;
@@ -455,14 +429,10 @@ textarea.field-input {
     height: 64px;
     background: #ffffff;
     border-top: 1px solid var(--border-color);
-    z-index: 100;
     display: flex;
-    align-items: center;
-}
-
-.nav-container {
     justify-content: space-around;
     align-items: center;
+    z-index: 100;
 }
 
 .bottom-nav-item {
@@ -474,7 +444,7 @@ textarea.field-input {
     font-size: 11px;
     font-weight: 500;
     gap: 4px;
-    width: 70px;
+    width: 60px;
     transition: color 0.2s;
 }
 
@@ -486,18 +456,18 @@ textarea.field-input {
     color: var(--text-main);
 }
 
-/* FAB Botón de la barra con tono naranja */
+/* Floating Action Button en la barra inferior */
 .nav-fab {
-    width: 42px;
-    height: 42px;
+    width: 40px;
+    height: 40px;
     background: var(--primary);
     border-radius: 50%;
     color: white;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 4px 12px rgba(255, 107, 0, 0.3);
-    margin-top: -14px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    margin-top: -12px; /* Eleva el botón de manera elegante */
 }
 
 .bottom-nav-item.active .nav-fab {

@@ -14,110 +14,102 @@
 <div class="page-wrapper">
 
     <header class="page-header">
-        <div class="header-container">
-            <button class="btn-back" onclick="window.location.href='/registros'">
-                <i class="fas fa-chevron-left"></i>
-            </button>
-            <div class="header-center">
-                <img src="{{ url_for('static', filename='logo.png') }}" alt="IAC" class="header-logo">
-                <span class="header-title">Synchro Control</span>
-            </div>
+        <button class="btn-back" onclick="window.location.href='/registros'">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <div class="header-center">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="IAC" class="header-logo">
+            <span class="header-title">Synchro Control</span>
         </div>
     </header>
 
     <div class="content-scroll">
-        <div class="form-container">
 
-            <div class="section">
-                <div class="section-header">
-                    <span class="section-icon">
-                        <i class="fas fa-folder-open"></i>
-                    </span>
-                    <h3 class="section-title">Datos del Proyecto</h3>
-                </div>
+        <div class="section">
+            <div class="section-header">
+                <span class="section-icon">
+                    <i class="fas fa-folder-open"></i>
+                </span>
+                <h3 class="section-title">Datos del Proyecto</h3>
+            </div>
 
-                <div class="field-group form-group">
-                    <label class="field-label">Código Proyecto</label>
-                    <div class="input-with-icon readonly-wrapper">
-                        <input type="text" id="form-codigo-proyecto"
-                               class="field-input field-readonly" readonly
-                               placeholder="Se carga automáticamente">
-                        <i class="fas fa-lock lock-icon"></i>
-                    </div>
-                </div>
-
-                <div class="field-group form-group">
-                    <label class="field-label">Contratista</label>
-                    <div class="input-with-icon readonly-wrapper">
-                        <input type="text" id="form-contratista"
-                               class="field-input field-readonly" readonly
-                               placeholder="Se carga automáticamente">
-                        <i class="fas fa-lock lock-icon"></i>
-                    </div>
-                </div>
-
-                <div class="field-group form-group">
-                    <label class="field-label">Contrato N°</label>
-                    <div class="input-with-icon readonly-wrapper">
-                        <input type="text" id="form-contrato"
-                               class="field-input field-readonly" readonly
-                               placeholder="Se carga automáticamente">
-                        <i class="fas fa-lock lock-icon"></i>
-                    </div>
+            <div class="field-group form-group">
+                <label class="field-label">Código Proyecto</label>
+                <div class="input-with-icon readonly-wrapper">
+                    <input type="text" id="form-codigo-proyecto"
+                           class="field-input field-readonly" readonly
+                           placeholder="Se carga automáticamente">
+                    <i class="fas fa-lock lock-icon"></i>
                 </div>
             </div>
 
-            <div class="section">
-                <div class="section-header">
-                    <span class="section-icon">
-                        <i class="fas fa-clipboard-check"></i>
-                    </span>
-                    <h3 class="section-title">Control Calidad Materiales</h3>
-                </div>
-
-                <div class="accordion-content" id="container-calidad-materiales" data-api-section="Cumplimientos">
-                    <button type="button" class="btn-add-row add-item-btn" data-template="template-control-calidad">
-                        <i class="fas fa-plus"></i> Añadir fila o ítem
-                    </button>
+            <div class="field-group form-group">
+                <label class="field-label">Contratista</label>
+                <div class="input-with-icon readonly-wrapper">
+                    <input type="text" id="form-contratista"
+                           class="field-input field-readonly" readonly
+                           placeholder="Se carga automáticamente">
+                    <i class="fas fa-lock lock-icon"></i>
                 </div>
             </div>
 
-            <p class="form-note">
-                <i class="fas fa-info-circle"></i>
-                Los campos con asterisco (*) son obligatorios. Puede usar el dictado por voz.
-            </p>
-            
+            <div class="field-group form-group">
+                <label class="field-label">Contrato N°</label>
+                <div class="input-with-icon readonly-wrapper">
+                    <input type="text" id="form-contrato"
+                           class="field-input field-readonly" readonly
+                           placeholder="Se carga automáticamente">
+                    <i class="fas fa-lock lock-icon"></i>
+                </div>
+            </div>
         </div>
+
+        <div class="section">
+            <div class="section-header">
+                <span class="section-icon">
+                    <i class="fas fa-clipboard-check"></i>
+                </span>
+                <h3 class="section-title">Control Calidad Materiales</h3>
+            </div>
+
+            <div class="accordion-content" id="container-calidad-materiales" data-api-section="Cumplimientos">
+                <button type="button" class="btn-add-row add-item-btn" data-template="template-control-calidad">
+                    <i class="fas fa-plus"></i> Añadir fila
+                </button>
+            </div>
+        </div>
+
+        <p class="form-note">
+            <i class="fas fa-info-circle"></i>
+            Los campos con asterisco (*) son obligatorios. Puede usar el dictado por voz.
+        </p>
+
     </div>
 
     <div class="bottom-actions">
-        <div class="actions-container">
-            <button type="button" id="save-form-button" class="btn-guardar">
-                <i class="fas fa-save"></i> Actualizar Formulario
-            </button>
-            <button type="button" onclick="window.location.href='/registros'" class="btn-cancelar">
-                Cancelar
-            </button>
-        </div>
+        <button type="button" id="save-form-button" class="btn-guardar">
+            <i class="fas fa-save"></i> Actualizar Formulario
+        </button>
+        <button type="button" onclick="window.location.href='/registros'" class="btn-cancelar">
+            Cancelar
+        </button>
     </div>
 
 </div>
 
 <nav class="bottom-nav">
-    <div class="nav-container">
-        <a href="{{ url_for('registros') }}" class="bottom-nav-item">
-            <i class="fas fa-folder-open"></i>
-            <span>Proyectos</span>
-        </a>
-        <a href="#" class="bottom-nav-item active">
-            <div class="nav-fab"><i class="fas fa-plus"></i></div>
-            <span>Formulario</span>
-        </a>
-        <a href="#" class="bottom-nav-item">
-            <i class="fas fa-user"></i>
-            <span>Perfil</span>
-        </a>
-    </div>
+    <a href="{{ url_for('registros') }}" class="bottom-nav-item">
+        <i class="fas fa-folder-open"></i>
+        <span>Proyectos</span>
+    </a>
+    <a href="#" class="bottom-nav-item active">
+        <div class="nav-fab"><i class="fas fa-plus"></i></div>
+        <span>Formulario</span>
+    </a>
+    <a href="#" class="bottom-nav-item">
+        <i class="fas fa-user"></i>
+        <span>Perfil</span>
+    </a>
 </nav>
 
 <template id="template-control-calidad">
