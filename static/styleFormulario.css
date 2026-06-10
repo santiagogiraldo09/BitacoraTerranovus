@@ -41,7 +41,7 @@ body {
     flex-direction: column;
     position: relative;
     min-height: 100vh; /* mejor que height fijo */
-    overflow: hidden;
+    overflow: visible;
 }
 
 /* ── Header Fijo ── */
@@ -107,7 +107,7 @@ body {
     max-width: 100%;
     overflow-y: auto;
 
-    padding: 80px 16px 100px 16px;
+    padding: 80px 16px calc(76px + 24px) 16px;
     box-sizing: border-box;
 }
 
@@ -381,9 +381,10 @@ textarea.field-input {
 /* ── Botones de Acción Inferiores (Fijos) ── */
 .bottom-actions {
     position: fixed;
-    bottom: 64px; /* Renderizado justo arriba de la bottom nav */
+    bottom: 0px; /* Renderizado justo arriba de la bottom nav */
     left: 0;
     right: 0;
+    width: 100%;
     height: 76px;
     background: rgba(255, 255, 255, 0.85);
     backdrop-filter: blur(12px);
