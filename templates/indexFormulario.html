@@ -13,7 +13,6 @@
 <body>
 <div class="page-wrapper">
 
-    <!-- Header fijo -->
     <header class="page-header">
         <button class="btn-back" onclick="window.location.href='/registros'">
             <i class="fas fa-chevron-left"></i>
@@ -24,10 +23,8 @@
         </div>
     </header>
 
-    <!-- Contenido con scroll -->
     <div class="content-scroll">
 
-        <!-- Sección 1: Datos del Proyecto -->
         <div class="section">
             <div class="section-header">
                 <span class="section-icon">
@@ -36,29 +33,37 @@
                 <h3 class="section-title">Datos del Proyecto</h3>
             </div>
 
-            <div class="field-group">
+            <div class="field-group form-group">
                 <label class="field-label">Código Proyecto</label>
-                <input type="text" id="form-codigo-proyecto"
-                       class="field-input field-readonly" readonly
-                       placeholder="Se carga automáticamente">
+                <div class="input-with-icon readonly-wrapper">
+                    <input type="text" id="form-codigo-proyecto"
+                           class="field-input field-readonly" readonly
+                           placeholder="Se carga automáticamente">
+                    <i class="fas fa-lock lock-icon"></i>
+                </div>
             </div>
 
-            <div class="field-group">
+            <div class="field-group form-group">
                 <label class="field-label">Contratista</label>
-                <input type="text" id="form-contratista"
-                       class="field-input field-readonly" readonly
-                       placeholder="Se carga automáticamente">
+                <div class="input-with-icon readonly-wrapper">
+                    <input type="text" id="form-contratista"
+                           class="field-input field-readonly" readonly
+                           placeholder="Se carga automáticamente">
+                    <i class="fas fa-lock lock-icon"></i>
+                </div>
             </div>
 
-            <div class="field-group">
+            <div class="field-group form-group">
                 <label class="field-label">Contrato N°</label>
-                <input type="text" id="form-contrato"
-                       class="field-input field-readonly" readonly
-                       placeholder="Se carga automáticamente">
+                <div class="input-with-icon readonly-wrapper">
+                    <input type="text" id="form-contrato"
+                           class="field-input field-readonly" readonly
+                           placeholder="Se carga automáticamente">
+                    <i class="fas fa-lock lock-icon"></i>
+                </div>
             </div>
         </div>
 
-        <!-- Sección 2: Control Calidad Materiales -->
         <div class="section">
             <div class="section-header">
                 <span class="section-icon">
@@ -67,19 +72,13 @@
                 <h3 class="section-title">Control Calidad Materiales</h3>
             </div>
 
-            <!-- Contenedor dinámico — data-api-section requerido por scriptFormulario.js -->
-            <div class="accordion-content"
-                 id="container-calidad-materiales"
-                 data-api-section="Cumplimientos">
-                <button type="button"
-                        class="btn-add-row add-item-btn"
-                        data-template="template-control-calidad">
+            <div class="accordion-content" id="container-calidad-materiales" data-api-section="Cumplimientos">
+                <button type="button" class="btn-add-row add-item-btn" data-template="template-control-calidad">
                     <i class="fas fa-plus"></i> Añadir fila
                 </button>
             </div>
         </div>
 
-        <!-- Nota -->
         <p class="form-note">
             <i class="fas fa-info-circle"></i>
             Los campos con asterisco (*) son obligatorios. Puede usar el dictado por voz.
@@ -87,21 +86,17 @@
 
     </div>
 
-    <!-- Botones fijos abajo -->
     <div class="bottom-actions">
         <button type="button" id="save-form-button" class="btn-guardar">
             <i class="fas fa-save"></i> Actualizar Formulario
         </button>
-        <button type="button"
-                onclick="window.location.href='/registros'"
-                class="btn-cancelar">
+        <button type="button" onclick="window.location.href='/registros'" class="btn-cancelar">
             Cancelar
         </button>
     </div>
 
 </div>
 
-<!-- Nav inferior -->
 <nav class="bottom-nav">
     <a href="{{ url_for('registros') }}" class="bottom-nav-item">
         <i class="fas fa-folder-open"></i>
@@ -117,12 +112,11 @@
     </a>
 </nav>
 
-<!-- Template de fila — IDs de data-api-name deben coincidir exactamente con Bentley -->
 <template id="template-control-calidad">
     <div class="dynamic-item-box">
 
         <div class="fila-header">
-            <span class="fila-num">Ítem</span>
+            <span class="fila-num"><i class="fas fa-cube"></i> Ítem Material</span>
             <button type="button" class="btn-eliminar-fila delete-item-btn">
                 <i class="fas fa-trash-alt"></i>
             </button>
@@ -141,12 +135,8 @@
                 <div class="input-with-icon">
                     <input type="text" class="field-input form-input"
                            data-api-name="Unidad" placeholder="m3, kg...">
-                    <button class="record-btn" type="button">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                    <button class="stop-btn" type="button" style="display:none;">
-                        <i class="fas fa-stop"></i>
-                    </button>
+                    <button class="record-btn" type="button"><i class="fas fa-microphone"></i></button>
+                    <button class="stop-btn" type="button" style="display:none;"><i class="fas fa-stop"></i></button>
                 </div>
             </div>
         </div>
@@ -156,32 +146,25 @@
             <div class="input-with-icon">
                 <input type="text" class="field-input form-input"
                        data-api-name="Material" placeholder="Descripción del material">
-                <button class="record-btn" type="button">
-                    <i class="fas fa-microphone"></i>
-                </button>
-                <button class="stop-btn" type="button" style="display:none;">
-                    <i class="fas fa-stop"></i>
-                </button>
+                <button class="record-btn" type="button"><i class="fas fa-microphone"></i></button>
+                <button class="stop-btn" type="button" style="display:none;"><i class="fas fa-stop"></i></button>
             </div>
         </div>
 
         <div class="fields-grid-2">
-            <div class="field-group">
+            <div class="field-group form-group">
                 <label class="field-label">Fecha Arribo</label>
-                <input type="date" class="field-input form-input"
-                       data-api-name="Fecha__x0020__Arribo">
+                <div class="input-with-icon">
+                    <input type="date" class="field-input form-input" data-api-name="Fecha__x0020__Arribo">
+                </div>
             </div>
             <div class="field-group form-group">
                 <label class="field-label">Proveedor</label>
                 <div class="input-with-icon">
                     <input type="text" class="field-input form-input"
                            data-api-name="Proveedor" placeholder="Proveedor">
-                    <button class="record-btn" type="button">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                    <button class="stop-btn" type="button" style="display:none;">
-                        <i class="fas fa-stop"></i>
-                    </button>
+                    <button class="record-btn" type="button"><i class="fas fa-microphone"></i></button>
+                    <button class="stop-btn" type="button" style="display:none;"><i class="fas fa-stop"></i></button>
                 </div>
             </div>
         </div>
@@ -190,45 +173,44 @@
             <div class="field-group form-group">
                 <label class="field-label">Cantidad</label>
                 <div class="input-with-icon">
-                    <input type="number" class="field-input form-input"
+                    <input type="number" step="any" class="field-input form-input"
                            data-api-name="Cantidad" placeholder="0.00">
-                    <button class="record-btn" type="button">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                    <button class="stop-btn" type="button" style="display:none;">
-                        <i class="fas fa-stop"></i>
-                    </button>
+                    <button class="record-btn" type="button"><i class="fas fa-microphone"></i></button>
+                    <button class="stop-btn" type="button" style="display:none;"><i class="fas fa-stop"></i></button>
                 </div>
             </div>
-            <div class="field-group">
+            <div class="field-group form-group">
                 <label class="field-label">Condiciones del Material</label>
-                <select class="field-input form-input"
-                        data-api-name="Condiciones__x0020__del__x0020__Mate">
-                    <option value="Bueno">Bueno</option>
-                    <option value="Regular">Regular</option>
-                    <option value="Malo">Malo</option>
-                </select>
+                <div class="input-with-icon">
+                    <select class="field-input form-input" data-api-name="Condiciones__x0020__del__x0020__Mate">
+                        <option value="Bueno">Bueno</option>
+                        <option value="Regular">Regular</option>
+                        <option value="Malo">Malo</option>
+                    </select>
+                </div>
             </div>
         </div>
 
         <div class="fields-grid-2">
-            <div class="field-group">
+            <div class="field-group form-group">
                 <label class="field-label">Cumplimiento Especificaciones</label>
-                <select class="field-input form-input"
-                        data-api-name="Cumplimiento__x0020__Especificacione">
-                    <option value="SI">SI</option>
-                    <option value="NO">NO</option>
-                    <option value="N/A">N/A</option>
-                </select>
+                <div class="input-with-icon">
+                    <select class="field-input form-input" data-api-name="Cumplimiento__x0020__Especificacione">
+                        <option value="SI">SI</option>
+                        <option value="NO">NO</option>
+                        <option value="N/A">N/A</option>
+                    </select>
+                </div>
             </div>
-            <div class="field-group">
+            <div class="field-group form-group">
                 <label class="field-label">Certificación de Calidad</label>
-                <select class="field-input form-input"
-                        data-api-name="Certificaci__x00f3__n__x0020__de__x0">
-                    <option value="SI">SI</option>
-                    <option value="NO">NO</option>
-                    <option value="N/A">N/A</option>
-                </select>
+                <div class="input-with-icon">
+                    <select class="field-input form-input" data-api-name="Certificaci__x00f3__n__x0020__de__x0">
+                        <option value="SI">SI</option>
+                        <option value="NO">NO</option>
+                        <option value="N/A">N/A</option>
+                    </select>
+                </div>
             </div>
         </div>
 
@@ -239,12 +221,8 @@
                           data-api-name="Observaciones"
                           rows="3"
                           placeholder="Observaciones adicionales..."></textarea>
-                <button class="record-btn" type="button">
-                    <i class="fas fa-microphone"></i>
-                </button>
-                <button class="stop-btn" type="button" style="display:none;">
-                    <i class="fas fa-stop"></i>
-                </button>
+                <button class="record-btn" type="button"><i class="fas fa-microphone"></i></button>
+                <button class="stop-btn" type="button" style="display:none;"><i class="fas fa-stop"></i></button>
             </div>
         </div>
 
