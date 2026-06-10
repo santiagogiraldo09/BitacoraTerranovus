@@ -138,12 +138,11 @@
         </div>
 
         <div class="fields-grid-2">
-            <div class="input-with-icon">
-                <input type="date" id="fecha-arribo" class="field-input">
-                
-                <button type="button" class="voice-btn" data-target="fecha-arribo">
-                    <i class="fas fa-microphone"></i>
-                </button>
+            <div class="field-group form-group">
+                <label class="field-label">Fecha Arribo</label>
+                <div class="input-with-icon">
+                    <input type="date" class="field-input form-input" data-api-name="Fecha__x0020__Arribo">
+                </div>
             </div>
             <div class="field-group form-group">
                 <label class="field-label">Proveedor</label>
@@ -169,15 +168,11 @@
             <div class="field-group form-group">
                 <label class="field-label">Condiciones del Material</label>
                 <div class="input-with-icon">
-                    <select id="condiciones-material" class="field-input">
-                        <option>Bueno</option>
-                        <option>Regular</option>
-                        <option>Malo</option>
+                    <select class="field-input form-input" data-api-name="Condiciones__x0020__del__x0020__Mate">
+                        <option value="Bueno">Bueno</option>
+                        <option value="Regular">Regular</option>
+                        <option value="Malo">Malo</option>
                     </select>
-
-                    <button type="button" class="voice-btn" data-target="condiciones-material">
-                        <i class="fas fa-microphone"></i>
-                    </button>
                 </div>
             </div>
         </div>
