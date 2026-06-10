@@ -35,12 +35,12 @@ body {
 /* Container principal simulando App Móvil / Layout Responsivo */
 .page-wrapper {
     width: 100%;
-    max-width: 600px;
+    max-width: 100%; /* quitar límite */
     background: var(--bg-global);
     display: flex;
     flex-direction: column;
     position: relative;
-    height: 100vh;
+    min-height: 100vh; /* mejor que height fijo */
     overflow: hidden;
 }
 
