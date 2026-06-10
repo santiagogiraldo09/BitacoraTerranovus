@@ -136,7 +136,7 @@
                                     Formularios <i class="fas fa-chevron-down"></i>
                                 </span>
                                 <div class="formularios-dropdown" id="formularios-{{ proyecto.id_proyecto }}">
-                                    <a class="dropdown-item" onclick="redirectToProjectDetails('{{ proyecto.name }}', '{{ proyecto.id_proyecto }}')">
+                                    <a class="dropdown-item" onclick="window.location.href='/formContacto?project_id={{ proyecto.id_proyecto }}'">
                                         <i class="fas fa-address-book"></i> Registro de Contactos
                                     </a>
                                     <a class="dropdown-item" onclick="redirectToSynchro('{{ proyecto.id_proyecto }}')">
