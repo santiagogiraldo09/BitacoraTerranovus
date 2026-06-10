@@ -334,7 +334,8 @@ select.field-input {
 
 /* Ajuste específico de voz dentro de Textareas */
 .textarea-group .record-btn, .textarea-group .stop-btn {
-    top: 6px;
+    top: 10px;
+    transform: none;
 }
 
 /* ── Bloques Dinámicos (Filas Añadidas) ── */
