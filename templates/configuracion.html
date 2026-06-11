@@ -215,10 +215,81 @@
 
         <!-- ── SECCIÓN: GESTIÓN DE CAMPOS ── -->
         <div id="seccion-campos" class="cfg-seccion" style="display:none;">
-            <div class="cfg-card proxima-seccion">
-                <i class="fas fa-tools proxima-icon"></i>
-                <h3>Gestión de Campos</h3>
-                <p>Esta funcionalidad estará disponible próximamente.</p>
+
+            <div class="cfg-card">
+                <div class="cfg-card-title">
+                    <i class="fas fa-list-alt cfg-icon-orange"></i>
+                    <span>Gestión de Campos</span>
+                </div>
+                <p class="cfg-card-subtitle">Crea los campos que podrás usar en tus formularios personalizados.</p>
+
+                <!-- Lista de campos existentes -->
+                <div id="lista-campos"></div>
+
+                <!-- Botón abrir modal -->
+                <button class="btn-nuevo-campo" onclick="abrirModalCampo()">
+                    <i class="fas fa-plus"></i> Nuevo campo
+                </button>
+            </div>
+
+        </div>
+
+        <!-- MODAL: CREAR CAMPO -->
+        <div class="invite-overlay" id="modal-campo">
+            <div class="invite-modal">
+                <div class="invite-header">
+                    <h3><i class="fas fa-list-alt"></i> Nuevo Campo</h3>
+                    <button class="invite-close" onclick="cerrarModalCampo()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <p class="invite-subtitle">Define el campo que usarás en tus formularios.</p>
+
+                <div class="invite-field">
+                    <label>Nombre del campo *</label>
+                    <input type="text" id="campo-nombre" placeholder="Ej: Observaciones, Cantidad...">
+                </div>
+
+                <div class="invite-field">
+                    <label>Tipo de campo *</label>
+                    <select id="campo-tipo" onchange="onTipoCampoChange()">
+                        <option value="">Selecciona un tipo</option>
+                        <option value="texto_corto">Texto corto</option>
+                        <option value="texto_largo">Texto largo</option>
+                        <option value="numero">Número</option>
+                        <option value="imagen">Imagen</option>
+                        <option value="fecha">Fecha</option>
+                        <option value="seleccion">Selección (opciones)</option>
+                    </select>
+                </div>
+
+                <!-- Límite de caracteres (solo texto) -->
+                <div class="invite-field" id="campo-max-chars-group" style="display:none;">
+                    <label>Límite de caracteres (opcional)</label>
+                    <input type="number" id="campo-max-chars" placeholder="Ej: 100" min="1">
+                </div>
+
+                <!-- Opciones (solo selección) -->
+                <div id="campo-opciones-group" style="display:none;">
+                    <div class="invite-field">
+                        <label>Opciones</label>
+                        <div id="opciones-lista"></div>
+                        <button type="button" class="btn-agregar-persona" onclick="agregarOpcion()" style="margin-top:8px;">
+                            <i class="fas fa-plus"></i> Agregar opción
+                        </button>
+                    </div>
+                </div>
+
+                <div class="invite-field" style="display:flex; align-items:center; gap:10px; margin-top:4px;">
+                    <input type="checkbox" id="campo-requerido" style="width:auto;">
+                    <label for="campo-requerido" style="text-transform:none; font-size:14px;">Campo obligatorio</label>
+                </div>
+
+                <p class="invite-feedback" id="campo-feedback"></p>
+
+                <button class="send-invite-btn" onclick="guardarCampo()">
+                    <i class="fas fa-save"></i> Guardar campo
+                </button>
             </div>
         </div>
 
@@ -291,12 +362,6 @@
         window.location.hash = seccion;
     }
 
-    // Cargar sección desde hash al entrar
-    document.addEventListener('DOMContentLoaded', () => {
-        const hash = window.location.hash.replace('#', '');
-        mostrarSeccion(secciones.includes(hash) ? hash : 'identidad');
-    });
-
     // ── Colores ──
     document.getElementById('color_primario').addEventListener('input', function() {
         document.getElementById('swatch-primario').style.background = this.value;
@@ -334,10 +399,10 @@
     }
 
     document.addEventListener('DOMContentLoaded', function() {
+        // Logo y colores
         window._logoUrl = "{{ logo_actual or '' }}";
         const primario   = "{{ color_primario }}";
         const secundario = "{{ color_secundario }}";
-        //document.documentElement.style.setProperty('--naranja', primario);
         aplicarColorPrimario(primario);
         document.getElementById('color_primario').value  = primario;
         document.getElementById('color_secundario').value = secundario;
@@ -345,6 +410,13 @@
         document.getElementById('swatch-secundario').style.background = secundario;
         document.getElementById('hex-primario').textContent   = primario.toUpperCase();
         document.getElementById('hex-secundario').textContent = secundario.toUpperCase();
+
+        // Sección desde hash
+        const hash = window.location.hash.replace('#', '');
+        mostrarSeccion(secciones.includes(hash) ? hash : 'identidad');
+
+        // Cargar campos
+        cargarCampos();
     });
 
     // Subir logo nuevo
@@ -617,6 +689,151 @@
         t.classList.add('show');
         setTimeout(() => t.classList.remove('show'), 3000);
     }
+
+    // ── Gestión de Campos ──
+    function abrirModalCampo() {
+        document.getElementById('modal-campo').classList.add('active');
+        document.getElementById('campo-nombre').value   = '';
+        document.getElementById('campo-tipo').value     = '';
+        document.getElementById('campo-max-chars').value = '';
+        document.getElementById('campo-requerido').checked = false;
+        document.getElementById('opciones-lista').innerHTML = '';
+        document.getElementById('campo-feedback').textContent = '';
+        document.getElementById('campo-max-chars-group').style.display = 'none';
+        document.getElementById('campo-opciones-group').style.display  = 'none';
+    }
+
+    function cerrarModalCampo() {
+        document.getElementById('modal-campo').classList.remove('active');
+    }
+
+    function onTipoCampoChange() {
+        const tipo = document.getElementById('campo-tipo').value;
+        document.getElementById('campo-max-chars-group').style.display =
+            ['texto_corto', 'texto_largo'].includes(tipo) ? '' : 'none';
+        document.getElementById('campo-opciones-group').style.display =
+            tipo === 'seleccion' ? '' : 'none';
+    }
+
+    function agregarOpcion() {
+        const lista = document.getElementById('opciones-lista');
+        const div   = document.createElement('div');
+        div.className = 'opcion-row';
+        div.innerHTML = `
+            <input type="text" placeholder="Opción...">
+            <button type="button" class="btn-quitar-opcion" onclick="this.parentElement.remove()">
+                <i class="fas fa-times"></i>
+            </button>`;
+        lista.appendChild(div);
+    }
+
+    async function guardarCampo() {
+        const fb      = document.getElementById('campo-feedback');
+        const nombre  = document.getElementById('campo-nombre').value.trim();
+        const tipo    = document.getElementById('campo-tipo').value;
+        const requerido = document.getElementById('campo-requerido').checked;
+        const maxChars  = document.getElementById('campo-max-chars').value;
+
+        if (!nombre || !tipo) {
+            fb.textContent = 'Nombre y tipo son obligatorios.';
+            fb.className   = 'invite-feedback error';
+            return;
+        }
+
+        const configuracion = {};
+        if (maxChars) configuracion.max_caracteres = parseInt(maxChars);
+
+        const opciones = [];
+        if (tipo === 'seleccion') {
+            document.querySelectorAll('#opciones-lista .opcion-row input').forEach(inp => {
+                if (inp.value.trim()) opciones.push(inp.value.trim());
+            });
+            if (opciones.length === 0) {
+                fb.textContent = 'Agrega al menos una opción.';
+                fb.className   = 'invite-feedback error';
+                return;
+            }
+        }
+
+        try {
+            const res  = await fetch('/api/campos-globales', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ nombre, tipo, requerido, opciones, configuracion })
+            });
+            const data = await res.json();
+            if (data.success) {
+                cerrarModalCampo();
+                cargarCampos();
+                mostrarToast('✅ Campo creado correctamente');
+            } else {
+                fb.textContent = data.error || 'Error al guardar.';
+                fb.className   = 'invite-feedback error';
+            }
+        } catch {
+            fb.textContent = 'Error de conexión.';
+            fb.className   = 'invite-feedback error';
+        }
+    }
+
+    async function cargarCampos() {
+        const lista = document.getElementById('lista-campos');
+        if (!lista) return;
+        try {
+            const res  = await fetch('/api/campos-globales');
+            const data = await res.json();
+            if (!data.campos || data.campos.length === 0) {
+                lista.innerHTML = '<p style="color:var(--gris-texto);font-size:13px;">Aún no hay campos creados.</p>';
+                return;
+            }
+            lista.innerHTML = '';
+            data.campos.forEach(campo => {
+                const tipoLabel = {
+                    texto_corto: 'Texto corto',
+                    texto_largo: 'Texto largo',
+                    numero:      'Número',
+                    imagen:      'Imagen',
+                    fecha:       'Fecha',
+                    seleccion:   'Selección'
+                }[campo.tipo] || campo.tipo;
+
+                const div = document.createElement('div');
+                div.className = 'campo-item';
+                div.innerHTML = `
+                    <div class="campo-item-info">
+                        <span class="campo-item-nombre">${campo.nombre}</span>
+                        <span class="campo-item-tipo">
+                            <span class="campo-tipo-badge">${tipoLabel}</span>
+                            ${campo.requerido ? '<span style="color:#d97706;font-size:11px;">Obligatorio</span>' : ''}
+                        </span>
+                    </div>
+                    <button class="icon-btn danger" onclick="eliminarCampo(${campo.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>`;
+                lista.appendChild(div);
+            });
+        } catch {
+            lista.innerHTML = '<p style="color:var(--gris-texto);">Error al cargar campos.</p>';
+        }
+    }
+
+    async function eliminarCampo(id) {
+        if (!confirm('¿Seguro que deseas eliminar este campo?')) return;
+        try {
+            const res  = await fetch(`/api/campos-globales/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                cargarCampos();
+                mostrarToast('🗑️ Campo eliminado');
+            }
+        } catch {
+            mostrarToast('❌ Error al eliminar', true);
+        }
+    }
+
+    document.getElementById('modal-campo').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalCampo();
+    });
 </script>
 </body>
 </html>

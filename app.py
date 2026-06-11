@@ -1675,6 +1675,82 @@ def create_synchro_form():
         return jsonify({'error': str(e)}), 500
 
 
+# Obtener campos globales de la empresa
+@app.route('/api/campos-globales', methods=['GET'])
+def get_campos_globales():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT id, nombre, tipo, requerido, opciones, configuracion
+                FROM campos_globales
+                WHERE empresa_id = %s
+                ORDER BY created_at ASC
+            """, (session.get('empresa_id'),))
+            campos = []
+            for row in cursor.fetchall():
+                campos.append({
+                    'id':            row[0],
+                    'nombre':        row[1],
+                    'tipo':          row[2],
+                    'requerido':     row[3],
+                    'opciones':      row[4] or [],
+                    'configuracion': row[5] or {}
+                })
+            return jsonify({'campos': campos})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# Crear campo global
+@app.route('/api/campos-globales', methods=['POST'])
+def crear_campo_global():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        data          = request.get_json()
+        nombre        = data.get('nombre', '').strip()
+        tipo          = data.get('tipo')
+        requerido     = data.get('requerido', False)
+        opciones      = data.get('opciones', [])
+        configuracion = data.get('configuracion', {})
+
+        if not nombre or not tipo:
+            return jsonify({'error': 'Nombre y tipo son obligatorios'}), 400
+
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                INSERT INTO campos_globales
+                    (empresa_id, nombre, tipo, requerido, opciones, configuracion)
+                VALUES (%s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                session.get('empresa_id'), nombre, tipo, requerido,
+                json.dumps(opciones), json.dumps(configuracion)
+            ))
+            nuevo_id = cursor.fetchone()[0]
+            return jsonify({'success': True, 'id': nuevo_id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# Eliminar campo global
+@app.route('/api/campos-globales/<int:campo_id>', methods=['DELETE'])
+def eliminar_campo_global(campo_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                DELETE FROM campos_globales
+                WHERE id = %s AND empresa_id = %s
+            """, (campo_id, session.get('empresa_id')))
+            return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/formulario')
 def indexFormulario():
     """Muestra el formulario con datos pre-cargados"""
