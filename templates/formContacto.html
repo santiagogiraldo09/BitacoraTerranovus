@@ -27,7 +27,7 @@
             <i class="fas fa-chevron-left"></i>
         </button> -->
         <div class="header-center">
-            <img src="{{ url_for('static', filename='logo.png') }}" alt="IAC" class="header-logo">
+            <img src="{{ logo_actual or url_for('static', filename='logo.png') }}" alt="IAC" class="header-logo">
             <span class="header-title">Nuevo Contacto</span>
         </div>
     </header>

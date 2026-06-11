@@ -2029,7 +2029,18 @@ def detalleContacto(id_contacto):
                         'desc': img_row[1] or ''
                     })
     
-            return render_template('detalleContacto.html', contacto=contacto)
+            cursor.execute("""
+                SELECT color_primario, color_secundario
+                FROM empresas WHERE id = %s
+            """, (session.get('empresa_id'),))
+            empresa_row      = cursor.fetchone()
+            color_primario   = empresa_row[0] if empresa_row else '#FFAF33'
+            color_secundario = empresa_row[1] if empresa_row else '#E3E3E3'
+
+            return render_template('detalleContacto.html',
+                                contacto=contacto,
+                                color_primario=color_primario,
+                                color_secundario=color_secundario)
  
     except Exception as e:
         print(f"Error en detalleContacto: {e}")
@@ -2046,19 +2057,21 @@ def form_contacto():
     try:
         with db_connection() as (conn, cursor):
             cursor.execute("""
-                SELECT color_primario, color_secundario
+                SELECT color_primario, color_secundario, logo_url
                 FROM empresas WHERE id = %s
             """, (session.get('empresa_id'),))
             row = cursor.fetchone()
             if row:
                 color_primario   = row[0] or '#FFAF33'
                 color_secundario = row[1] or '#E3E3E3'
+                logo_actual      = row[2] or None
     except Exception as e:
         print(f"Error cargando colores formContacto: {e}")
 
     return render_template('formContacto.html',
-                           color_primario=color_primario,
-                           color_secundario=color_secundario)
+                       color_primario=color_primario,
+                       color_secundario=color_secundario,
+                       logo_actual=logo_actual)
 
 
 @app.route('/detalleRegistro/<int:id_registro>')
