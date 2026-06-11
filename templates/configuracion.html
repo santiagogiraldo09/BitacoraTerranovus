@@ -295,10 +295,82 @@
 
         <!-- ── SECCIÓN: FORMULARIOS ── -->
         <div id="seccion-formularios" class="cfg-seccion" style="display:none;">
-            <div class="cfg-card proxima-seccion">
-                <i class="fas fa-file-alt proxima-icon"></i>
-                <h3>Formularios</h3>
-                <p>Esta funcionalidad estará disponible próximamente.</p>
+
+            <!-- Lista de formularios existentes -->
+            <div id="vista-lista-formularios">
+                <div class="cfg-card">
+                    <div class="cfg-card-title">
+                        <i class="fas fa-file-alt cfg-icon-orange"></i>
+                        <span>Formularios</span>
+                    </div>
+                    <p class="cfg-card-subtitle">Crea y gestiona formularios personalizados para tus proyectos.</p>
+                    <div id="lista-formularios"></div>
+                    <button class="btn-nuevo-campo" onclick="abrirBuilder(null)">
+                        <i class="fas fa-plus"></i> Nuevo formulario
+                    </button>
+                </div>
+            </div>
+
+            <!-- Form Builder -->
+            <div id="vista-form-builder" style="display:none;">
+
+                <!-- Header del builder -->
+                <div class="builder-header">
+                    <button class="btn-back" onclick="cerrarBuilder()">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <input type="text" id="builder-nombre"
+                        class="builder-nombre-input"
+                        placeholder="Nombre del formulario *">
+                    <button class="btn-guardar-form" onclick="guardarFormulario()">
+                        <i class="fas fa-save"></i> <span>Guardar</span>
+                    </button>
+                </div>
+
+                <!-- Descripción -->
+                <div class="builder-desc-row">
+                    <input type="text" id="builder-descripcion"
+                        class="field-input"
+                        placeholder="Descripción opcional...">
+                </div>
+
+                <!-- Tabs móvil -->
+                <div class="builder-tabs">
+                    <button class="builder-tab active" id="tab-disponibles"
+                            onclick="cambiarTab('disponibles')">
+                        Campos disponibles
+                    </button>
+                    <button class="builder-tab" id="tab-formulario"
+                            onclick="cambiarTab('formulario')">
+                        Mi formulario (<span id="contador-campos-form">0</span>)
+                    </button>
+                </div>
+
+                <!-- Layout desktop: dos columnas / móvil: tabs -->
+                <div class="builder-layout">
+
+                    <!-- Panel izquierdo: campos disponibles -->
+                    <div class="builder-panel" id="panel-disponibles">
+                        <h4 class="builder-panel-title">
+                            <i class="fas fa-database"></i> Campos globales
+                        </h4>
+                        <div id="campos-disponibles-list"></div>
+                    </div>
+
+                    <!-- Panel derecho: canvas del formulario -->
+                    <div class="builder-panel" id="panel-formulario">
+                        <h4 class="builder-panel-title">
+                            <i class="fas fa-eye"></i> Vista previa
+                        </h4>
+                        <div id="canvas-formulario">
+                            <div class="canvas-empty" id="canvas-empty">
+                                <i class="fas fa-hand-point-left"></i>
+                                <p>Agrega campos desde el panel izquierdo</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
             </div>
         </div>
 
@@ -351,6 +423,326 @@
         'campos':      'Gestión de Campos',
         'formularios': 'Formularios'
     };
+
+    // ── Form Builder ──
+    let builderCamposGlobales = [];
+    let builderCamposForm     = [];
+    let builderFormId         = null;
+    let dragSrcIndex          = null;
+
+    const tipoIconos = {
+        texto_corto: 'fa-font',
+        texto_largo: 'fa-align-left',
+        numero:      'fa-hashtag',
+        imagen:      'fa-image',
+        fecha:       'fa-calendar',
+        seleccion:   'fa-list'
+    };
+
+    const tipoLabels = {
+        texto_corto: 'Texto corto',
+        texto_largo: 'Texto largo',
+        numero:      'Número',
+        imagen:      'Imagen',
+        fecha:       'Fecha',
+        seleccion:   'Selección'
+    };
+
+    async function abrirBuilder(formId) {
+        builderFormId     = formId;
+        builderCamposForm = [];
+
+        document.getElementById('vista-lista-formularios').style.display = 'none';
+        document.getElementById('vista-form-builder').style.display      = '';
+        document.getElementById('builder-nombre').value      = '';
+        document.getElementById('builder-descripcion').value = '';
+        cambiarTab('disponibles');
+
+        // Cargar campos globales
+        try {
+            const res  = await fetch('/api/campos-globales');
+            const data = await res.json();
+            builderCamposGlobales = data.campos || [];
+        } catch { builderCamposGlobales = []; }
+
+        // Si es edición, cargar datos del formulario
+        if (formId) {
+            try {
+                const res  = await fetch('/api/formularios');
+                const data = await res.json();
+                const form = (data.formularios || []).find(f => f.id === formId);
+                if (form) {
+                    document.getElementById('builder-nombre').value      = form.nombre;
+                    document.getElementById('builder-descripcion').value = form.descripcion;
+                    builderCamposForm = form.campos.map(id =>
+                        builderCamposGlobales.find(c => c.id === id)
+                    ).filter(Boolean);
+                }
+            } catch {}
+        }
+
+        renderCamposDisponibles();
+        renderCanvas();
+    }
+
+    function cerrarBuilder() {
+        document.getElementById('vista-form-builder').style.display      = 'none';
+        document.getElementById('vista-lista-formularios').style.display = '';
+        cargarFormularios();
+    }
+
+    function cambiarTab(tab) {
+        document.getElementById('tab-disponibles').classList.toggle('active', tab === 'disponibles');
+        document.getElementById('tab-formulario').classList.toggle('active', tab === 'formulario');
+        document.getElementById('panel-disponibles').style.display = tab === 'disponibles' ? '' : 'none';
+        document.getElementById('panel-formulario').style.display  = tab === 'formulario'  ? '' : 'none';
+    }
+
+    function renderCamposDisponibles() {
+        const lista = document.getElementById('campos-disponibles-list');
+        if (builderCamposGlobales.length === 0) {
+            lista.innerHTML = '<p style="color:var(--gris-texto);font-size:13px;">No hay campos globales creados aún.</p>';
+            return;
+        }
+        lista.innerHTML = '';
+        builderCamposGlobales.forEach(campo => {
+            const div = document.createElement('div');
+            div.className   = 'campo-disponible';
+            div.draggable   = true;
+            div.dataset.id  = campo.id;
+            div.innerHTML   = `
+                <div class="campo-disp-info">
+                    <div class="campo-disp-icon">
+                        <i class="fas ${tipoIconos[campo.tipo] || 'fa-field'}"></i>
+                    </div>
+                    <div>
+                        <div class="campo-disp-nombre">${campo.nombre}</div>
+                        <div class="campo-disp-tipo">${tipoLabels[campo.tipo] || campo.tipo}</div>
+                    </div>
+                </div>
+                <button class="btn-agregar-campo" onclick="agregarCampoAlForm(${campo.id})" title="Agregar">
+                    <i class="fas fa-plus"></i>
+                </button>`;
+
+            div.addEventListener('dragstart', () => {
+                div.classList.add('dragging');
+                div.dataset.origen = 'disponibles';
+            });
+            div.addEventListener('dragend', () => div.classList.remove('dragging'));
+
+            lista.appendChild(div);
+        });
+    }
+
+    function agregarCampoAlForm(campoId) {
+        const campo = builderCamposGlobales.find(c => c.id === campoId);
+        if (!campo) return;
+        if (builderCamposForm.find(c => c.id === campoId)) {
+            mostrarToast('⚠️ Este campo ya está en el formulario');
+            return;
+        }
+        builderCamposForm.push(campo);
+        renderCanvas();
+        // En móvil cambiar al tab del formulario
+        if (window.innerWidth <= 768) cambiarTab('formulario');
+        mostrarToast('✅ Campo agregado');
+    }
+
+    function renderCanvas() {
+        const canvas  = document.getElementById('canvas-formulario');
+        const empty   = document.getElementById('canvas-empty');
+        const contador = document.getElementById('contador-campos-form');
+        contador.textContent = builderCamposForm.length;
+
+        if (builderCamposForm.length === 0) {
+            canvas.innerHTML = '';
+            canvas.appendChild(empty);
+            empty.style.display = 'flex';
+            return;
+        }
+
+        empty.style.display = 'none';
+        // Limpiar sin borrar el empty
+        Array.from(canvas.children).forEach(c => {
+            if (c !== empty) c.remove();
+        });
+
+        builderCamposForm.forEach((campo, idx) => {
+            const div = document.createElement('div');
+            div.className      = 'canvas-campo';
+            div.draggable      = true;
+            div.dataset.index  = idx;
+
+            const preview = previsualizarCampo(campo);
+
+            div.innerHTML = `
+                <i class="fas fa-grip-vertical canvas-campo-handle"></i>
+                <div class="canvas-campo-info">
+                    <span class="canvas-campo-nombre">${campo.nombre}${campo.requerido ? ' *' : ''}</span>
+                    <span class="canvas-campo-preview">${preview}</span>
+                </div>
+                <div class="canvas-campo-actions">
+                    <button class="icon-btn" onclick="moverCampo(${idx}, -1)" title="Subir"
+                            ${idx === 0 ? 'disabled' : ''}>
+                        <i class="fas fa-chevron-up"></i>
+                    </button>
+                    <button class="icon-btn" onclick="moverCampo(${idx}, 1)" title="Bajar"
+                            ${idx === builderCamposForm.length - 1 ? 'disabled' : ''}>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <button class="icon-btn danger" onclick="quitarCampoForm(${idx})" title="Quitar">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>`;
+
+            // Drag & drop reordenamiento
+            div.addEventListener('dragstart', () => { dragSrcIndex = idx; });
+            div.addEventListener('dragover',  (e) => {
+                e.preventDefault();
+                div.classList.add('drag-over-campo');
+            });
+            div.addEventListener('dragleave', () => div.classList.remove('drag-over-campo'));
+            div.addEventListener('drop', (e) => {
+                e.preventDefault();
+                div.classList.remove('drag-over-campo');
+                if (dragSrcIndex === null || dragSrcIndex === idx) return;
+                const moved = builderCamposForm.splice(dragSrcIndex, 1)[0];
+                builderCamposForm.splice(idx, 0, moved);
+                dragSrcIndex = null;
+                renderCanvas();
+            });
+
+            canvas.appendChild(div);
+        });
+
+        // Drop zone en canvas vacío
+        canvas.addEventListener('dragover', (e) => e.preventDefault());
+        canvas.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const campoId = parseInt(e.dataTransfer?.getData('text') || 0);
+            if (campoId) agregarCampoAlForm(campoId);
+        });
+    }
+
+    function previsualizarCampo(campo) {
+        switch(campo.tipo) {
+            case 'texto_corto': return `<input type="text" placeholder="${campo.nombre}..." disabled style="width:100%;padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;">`;
+            case 'texto_largo': return `<textarea disabled placeholder="${campo.nombre}..." style="width:100%;padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;resize:none;height:40px;"></textarea>`;
+            case 'numero':      return `<input type="number" placeholder="0" disabled style="width:80px;padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;">`;
+            case 'fecha':       return `<input type="date" disabled style="padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;">`;
+            case 'imagen':      return `<span style="font-size:11px;color:#6b7280;"><i class="fas fa-image"></i> Campo de imagen</span>`;
+            case 'seleccion':
+                const opts = (campo.opciones || []).slice(0, 3).map(o => `<option>${o}</option>`).join('');
+                return `<select disabled style="padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;">${opts}</select>`;
+            default: return `<span style="font-size:11px;color:#6b7280;">${campo.tipo}</span>`;
+        }
+    }
+
+    function moverCampo(idx, direccion) {
+        const nuevoIdx = idx + direccion;
+        if (nuevoIdx < 0 || nuevoIdx >= builderCamposForm.length) return;
+        const temp = builderCamposForm[idx];
+        builderCamposForm[idx]       = builderCamposForm[nuevoIdx];
+        builderCamposForm[nuevoIdx]  = temp;
+        renderCanvas();
+    }
+
+    function quitarCampoForm(idx) {
+        builderCamposForm.splice(idx, 1);
+        renderCanvas();
+    }
+
+    async function guardarFormulario() {
+        const nombre      = document.getElementById('builder-nombre').value.trim();
+        const descripcion = document.getElementById('builder-descripcion').value.trim();
+
+        if (!nombre) {
+            mostrarToast('❌ El nombre del formulario es obligatorio', true);
+            return;
+        }
+        if (builderCamposForm.length === 0) {
+            mostrarToast('❌ Agrega al menos un campo', true);
+            return;
+        }
+
+        const payload = {
+            nombre,
+            descripcion,
+            campos: builderCamposForm.map(c => c.id)
+        };
+
+        try {
+            const url    = builderFormId ? `/api/formularios/${builderFormId}` : '/api/formularios';
+            const method = builderFormId ? 'PUT' : 'POST';
+            const res    = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (data.success) {
+                mostrarToast('✅ Formulario guardado correctamente');
+                setTimeout(() => cerrarBuilder(), 1000);
+            } else {
+                mostrarToast('❌ ' + (data.error || 'Error al guardar'), true);
+            }
+        } catch {
+            mostrarToast('❌ Error de conexión', true);
+        }
+    }
+
+    async function cargarFormularios() {
+        const lista = document.getElementById('lista-formularios');
+        if (!lista) return;
+        try {
+            const res  = await fetch('/api/formularios');
+            const data = await res.json();
+            if (!data.formularios || data.formularios.length === 0) {
+                lista.innerHTML = '<p style="color:var(--gris-texto);font-size:13px;margin-bottom:12px;">Aún no hay formularios creados.</p>';
+                return;
+            }
+            lista.innerHTML = '';
+            data.formularios.forEach(form => {
+                const div = document.createElement('div');
+                div.className = 'formulario-item';
+                div.innerHTML = `
+                    <div class="formulario-item-info">
+                        <span class="formulario-item-nombre">${form.nombre}</span>
+                        <span class="formulario-item-meta">
+                            ${form.campos.length} campo${form.campos.length !== 1 ? 's' : ''} · ${form.created_at}
+                        </span>
+                    </div>
+                    <div class="formulario-item-actions">
+                        <button class="icon-btn" onclick="abrirBuilder(${form.id})" title="Editar">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="icon-btn danger" onclick="eliminarFormulario(${form.id}, '${form.nombre}')" title="Eliminar">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>`;
+                lista.appendChild(div);
+            });
+        } catch {
+            lista.innerHTML = '<p style="color:var(--gris-texto);">Error al cargar formularios.</p>';
+        }
+    }
+
+    async function eliminarFormulario(id, nombre) {
+        if (!confirm(`¿Seguro que deseas eliminar "${nombre}"?`)) return;
+        try {
+            const res  = await fetch(`/api/formularios/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                mostrarToast('🗑️ Formulario eliminado');
+                cargarFormularios();
+            }
+        } catch {
+            mostrarToast('❌ Error al eliminar', true);
+        }
+    }
+
+
+
 
     function mostrarSeccion(seccion) {
         secciones.forEach(s => {
@@ -417,6 +809,9 @@
 
         // Cargar campos
         cargarCampos();
+
+        //Cargar Formulario
+        cargarFormularios();
     });
 
     // Subir logo nuevo

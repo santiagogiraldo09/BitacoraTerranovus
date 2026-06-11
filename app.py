@@ -1751,6 +1751,105 @@ def eliminar_campo_global(campo_id):
         return jsonify({'error': str(e)}), 500
 
 
+# Obtener formularios de la empresa
+@app.route('/api/formularios', methods=['GET'])
+def get_formularios():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT id, nombre, descripcion, campos, created_at
+                FROM formularios
+                WHERE empresa_id = %s
+                ORDER BY created_at DESC
+            """, (session.get('empresa_id'),))
+            formularios = []
+            for row in cursor.fetchall():
+                formularios.append({
+                    'id':          row[0],
+                    'nombre':      row[1],
+                    'descripcion': row[2] or '',
+                    'campos':      row[3] or [],
+                    'created_at':  row[4].strftime('%d/%m/%Y') if row[4] else ''
+                })
+            return jsonify({'formularios': formularios})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# Crear formulario
+@app.route('/api/formularios', methods=['POST'])
+def crear_formulario():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        data        = request.get_json()
+        nombre      = data.get('nombre', '').strip()
+        descripcion = data.get('descripcion', '').strip()
+        campos      = data.get('campos', [])
+
+        if not nombre:
+            return jsonify({'error': 'El nombre es obligatorio'}), 400
+
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                INSERT INTO formularios (empresa_id, nombre, descripcion, campos)
+                VALUES (%s, %s, %s, %s)
+                RETURNING id
+            """, (
+                session.get('empresa_id'), nombre, descripcion,
+                json.dumps(campos)
+            ))
+            nuevo_id = cursor.fetchone()[0]
+            return jsonify({'success': True, 'id': nuevo_id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# Actualizar formulario
+@app.route('/api/formularios/<int:form_id>', methods=['PUT'])
+def actualizar_formulario(form_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        data        = request.get_json()
+        nombre      = data.get('nombre', '').strip()
+        descripcion = data.get('descripcion', '').strip()
+        campos      = data.get('campos', [])
+
+        if not nombre:
+            return jsonify({'error': 'El nombre es obligatorio'}), 400
+
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                UPDATE formularios
+                SET nombre = %s, descripcion = %s, campos = %s
+                WHERE id = %s AND empresa_id = %s
+            """, (
+                nombre, descripcion, json.dumps(campos),
+                form_id, session.get('empresa_id')
+            ))
+            return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# Eliminar formulario
+@app.route('/api/formularios/<int:form_id>', methods=['DELETE'])
+def eliminar_formulario(form_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                DELETE FROM formularios
+                WHERE id = %s AND empresa_id = %s
+            """, (form_id, session.get('empresa_id')))
+            return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/formulario')
 def indexFormulario():
     """Muestra el formulario con datos pre-cargados"""
