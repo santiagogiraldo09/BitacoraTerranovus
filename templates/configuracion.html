@@ -24,10 +24,23 @@
                 <i class="fas fa-folder-open"></i>
                 <span>Proyectos</span>
             </a>
-            <a href="{{ url_for('configuracion') }}" class="sidebar-nav-item active">
-                <i class="fas fa-cog"></i>
-                <span>Configuración</span>
-            </a>
+            <hr class="sidebar-divider">
+            <button class="sidebar-nav-item active" id="nav-identidad" onclick="mostrarSeccion('identidad')">
+                <i class="fas fa-palette"></i>
+                <span>Identidad Visual</span>
+            </button>
+            <button class="sidebar-nav-item" id="nav-usuarios" onclick="mostrarSeccion('usuarios')">
+                <i class="fas fa-users"></i>
+                <span>Gestión de Usuarios</span>
+            </button>
+            <button class="sidebar-nav-item" id="nav-campos" onclick="mostrarSeccion('campos')">
+                <i class="fas fa-list-alt"></i>
+                <span>Gestión de Campos</span>
+            </button>
+            <button class="sidebar-nav-item" id="nav-formularios" onclick="mostrarSeccion('formularios')">
+                <i class="fas fa-wpforms"></i>
+                <span>Formularios</span>
+            </button>
         </nav>
         <div class="sidebar-footer">
             <div class="sidebar-user">
@@ -50,9 +63,8 @@
             <button class="btn-back" onclick="window.location.href='{{ url_for('registros') }}'">
                 <i class="fas fa-chevron-left"></i>
             </button>
-            <!--<img src="{{ url_for('static', filename='logo.png') }}" alt="IAC" class="mobile-logo">-->
             <img src="{{ logo_actual or url_for('static', filename='logo.png') }}" alt="IAC" class="mobile-logo">
-            <span class="mobile-title">Configuración</span>
+            <span class="mobile-title" id="mobile-section-title">Identidad Visual</span>
         </div>
 
         <!-- Título desktop -->
@@ -60,139 +72,159 @@
             <button class="btn-back" onclick="window.location.href='{{ url_for('registros') }}'">
                 <i class="fas fa-chevron-left"></i>
             </button>
-            <h1 class="page-title">Configuración</h1>
+            <h1 class="page-title" id="desktop-section-title">Identidad Visual</h1>
         </div>
 
-        <!-- ── TARJETA IDENTIDAD VISUAL ── -->
-        <div class="cfg-card">
-            <div class="cfg-card-title">
-                <i class="fas fa-palette cfg-icon-orange"></i>
-                <span>Identidad Visual</span>
-            </div>
-            <p class="cfg-card-subtitle">Configura el logo y colores de tu marca</p>
-
-            <div class="logo-preview-wrapper">
-                <div class="logo-preview-circle">
-                    <img id="logo-preview-img" 
-                        src="{{ logo_actual or url_for('static', filename='logo.png') }}" 
-                        alt="Logo actual">
+        <!-- ── SECCIÓN: IDENTIDAD VISUAL ── -->
+        <div id="seccion-identidad" class="cfg-seccion">
+            <div class="cfg-card">
+                <div class="cfg-card-title">
+                    <i class="fas fa-palette cfg-icon-orange"></i>
+                    <span>Identidad Visual</span>
                 </div>
-                <p class="logo-label">Logo de la Empresa</p>
-                <span class="update-link" onclick="abrirGaleria()">
-                    <i class="fas fa-images"></i> Seleccionar logo
-                </span>
-            </div>
-            <input type="file" id="logo_empresa" name="logo_empresa" accept="image/*" style="display:none">
+                <p class="cfg-card-subtitle">Configura el logo y colores de tu marca</p>
 
-            <!-- Modal galería de logos -->
-            <div class="invite-overlay" id="galeria-overlay">
-                <div class="invite-modal">
-                    <div class="invite-header">
-                        <h3><i class="fas fa-images"></i> Logos subidos</h3>
-                        <button class="invite-close" onclick="cerrarGaleria()">
-                            <i class="fas fa-times"></i>
-                        </button>
+                <div class="logo-preview-wrapper">
+                    <div class="logo-preview-circle">
+                        <img id="logo-preview-img"
+                            src="{{ logo_actual or url_for('static', filename='logo.png') }}"
+                            alt="Logo actual">
                     </div>
-                    <p class="invite-subtitle">Selecciona un logo previamente subido.</p>
-                    <div class="galeria-upload-row">
-                        <button class="btn-subir-logo" onclick="document.getElementById('logo_empresa').click()">
-                            <i class="fas fa-upload"></i> Subir nuevo logo
-                        </button>
-                    </div>
-                    <div id="galeria-logos" class="galeria-logos">
-                        <p style="color:var(--gris-texto); text-align:center;">Cargando...</p>
-                    </div>
+                    <p class="logo-label">Logo de la Empresa</p>
+                    <span class="update-link" onclick="abrirGaleria()">
+                        <i class="fas fa-images"></i> Seleccionar logo
+                    </span>
                 </div>
-            </div>
+                <input type="file" id="logo_empresa" name="logo_empresa" accept="image/*" style="display:none">
 
-            <div class="cfg-inner-divider"></div>
-
-            <p class="palette-title">Paleta de Colores</p>
-            <div class="color-row">
-                <label class="color-card" for="color_primario">
-                    <input type="color" id="color_primario" value="{{ color_primario }}">
-                    <span class="color-swatch" id="swatch-primario" style="background:{{ color_primario }}"></span>
-                    <div class="color-info">
-                        <span class="color-hex" id="hex-primario">{{ color_primario }}</span>
-                        <span class="color-role">Primario</span>
-                    </div>
-                </label>
-                <label class="color-card" for="color_secundario">
-                    <input type="color" id="color_secundario" value="{{ color_secundario }}">
-                    <span class="color-swatch" id="swatch-secundario" style="background:{{ color_secundario }}"></span>
-                    <div class="color-info">
-                        <span class="color-hex" id="hex-secundario">{{ color_secundario }}</span>
-                        <span class="color-role">Secundario</span>
-                    </div>
-                </label>
-            </div>
-        </div>
-
-        <!-- ── SECCIÓN USUARIOS ── -->
-        <div class="usuarios-section">
-            <div class="usuarios-header">
-                <div>
-                    <h2 class="usuarios-title">Usuarios</h2>
-                    <p class="usuarios-count" id="usuarios-count">
-                        {{ miembros|length }} miembro{{ 's' if miembros|length != 1 else '' }} activo{{ 's' if miembros|length != 1 else '' }}
-                    </p>
-                </div>
-                <button class="crear-usuario-btn" onclick="abrirInviteModal()">
-                    <i class="fas fa-user-plus"></i> Invitar usuario
-                </button>
-            </div>
-
-            <div class="user-list" id="user-list">
-                {% if miembros %}
-                    {% for m in miembros %}
-                    <div class="user-card">
-                        <div class="user-avatar">
-                            {% if m.foto %}
-                                <img src="{{ m.foto }}" alt="{{ m.nombre }}">
-                            {% else %}
-                                <div class="avatar-placeholder">
-                                    {{ m.nombre[0]|upper }}{{ m.apellido[0]|upper if m.apellido else '' }}
-                                </div>
-                            {% endif %}
-                        </div>
-                        <div class="user-info">
-                            <span class="user-name">{{ m.nombre }} {{ m.apellido }}</span>
-                            <span class="user-email">{{ m.email }}</span>
-                            <div class="user-meta">
-                                <span class="user-role-badge">{{ m.rol }}</span>
-                                <span class="user-status-badge {{ 'status-activo' if m.estado == 'activo' else 'status-pendiente' }}">
-                                    {{ 'Activo' if m.estado == 'activo' else 'Invitación pendiente' }}
-                                </span>
-                            </div>
-                        </div>
-                        <div class="user-actions">
-                            <button class="asignar-btn" onclick="asignarUsuario({{ m.user_id }})">
-                                <i class="fas fa-user-check"></i> Asignar
+                <div class="invite-overlay" id="galeria-overlay">
+                    <div class="invite-modal">
+                        <div class="invite-header">
+                            <h3><i class="fas fa-images"></i> Logos subidos</h3>
+                            <button class="invite-close" onclick="cerrarGaleria()">
+                                <i class="fas fa-times"></i>
                             </button>
-                            <div class="user-actions-row">
-                                <button class="icon-btn" onclick="verOpciones({{ m.user_id }})">
-                                    <i class="fas fa-ellipsis-h"></i>
-                                </button>
-                                {% if m.user_id != session.get('user_id') %}
-                                <button class="icon-btn danger" onclick="eliminarUsuario({{ m.user_id }}, '{{ m.nombre }}')">
-                                    <i class="fas fa-trash"></i>
-                                </button>
+                        </div>
+                        <p class="invite-subtitle">Selecciona un logo previamente subido.</p>
+                        <div class="galeria-upload-row">
+                            <button class="btn-subir-logo" onclick="document.getElementById('logo_empresa').click()">
+                                <i class="fas fa-upload"></i> Subir nuevo logo
+                            </button>
+                        </div>
+                        <div id="galeria-logos" class="galeria-logos">
+                            <p style="color:var(--gris-texto); text-align:center;">Cargando...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="cfg-inner-divider"></div>
+
+                <p class="palette-title">Paleta de Colores</p>
+                <div class="color-row">
+                    <label class="color-card" for="color_primario">
+                        <input type="color" id="color_primario" value="{{ color_primario }}" class="color-input-hidden">
+                        <span class="color-swatch" id="swatch-primario" style="background:{{ color_primario }}"></span>
+                        <div class="color-info">
+                            <span class="color-hex" id="hex-primario">{{ color_primario }}</span>
+                            <span class="color-role">Primario</span>
+                        </div>
+                    </label>
+                    <label class="color-card" for="color_secundario">
+                        <input type="color" id="color_secundario" value="{{ color_secundario }}" class="color-input-hidden">
+                        <span class="color-swatch" id="swatch-secundario" style="background:{{ color_secundario }}"></span>
+                        <div class="color-info">
+                            <span class="color-hex" id="hex-secundario">{{ color_secundario }}</span>
+                            <span class="color-role">Secundario</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── SECCIÓN: GESTIÓN DE USUARIOS ── -->
+        <div id="seccion-usuarios" class="cfg-seccion" style="display:none;">
+            <div class="usuarios-section">
+                <div class="usuarios-header">
+                    <div>
+                        <h2 class="usuarios-title">Usuarios</h2>
+                        <p class="usuarios-count" id="usuarios-count">
+                            {{ miembros|length }} miembro{{ 's' if miembros|length != 1 else '' }} activo{{ 's' if miembros|length != 1 else '' }}
+                        </p>
+                    </div>
+                    <button class="crear-usuario-btn" onclick="abrirInviteModal()">
+                        <i class="fas fa-user-plus"></i> Invitar usuario
+                    </button>
+                </div>
+                <div class="user-list" id="user-list">
+                    {% if miembros %}
+                        {% for m in miembros %}
+                        <div class="user-card">
+                            <div class="user-avatar">
+                                {% if m.foto %}
+                                    <img src="{{ m.foto }}" alt="{{ m.nombre }}">
+                                {% else %}
+                                    <div class="avatar-placeholder">
+                                        {{ m.nombre[0]|upper }}{{ m.apellido[0]|upper if m.apellido else '' }}
+                                    </div>
                                 {% endif %}
                             </div>
+                            <div class="user-info">
+                                <span class="user-name">{{ m.nombre }} {{ m.apellido }}</span>
+                                <span class="user-email">{{ m.email }}</span>
+                                <div class="user-meta">
+                                    <span class="user-role-badge">{{ m.rol }}</span>
+                                    <span class="user-status-badge {{ 'status-activo' if m.estado == 'activo' else 'status-pendiente' }}">
+                                        {{ 'Activo' if m.estado == 'activo' else 'Invitación pendiente' }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="user-actions">
+                                <button class="asignar-btn" onclick="asignarUsuario({{ m.user_id }})">
+                                    <i class="fas fa-user-check"></i> Asignar
+                                </button>
+                                <div class="user-actions-row">
+                                    <button class="icon-btn" onclick="verOpciones({{ m.user_id }})">
+                                        <i class="fas fa-ellipsis-h"></i>
+                                    </button>
+                                    {% if m.user_id != session.get('user_id') %}
+                                    <button class="icon-btn danger" onclick="eliminarUsuario({{ m.user_id }}, '{{ m.nombre }}')">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="empty-users">
-                        <i class="fas fa-users empty-icon"></i>
-                        <p>Aún no hay usuarios en tu organización.</p>
-                        <span>Usa "Invitar usuario" para invitar usuarios.</span>
-                    </div>
-                {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        <div class="empty-users">
+                            <i class="fas fa-users empty-icon"></i>
+                            <p>Aún no hay usuarios en tu organización.</p>
+                            <span>Usa "Invitar usuario" para invitar usuarios.</span>
+                        </div>
+                    {% endif %}
+                </div>
             </div>
         </div>
 
-        <!-- BOTONES FINALES -->
+        <!-- ── SECCIÓN: GESTIÓN DE CAMPOS ── -->
+        <div id="seccion-campos" class="cfg-seccion" style="display:none;">
+            <div class="cfg-card proxima-seccion">
+                <i class="fas fa-tools proxima-icon"></i>
+                <h3>Gestión de Campos</h3>
+                <p>Esta funcionalidad estará disponible próximamente.</p>
+            </div>
+        </div>
+
+        <!-- ── SECCIÓN: FORMULARIOS ── -->
+        <div id="seccion-formularios" class="cfg-seccion" style="display:none;">
+            <div class="cfg-card proxima-seccion">
+                <i class="fas fa-wpforms proxima-icon"></i>
+                <h3>Formularios</h3>
+                <p>Esta funcionalidad estará disponible próximamente.</p>
+            </div>
+        </div>
+
+        <!-- BOTONES FIJOS -->
         <div class="cfg-actions">
             <button class="btn-guardar" onclick="guardarCambios()">Guardar cambios</button>
             <button class="btn-restablecer" onclick="restablecerColores()">
@@ -241,6 +273,31 @@
 </div>
 
 <script>
+
+    const secciones = ['identidad', 'usuarios', 'campos', 'formularios'];
+    const titulos   = {
+        'identidad':   'Identidad Visual',
+        'usuarios':    'Gestión de Usuarios',
+        'campos':      'Gestión de Campos',
+        'formularios': 'Formularios'
+    };
+
+    function mostrarSeccion(seccion) {
+        secciones.forEach(s => {
+            document.getElementById(`seccion-${s}`).style.display = s === seccion ? '' : 'none';
+            document.getElementById(`nav-${s}`).classList.toggle('active', s === seccion);
+        });
+        document.getElementById('desktop-section-title').textContent = titulos[seccion];
+        document.getElementById('mobile-section-title').textContent  = titulos[seccion];
+        window.location.hash = seccion;
+    }
+
+    // Cargar sección desde hash al entrar
+    document.addEventListener('DOMContentLoaded', () => {
+        const hash = window.location.hash.replace('#', '');
+        mostrarSeccion(secciones.includes(hash) ? hash : 'identidad');
+    });
+
     // ── Colores ──
     document.getElementById('color_primario').addEventListener('input', function() {
         document.getElementById('swatch-primario').style.background = this.value;
