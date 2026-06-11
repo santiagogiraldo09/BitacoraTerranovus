@@ -1369,3 +1369,48 @@ button { font-family: inherit; cursor: pointer; }
     #panel-disponibles { display: block; }
     #panel-formulario  { display: none; }
 }
+
+
+/*-----------------------------------------------------  */
+/*  Esto posiblemente se elimine*/
+/* ── Tabs móvil configuración ── */
+.cfg-tabs-mobile {
+    display: none;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding: 8px 16px;
+    gap: 8px;
+    border-bottom: 1px solid var(--gris-borde);
+    background: var(--blanco);
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.cfg-tabs-mobile::-webkit-scrollbar { display: none; }
+
+.cfg-tab-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 20px;
+    border: 1.5px solid var(--gris-borde);
+    background: var(--blanco);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gris-texto);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+    font-family: 'DM Sans', sans-serif;
+}
+
+.cfg-tab-item.active {
+    background: var(--naranja);
+    border-color: var(--naranja);
+    color: white;
+}
+
+@media (max-width: 768px) {
+    .cfg-tabs-mobile { display: flex; }
+}

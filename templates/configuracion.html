@@ -67,6 +67,23 @@
             <span class="mobile-title" id="mobile-section-title">Identidad Visual</span>
         </div>
 
+        <!-- Tabs móvil configuración -->
+        <div class="cfg-tabs-mobile">
+            <button class="cfg-tab-item active" id="ctab-identidad" onclick="mostrarSeccion('identidad')">
+                <i class="fas fa-palette"></i> Identidad Visual
+            </button>
+            <button class="cfg-tab-item" id="ctab-usuarios" onclick="mostrarSeccion('usuarios')">
+                <i class="fas fa-users"></i> Usuarios
+            </button>
+            <button class="cfg-tab-item" id="ctab-campos" onclick="mostrarSeccion('campos')">
+                <i class="fas fa-list-alt"></i> Campos
+            </button>
+            <button class="cfg-tab-item" id="ctab-formularios" onclick="mostrarSeccion('formularios')">
+                <i class="fas fa-file-alt"></i> Formularios
+            </button>
+        </div>
+
+
         <!-- Título desktop -->
         <div class="page-title-row">
             <button class="btn-back" onclick="window.location.href='{{ url_for('registros') }}'">
@@ -752,6 +769,11 @@
         document.getElementById('desktop-section-title').textContent = titulos[seccion];
         document.getElementById('mobile-section-title').textContent  = titulos[seccion];
         window.location.hash = seccion;
+
+        // Sincronizar tabs móvil
+        document.querySelectorAll('.cfg-tab-item').forEach(t => t.classList.remove('active'));
+        const ctab = document.getElementById(`ctab-${seccion}`);
+        if (ctab) ctab.classList.add('active');
     }
 
     // ── Colores ──
