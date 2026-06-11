@@ -2040,7 +2040,25 @@ def detalleContacto(id_contacto):
 def form_contacto():
     if 'user_id' not in session:
         return redirect(url_for('principalscreen'))
-    return render_template('formContacto.html')
+
+    color_primario   = '#FFAF33'
+    color_secundario = '#E3E3E3'
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT color_primario, color_secundario
+                FROM empresas WHERE id = %s
+            """, (session.get('empresa_id'),))
+            row = cursor.fetchone()
+            if row:
+                color_primario   = row[0] or '#FFAF33'
+                color_secundario = row[1] or '#E3E3E3'
+    except Exception as e:
+        print(f"Error cargando colores formContacto: {e}")
+
+    return render_template('formContacto.html',
+                           color_primario=color_primario,
+                           color_secundario=color_secundario)
 
 
 @app.route('/detalleRegistro/<int:id_registro>')
