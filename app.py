@@ -2239,7 +2239,9 @@ def add_project():
             return jsonify({"status": "error", "error": str(e)}), 500
 
     # GET
-    usuarios = []
+    usuarios         = []
+    color_primario   = '#FFAF33'
+    color_secundario = '#E3E3E3'
     try:
         with db_connection() as (conn, cursor):
             cursor.execute("""
@@ -2256,10 +2258,21 @@ def add_project():
                     'apellido': row[2],
                     'cargo':    row[3] or 'Sin cargo'
                 })
-    except Exception as e:
-        print(f"Error al cargar usuarios: {e}")
 
-    return render_template('addproject.html', usuarios=usuarios)
+            cursor.execute("""
+                SELECT color_primario, color_secundario
+                FROM empresas WHERE id = %s
+            """, (session.get('empresa_id'),))
+            empresa_row = cursor.fetchone()
+            if empresa_row:
+                color_primario   = empresa_row[0] or '#FFAF33'
+                color_secundario = empresa_row[1] or '#E3E3E3'
+    except Exception as e:
+        print(f"Error en add_project GET: {e}")
+
+    return render_template('addproject.html', usuarios=usuarios,
+                        color_primario=color_primario,
+                        color_secundario=color_secundario)
 
 
 #@app.route('/generar-hash')
