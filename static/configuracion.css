@@ -857,6 +857,9 @@ button { font-family: inherit; cursor: pointer; }
         to   { opacity: 1; transform: scale(1); }
     }
     .cfg-toast { bottom: 32px; }
+    #panel-disponibles { display: block !important; }
+    #panel-formulario  { display: block !important; }
+    .builder-tabs      { display: none !important; }
 }
 
 /* ─── Responsive — Móvil ─────────────────────────────────────── */
