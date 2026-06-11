@@ -231,7 +231,7 @@ input::placeholder { color: #c4c9d4; }
         flex-direction: row;
         justify-content: flex-end;
         padding: 16px 32px;
-        bottom: 60px;
+        bottom: 0px;
         gap: 12px;
     }
 
