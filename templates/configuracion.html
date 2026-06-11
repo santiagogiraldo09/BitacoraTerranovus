@@ -38,7 +38,7 @@
                 <span>Gestión de Campos</span>
             </button>
             <button class="sidebar-nav-item" id="nav-formularios" onclick="mostrarSeccion('formularios')">
-                <i class="fas fa-wpforms"></i>
+                <i class="fas fa-file-alt"></i>
                 <span>Formularios</span>
             </button>
         </nav>
@@ -139,6 +139,13 @@
                     </label>
                 </div>
             </div>
+            <!-- BOTONES FIJOS -->
+            <div class="cfg-actions">
+                <button class="btn-guardar" onclick="guardarCambios()">Guardar cambios</button>
+                <button class="btn-restablecer" onclick="restablecerColores()">
+                    <i class="fas fa-rotate-left"></i> Restablecer colores
+                </button>
+            </div>
         </div>
 
         <!-- ── SECCIÓN: GESTIÓN DE USUARIOS ── -->
@@ -218,18 +225,10 @@
         <!-- ── SECCIÓN: FORMULARIOS ── -->
         <div id="seccion-formularios" class="cfg-seccion" style="display:none;">
             <div class="cfg-card proxima-seccion">
-                <i class="fas fa-wpforms proxima-icon"></i>
+                <i class="fas fa-file-alt proxima-icon"></i>
                 <h3>Formularios</h3>
                 <p>Esta funcionalidad estará disponible próximamente.</p>
             </div>
-        </div>
-
-        <!-- BOTONES FIJOS -->
-        <div class="cfg-actions">
-            <button class="btn-guardar" onclick="guardarCambios()">Guardar cambios</button>
-            <button class="btn-restablecer" onclick="restablecerColores()">
-                <i class="fas fa-rotate-left"></i> Restablecer colores
-            </button>
         </div>
 
     </main>
