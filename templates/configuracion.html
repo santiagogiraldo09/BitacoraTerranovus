@@ -65,9 +65,6 @@
             </button>
             <img src="{{ logo_actual or url_for('static', filename='logo.png') }}" alt="IAC" class="mobile-logo">
             <span class="mobile-title" id="mobile-section-title">Identidad Visual</span>
-            <button class="btn-hamburger" onclick="toggleMenuMobile()">
-                <i class="fas fa-bars"></i>
-            </button>
         </div>
 
         <!-- Título desktop -->
@@ -382,14 +379,22 @@
 
 <!-- Bottom nav (solo móvil) -->
 <nav class="bottom-nav">
-    <a href="{{ url_for('registros') }}" class="nav-item">
-        <i class="fas fa-folder-open"></i>
-        <span>Proyectos</span>
-    </a>
-    <a href="{{ url_for('configuracion') }}" class="nav-item active">
-        <i class="fas fa-user"></i>
-        <span>Perfil</span>
-    </a>
+    <button class="nav-item active" id="bnav-identidad" onclick="mostrarSeccion('identidad')">
+        <i class="fas fa-palette"></i>
+        <span>Identidad</span>
+    </button>
+    <button class="nav-item" id="bnav-usuarios" onclick="mostrarSeccion('usuarios')">
+        <i class="fas fa-users"></i>
+        <span>Usuarios</span>
+    </button>
+    <button class="nav-item" id="bnav-campos" onclick="mostrarSeccion('campos')">
+        <i class="fas fa-list-alt"></i>
+        <span>Campos</span>
+    </button>
+    <button class="nav-item" id="bnav-formularios" onclick="mostrarSeccion('formularios')">
+        <i class="fas fa-file-alt"></i>
+        <span>Formularios</span>
+    </button>
 </nav>
 
 <!-- MODAL: INVITAR / CREAR USUARIO -->
@@ -417,59 +422,6 @@
     </div>
 </div>
 
-
-<!-- Drawer móvil -->
-<div class="drawer-overlay" id="drawer-overlay" onclick="toggleMenuMobile()"></div>
-<div class="drawer-menu" id="drawer-menu">
-    <div class="drawer-header">
-        <span class="drawer-title">Configuración</span>
-        <button class="drawer-close" onclick="toggleMenuMobile()">
-            <i class="fas fa-times"></i>
-        </button>
-    </div>
-    <nav class="drawer-nav">
-        <button class="drawer-nav-item active" id="drawer-identidad" onclick="mostrarSeccionMobile('identidad')">
-            <div class="drawer-nav-icon">
-                <i class="fas fa-palette"></i>
-            </div>
-            <div class="drawer-nav-info">
-                <span class="drawer-nav-label">Identidad Visual</span>
-                <span class="drawer-nav-desc">Logo y colores de tu marca</span>
-            </div>
-            <i class="fas fa-chevron-right drawer-nav-arrow"></i>
-        </button>
-        <button class="drawer-nav-item" id="drawer-usuarios" onclick="mostrarSeccionMobile('usuarios')">
-            <div class="drawer-nav-icon">
-                <i class="fas fa-users"></i>
-            </div>
-            <div class="drawer-nav-info">
-                <span class="drawer-nav-label">Gestión de Usuarios</span>
-                <span class="drawer-nav-desc">Invita y gestiona tu equipo</span>
-            </div>
-            <i class="fas fa-chevron-right drawer-nav-arrow"></i>
-        </button>
-        <button class="drawer-nav-item" id="drawer-campos" onclick="mostrarSeccionMobile('campos')">
-            <div class="drawer-nav-icon">
-                <i class="fas fa-list-alt"></i>
-            </div>
-            <div class="drawer-nav-info">
-                <span class="drawer-nav-label">Gestión de Campos</span>
-                <span class="drawer-nav-desc">Crea campos personalizados</span>
-            </div>
-            <i class="fas fa-chevron-right drawer-nav-arrow"></i>
-        </button>
-        <button class="drawer-nav-item" id="drawer-formularios" onclick="mostrarSeccionMobile('formularios')">
-            <div class="drawer-nav-icon">
-                <i class="fas fa-file-alt"></i>
-            </div>
-            <div class="drawer-nav-info">
-                <span class="drawer-nav-label">Formularios</span>
-                <span class="drawer-nav-desc">Crea formularios personalizados</span>
-            </div>
-            <i class="fas fa-chevron-right drawer-nav-arrow"></i>
-        </button>
-    </nav>
-</div>
 
 
 <script>
@@ -813,6 +765,9 @@
         document.querySelectorAll('.drawer-nav-item').forEach(i => i.classList.remove('active'));
         const drawerItem = document.getElementById(`drawer-${seccion}`);
         if (drawerItem) drawerItem.classList.add('active');
+        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+        const bnavItem = document.getElementById(`bnav-${seccion}`);
+        if (bnavItem) bnavItem.classList.add('active');
     }
 
     // ── Colores ──
@@ -1290,23 +1245,6 @@
     document.getElementById('modal-campo').addEventListener('click', function(e) {
         if (e.target === this) cerrarModalCampo();
     });
-
-    function toggleMenuMobile() {
-        const drawer  = document.getElementById('drawer-menu');
-        const overlay = document.getElementById('drawer-overlay');
-        drawer.classList.toggle('active');
-        overlay.classList.toggle('active');
-    }
-
-    function mostrarSeccionMobile(seccion) {
-        mostrarSeccion(seccion);
-        // Actualizar estado activo en drawer
-        document.querySelectorAll('.drawer-nav-item').forEach(i => i.classList.remove('active'));
-        const item = document.getElementById(`drawer-${seccion}`);
-        if (item) item.classList.add('active');
-        // Cerrar drawer
-        toggleMenuMobile();
-    }
 </script>
 </body>
 </html>
