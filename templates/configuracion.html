@@ -222,7 +222,13 @@
                     <span>Gestión de Campos</span>
                 </div>
                 <p class="cfg-card-subtitle">Crea los campos que podrás usar en tus formularios personalizados.</p>
-
+                
+                <div class="buscador-seccion">
+                    <i class="fas fa-search buscador-icon"></i>
+                    <input type="text" id="buscar-campos" class="buscador-input"
+                        placeholder="Buscar campo..."
+                        oninput="filtrarCampos(this.value)">
+                </div>
                 <!-- Lista de campos existentes -->
                 <div id="lista-campos"></div>
 
@@ -304,6 +310,14 @@
                         <span>Formularios</span>
                     </div>
                     <p class="cfg-card-subtitle">Crea y gestiona formularios personalizados para tus proyectos.</p>
+                    
+                    <div class="buscador-seccion">
+                        <i class="fas fa-search buscador-icon"></i>
+                        <input type="text" id="buscar-formularios" class="buscador-input"
+                            placeholder="Buscar formulario..."
+                            oninput="filtrarFormularios(this.value)">
+                    </div>
+                    
                     <div id="lista-formularios"></div>
                     <button class="btn-nuevo-campo" onclick="abrirBuilder(null)">
                         <i class="fas fa-plus"></i> Nuevo formulario
@@ -1084,6 +1098,23 @@
                 if (data.success) { mostrarToast('Usuario eliminado'); location.reload(); }
                 else mostrarToast('Error al eliminar', true);
             });
+    }
+
+    function filtrarCampos(query) {
+        const q = query.toLowerCase().trim();
+        document.querySelectorAll('#lista-campos .campo-item').forEach(item => {
+            const nombre = item.querySelector('.campo-item-nombre')?.textContent.toLowerCase() || '';
+            const tipo   = item.querySelector('.campo-item-tipo')?.textContent.toLowerCase() || '';
+            item.style.display = (nombre.includes(q) || tipo.includes(q)) ? '' : 'none';
+        });
+    }
+
+    function filtrarFormularios(query) {
+        const q = query.toLowerCase().trim();
+        document.querySelectorAll('#lista-formularios .formulario-item').forEach(item => {
+            const nombre = item.querySelector('.formulario-item-nombre')?.textContent.toLowerCase() || '';
+            item.style.display = nombre.includes(q) ? '' : 'none';
+        });
     }
 
     // ── Toast ──
