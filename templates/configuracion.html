@@ -480,6 +480,10 @@
         document.getElementById('vista-form-builder').style.display      = '';
         document.getElementById('builder-nombre').value      = '';
         document.getElementById('builder-descripcion').value = '';
+
+        // Resetear paneles antes de cambiar tab
+        document.getElementById('panel-disponibles').classList.remove('panel-oculto');
+        document.getElementById('panel-formulario').classList.add('panel-oculto');
         cambiarTab('disponibles');
 
         // Cargar campos globales
@@ -518,8 +522,8 @@
     function cambiarTab(tab) {
         document.getElementById('tab-disponibles').classList.toggle('active', tab === 'disponibles');
         document.getElementById('tab-formulario').classList.toggle('active', tab === 'formulario');
-        document.getElementById('panel-disponibles').style.display = tab === 'disponibles' ? '' : 'none';
-        document.getElementById('panel-formulario').style.display  = tab === 'formulario'  ? '' : 'none';
+        document.getElementById('panel-disponibles').classList.toggle('panel-oculto', tab !== 'disponibles');
+        document.getElementById('panel-formulario').classList.toggle('panel-oculto', tab !== 'formulario');
     }
 
     function renderCamposDisponibles() {

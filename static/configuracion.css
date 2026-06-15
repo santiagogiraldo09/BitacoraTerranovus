@@ -1366,8 +1366,8 @@ button { font-family: inherit; cursor: pointer; }
     .builder-tabs   { display: flex; }
     .builder-layout { grid-template-columns: 1fr; }
 
-    #panel-disponibles { display: block; }
-    #panel-formulario  { display: none; }
+    #panel-disponibles.panel-oculto { display: none; }
+    #panel-formulario.panel-oculto  { display: none; }
 }
 
 .buscador-seccion {
