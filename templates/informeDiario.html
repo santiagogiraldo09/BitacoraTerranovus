@@ -59,7 +59,7 @@
                 <span class="section-icon"><i class="fas fa-boxes"></i></span>
                 <h3 class="section-title">Materiales</h3>
             </div>
-            <div class="field-group">
+            <div class="field-group form-group">
                 <div class="input-with-icon textarea-group">
                     <textarea id="campo-materiales" class="field-input" rows="3"
                               placeholder="Describe los materiales utilizados o requeridos..."></textarea>
@@ -91,7 +91,7 @@
                 <span class="section-icon"><i class="fas fa-hard-hat"></i></span>
                 <h3 class="section-title">Observaciones de Seguridad del Sitio</h3>
             </div>
-            <div class="field-group">
+            <div class="field-group form-group">
                 <div class="input-with-icon textarea-group">
                     <textarea id="campo-seguridad" class="field-input" rows="3"
                               placeholder="Describe las observaciones de seguridad del sitio..."></textarea>
@@ -111,7 +111,7 @@
                 <span class="section-icon"><i class="fas fa-check-circle"></i></span>
                 <h3 class="section-title">Observaciones de Control de Calidad</h3>
             </div>
-            <div class="field-group">
+            <div class="field-group form-group">
                 <div class="input-with-icon textarea-group">
                     <textarea id="campo-calidad" class="field-input" rows="3"
                               placeholder="Describe las observaciones de control de calidad..."></textarea>
@@ -135,8 +135,7 @@
                 <div class="input-with-icon">
                     <input type="date" id="campo-fecha-cierre" class="field-input date-input">
                     <button class="record-btn" type="button"
-                            data-target-input="campo-fecha-cierre"
-                            onclick="iniciarVozFecha()">
+                            data-target-input="campo-fecha-cierre">
                         <i class="fas fa-microphone"></i>
                     </button>
                     <button class="stop-btn" type="button"
@@ -164,8 +163,7 @@
                            min="0" max="100" placeholder="0"
                            oninput="actualizarBarraAvance(this.value)">
                     <button class="record-btn" type="button"
-                            data-target-input="campo-avance"
-                            onclick="iniciarVozAvance()">
+                            data-target-input="campo-avance">
                         <i class="fas fa-microphone"></i>
                     </button>
                     <button class="stop-btn" type="button"
@@ -322,6 +320,17 @@
         });
         addNota();
         if (typeof setupVoiceButtons === 'function') setupVoiceButtons();
+        // Voz fecha — asignar después de setupVoiceButtons para no ser sobreescrito
+        const recFecha  = document.querySelector('.record-btn[data-target-input="campo-fecha-cierre"]');
+        const stopFecha = document.querySelector('.stop-btn[data-target-input="campo-fecha-cierre"]');
+        if (recFecha) recFecha.onclick  = iniciarVozFecha;
+        if (stopFecha) stopFecha.onclick = () => { if (window.currentRecognition) window.currentRecognition.stop(); };
+
+        // Voz avance
+        const recAvance  = document.querySelector('.record-btn[data-target-input="campo-avance"]');
+        const stopAvance = document.querySelector('.stop-btn[data-target-input="campo-avance"]');
+        if (recAvance) recAvance.onclick  = iniciarVozAvance;
+        if (stopAvance) stopAvance.onclick = () => { if (window.currentRecognition) window.currentRecognition.stop(); };
     });
 
     // ── Barra de avance ──
