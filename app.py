@@ -1835,6 +1835,52 @@ def actualizar_formulario(form_id):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/informeDiario')
+def informe_diario():
+    if 'user_id' not in session:
+        return redirect(url_for('principalscreen'))
+
+    project_id = request.args.get('project_id')
+    project    = None
+    color_primario   = '#FFAF33'
+    color_secundario = '#E3E3E3'
+    logo_actual      = None
+
+    try:
+        with db_connection() as (conn, cursor):
+            if project_id:
+                cursor.execute("""
+                    SELECT nombre_proyecto, cliente, contratista,
+                           orden_de_trabajo, ubicacion
+                    FROM proyectos WHERE id = %s
+                """, (project_id,))
+                row = cursor.fetchone()
+                if row:
+                    project = {
+                        'nombre_proyecto':  row[0],
+                        'cliente':          row[1],
+                        'contratista':      row[2],
+                        'orden_de_trabajo': row[3],
+                        'ubicacion':        row[4]
+                    }
+            cursor.execute("""
+                SELECT color_primario, color_secundario, logo_url
+                FROM empresas WHERE id = %s
+            """, (session.get('empresa_id'),))
+            emp = cursor.fetchone()
+            if emp:
+                color_primario   = emp[0] or '#FFAF33'
+                color_secundario = emp[1] or '#E3E3E3'
+                logo_actual      = emp[2]
+    except Exception as e:
+        print(f"Error en informe_diario: {e}")
+
+    return render_template('informeDiario.html',
+                           project=project,
+                           color_primario=color_primario,
+                           color_secundario=color_secundario,
+                           logo_actual=logo_actual)
+
 # Eliminar formulario
 @app.route('/api/formularios/<int:form_id>', methods=['DELETE'])
 def eliminar_formulario(form_id):
