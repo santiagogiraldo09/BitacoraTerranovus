@@ -1397,3 +1397,42 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 .buscador-input::placeholder { color: var(--gris-texto); }
+
+/* Buscador de campos globales en el builder */
+#builder-buscar-campo {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1.5px solid var(--borde, #e0e0e0);
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--texto);
+    background: var(--fondo-input, #fff);
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+}
+
+#builder-buscar-campo:focus {
+    border-color: var(--naranja);
+}
+
+/* Textarea de descripción del formulario */
+#builder-descripcion {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1.5px solid var(--borde, #e0e0e0);
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--texto);
+    background: var(--fondo-input, #fff);
+    outline: none;
+    box-sizing: border-box;
+    resize: none;
+    transition: border-color 0.2s;
+}
+
+#builder-descripcion:focus {
+    border-color: var(--naranja);
+}
