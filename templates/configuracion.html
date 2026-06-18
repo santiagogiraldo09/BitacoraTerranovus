@@ -631,8 +631,8 @@
     function cambiarTabProyecto(tab) {
         document.getElementById('tab-proyecto-disponibles').classList.toggle('active', tab === 'disponibles');
         document.getElementById('tab-proyecto-canvas').classList.toggle('active', tab === 'canvas');
-        document.getElementById('panel-proyecto-disponibles').style.display = tab === 'disponibles' ? '' : 'none';
-        document.getElementById('panel-proyecto-canvas').style.display      = tab === 'canvas'      ? '' : 'none';
+        document.getElementById('panel-proyecto-disponibles').classList.toggle('panel-oculto', tab !== 'disponibles');
+        document.getElementById('panel-proyecto-canvas').classList.toggle('panel-oculto', tab !== 'canvas');
     }
 
     function renderCamposDisponiblesProyecto() {
