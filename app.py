@@ -1711,7 +1711,6 @@ def crear_campo_global():
         data          = request.get_json()
         nombre        = data.get('nombre', '').strip()
         tipo          = data.get('tipo')
-        requerido     = data.get('requerido', False)
         opciones      = data.get('opciones', [])
         configuracion = data.get('configuracion', {})
 
@@ -1721,11 +1720,11 @@ def crear_campo_global():
         with db_connection() as (conn, cursor):
             cursor.execute("""
                 INSERT INTO campos_globales
-                    (empresa_id, nombre, tipo, requerido, opciones, configuracion)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                    (empresa_id, nombre, tipo, opciones, configuracion)
+                VALUES (%s, %s, %s, %s, %s)
                 RETURNING id
             """, (
-                session.get('empresa_id'), nombre, tipo, requerido,
+                session.get('empresa_id'), nombre, tipo,
                 json.dumps(opciones), json.dumps(configuracion)
             ))
             nuevo_id = cursor.fetchone()[0]
