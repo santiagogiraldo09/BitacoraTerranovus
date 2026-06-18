@@ -1681,22 +1681,34 @@ def get_campos_globales():
     if 'user_id' not in session:
         return jsonify({'error': 'No autorizado'}), 401
     try:
+        objeto = request.args.get('objeto')  # opcional
         with db_connection() as (conn, cursor):
-            cursor.execute("""
-                SELECT id, nombre, tipo, opciones, configuracion
-                FROM campos_globales
-                WHERE empresa_id = %s
-                ORDER BY created_at ASC
-            """, (session.get('empresa_id'),))
-            campos = []
-            for row in cursor.fetchall():
-                campos.append({
-                    'id':            row[0],
-                    'nombre':        row[1],
-                    'tipo':          row[2],
-                    'opciones':      row[3] or [],
-                    'configuracion': row[4] or {}
-                })
+            if objeto:
+                cursor.execute("""
+                    SELECT id, nombre, tipo, objeto, opciones, configuracion
+                    FROM campos_globales
+                    WHERE empresa_id = %s AND objeto = %s
+                    ORDER BY created_at DESC
+                """, (session.get('empresa_id'), objeto))
+            else:
+                cursor.execute("""
+                    SELECT id, nombre, tipo, objeto, opciones, configuracion
+                    FROM campos_globales
+                    WHERE empresa_id = %s
+                    ORDER BY created_at DESC
+                """, (session.get('empresa_id'),))
+            rows = cursor.fetchall()
+            campos = [
+                {
+                    'id':            r[0],
+                    'nombre':        r[1],
+                    'tipo':          r[2],
+                    'objeto':        r[3],
+                    'opciones':      r[4] or [],
+                    'configuracion': r[5] or {}
+                }
+                for r in rows
+            ]
             return jsonify({'campos': campos})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1711,20 +1723,24 @@ def crear_campo_global():
         data          = request.get_json()
         nombre        = data.get('nombre', '').strip()
         tipo          = data.get('tipo')
+        objeto        = data.get('objeto', 'formulario')  # ← nuevo
         opciones      = data.get('opciones', [])
         configuracion = data.get('configuracion', {})
 
         if not nombre or not tipo:
             return jsonify({'error': 'Nombre y tipo son obligatorios'}), 400
 
+        if objeto not in ('formulario', 'proyecto'):
+            return jsonify({'error': 'Objeto inválido'}), 400
+
         with db_connection() as (conn, cursor):
             cursor.execute("""
                 INSERT INTO campos_globales
-                    (empresa_id, nombre, tipo, opciones, configuracion)
-                VALUES (%s, %s, %s, %s, %s)
+                    (empresa_id, nombre, tipo, objeto, opciones, configuracion)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id
             """, (
-                session.get('empresa_id'), nombre, tipo,
+                session.get('empresa_id'), nombre, tipo, objeto,
                 json.dumps(opciones), json.dumps(configuracion)
             ))
             nuevo_id = cursor.fetchone()[0]
