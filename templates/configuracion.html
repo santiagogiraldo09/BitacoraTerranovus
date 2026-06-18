@@ -1253,11 +1253,10 @@
     }
 
     async function guardarCampo() {
-        const fb      = document.getElementById('campo-feedback');
-        const nombre  = document.getElementById('campo-nombre').value.trim();
-        const tipo    = document.getElementById('campo-tipo').value;
-        const requerido = document.getElementById('campo-requerido').checked;
-        const maxChars  = document.getElementById('campo-max-chars').value;
+        const fb       = document.getElementById('campo-feedback');
+        const nombre   = document.getElementById('campo-nombre').value.trim();
+        const tipo     = document.getElementById('campo-tipo').value;
+        const maxChars = document.getElementById('campo-max-chars').value;
 
         if (!nombre || !tipo) {
             fb.textContent = 'Nombre y tipo son obligatorios.';
@@ -1269,7 +1268,7 @@
         if (maxChars) configuracion.max_caracteres = parseInt(maxChars);
 
         const opciones = [];
-        if (tipo === 'seleccion') {
+        if (['seleccion', 'seleccion_unica'].includes(tipo)) {
             document.querySelectorAll('#opciones-lista .opcion-row input').forEach(inp => {
                 if (inp.value.trim()) opciones.push(inp.value.trim());
             });
@@ -1284,7 +1283,7 @@
             const res  = await fetch('/api/campos-globales', {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ nombre, tipo, requerido, opciones, configuracion })
+                body:    JSON.stringify({ nombre, tipo, opciones, configuracion }) // ← requerido eliminado
             });
             const data = await res.json();
             if (data.success) {
