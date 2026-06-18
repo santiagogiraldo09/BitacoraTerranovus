@@ -261,7 +261,7 @@
                     <select id="campo-tipo" onchange="onTipoCampoChange()">
                         <option value="">Selecciona un tipo</option>
                         <option value="texto_corto">Texto corto</option>
-                        <option value="texto_largo">Texto largo</option>
+                        <option value="multi_linea">Multi línea</option>
                         <option value="numero">Número</option>
                         <option value="imagen">Imagen</option>
                         <option value="fecha">Fecha</option>
@@ -284,11 +284,6 @@
                             <i class="fas fa-plus"></i> Agregar opción
                         </button>
                     </div>
-                </div>
-
-                <div class="invite-field" style="display:flex; align-items:center; gap:10px; margin-top:4px;">
-                    <input type="checkbox" id="campo-requerido" style="width:auto;">
-                    <label for="campo-requerido" style="text-transform:none; font-size:14px;">Campo obligatorio</label>
                 </div>
 
                 <p class="invite-feedback" id="campo-feedback"></p>
@@ -465,7 +460,7 @@
 
     const tipoIconos = {
         texto_corto: 'fa-font',
-        texto_largo: 'fa-align-left',
+        multi_linea: 'fa-align-left',
         numero:      'fa-hashtag',
         imagen:      'fa-image',
         fecha:       'fa-calendar',
@@ -474,7 +469,7 @@
 
     const tipoLabels = {
         texto_corto: 'Texto corto',
-        texto_largo: 'Texto largo',
+        multi_linea: 'Multi línea',
         numero:      'Número',
         imagen:      'Imagen',
         fecha:       'Fecha',
@@ -512,14 +507,23 @@
                 if (form) {
                     document.getElementById('builder-nombre').value      = form.nombre;
                     document.getElementById('builder-descripcion').value = form.descripcion;
-                    builderCamposForm = form.campos.map(id =>
-                        builderCamposGlobales.find(c => c.id === id)
-                    ).filter(Boolean);
+                    builderCamposForm = form.campos.map(item => {
+                        const id       = typeof item === 'object' ? item.id : item;
+                        const requerido = typeof item === 'object' ? (item.requerido || false) : false;
+                        const campo    = builderCamposGlobales.find(c => c.id === id);
+                        return campo ? { ...campo, requerido } : null;
+                    }).filter(Boolean);
                 }
             } catch {}
         }
 
         renderCamposDisponibles();
+        renderCanvas();
+    }
+
+    
+    function toggleRequerido(idx) {
+        builderCamposForm[idx].requerido = !builderCamposForm[idx].requerido;
         renderCanvas();
     }
 
@@ -593,7 +597,7 @@
             mostrarToast('⚠️ Este campo ya está en el formulario');
             return;
         }
-        builderCamposForm.push(campo);
+        builderCamposForm.push({ ...campo, requerido: false }); // ← único cambio
         renderCanvas();
         // En móvil cambiar al tab del formulario
         if (window.innerWidth <= 768) cambiarTab('formulario');
@@ -601,8 +605,8 @@
     }
 
     function renderCanvas() {
-        const canvas  = document.getElementById('canvas-formulario');
-        const empty   = document.getElementById('canvas-empty');
+        const canvas   = document.getElementById('canvas-formulario');
+        const empty    = document.getElementById('canvas-empty');
         const contador = document.getElementById('contador-campos-form');
         contador.textContent = builderCamposForm.length;
 
@@ -614,26 +618,31 @@
         }
 
         empty.style.display = 'none';
-        // Limpiar sin borrar el empty
         Array.from(canvas.children).forEach(c => {
             if (c !== empty) c.remove();
         });
 
         builderCamposForm.forEach((campo, idx) => {
             const div = document.createElement('div');
-            div.className      = 'canvas-campo';
-            div.draggable      = true;
-            div.dataset.index  = idx;
+            div.className     = 'canvas-campo';
+            div.draggable     = true;
+            div.dataset.index = idx;
 
-            const preview = previsualizarCampo(campo);
+            const preview   = previsualizarCampo(campo);
+            const requerido = campo.requerido || false;
 
             div.innerHTML = `
                 <i class="fas fa-grip-vertical canvas-campo-handle"></i>
                 <div class="canvas-campo-info">
-                    <span class="canvas-campo-nombre">${campo.nombre}${campo.requerido ? ' *' : ''}</span>
+                    <span class="canvas-campo-nombre">${campo.nombre}${requerido ? ' *' : ''}</span>
                     <span class="canvas-campo-preview">${preview}</span>
                 </div>
                 <div class="canvas-campo-actions">
+                    <button class="icon-btn ${requerido ? 'active-required' : ''}"
+                            onclick="toggleRequerido(${idx})"
+                            title="${requerido ? 'Obligatorio (clic para quitar)' : 'Marcar como obligatorio'}">
+                        <i class="fas fa-asterisk"></i>
+                    </button>
                     <button class="icon-btn" onclick="moverCampo(${idx}, -1)" title="Subir"
                             ${idx === 0 ? 'disabled' : ''}>
                         <i class="fas fa-chevron-up"></i>
@@ -647,7 +656,6 @@
                     </button>
                 </div>`;
 
-            // Drag & drop reordenamiento
             div.addEventListener('dragstart', () => { dragSrcIndex = idx; });
             div.addEventListener('dragover',  (e) => {
                 e.preventDefault();
@@ -667,7 +675,6 @@
             canvas.appendChild(div);
         });
 
-        // Drop zone en canvas vacío
         canvas.addEventListener('dragover', (e) => e.preventDefault());
         canvas.addEventListener('drop', (e) => {
             e.preventDefault();
@@ -679,7 +686,7 @@
     function previsualizarCampo(campo) {
         switch(campo.tipo) {
             case 'texto_corto': return `<input type="text" placeholder="${campo.nombre}..." disabled style="width:100%;padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;">`;
-            case 'texto_largo': return `<textarea disabled placeholder="${campo.nombre}..." style="width:100%;padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;resize:none;height:40px;"></textarea>`;
+            case 'multi_linea': return `<textarea disabled placeholder="${campo.nombre}..." style="width:100%;padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;resize:none;height:40px;"></textarea>`;
             case 'numero':      return `<input type="number" placeholder="0" disabled style="width:80px;padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;">`;
             case 'fecha':       return `<input type="date" disabled style="padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;">`;
             case 'imagen':      return `<span style="font-size:11px;color:#6b7280;"><i class="fas fa-image"></i> Campo de imagen</span>`;
@@ -720,7 +727,7 @@
         const payload = {
             nombre,
             descripcion,
-            campos: builderCamposForm.map(c => c.id)
+            campos: builderCamposForm.map(c => ({ id: c.id, requerido: c.requerido || false }))
         };
 
         try {
@@ -1180,7 +1187,7 @@
     function onTipoCampoChange() {
         const tipo = document.getElementById('campo-tipo').value;
         document.getElementById('campo-max-chars-group').style.display =
-            ['texto_corto', 'texto_largo'].includes(tipo) ? '' : 'none';
+            ['texto_corto', 'multi_linea'].includes(tipo) ? '' : 'none';
         document.getElementById('campo-opciones-group').style.display =
             tipo === 'seleccion' ? '' : 'none';
     }
@@ -1260,7 +1267,7 @@
             data.campos.forEach(campo => {
                 const tipoLabel = {
                     texto_corto: 'Texto corto',
-                    texto_largo: 'Texto largo',
+                    multi_linea: 'Multi línea',
                     numero:      'Número',
                     imagen:      'Imagen',
                     fecha:       'Fecha',

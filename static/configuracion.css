@@ -1436,3 +1436,7 @@ button { font-family: inherit; cursor: pointer; }
 #builder-descripcion:focus {
     border-color: var(--naranja);
 }
+
+.icon-btn.active-required {
+    color: var(--naranja);
+}
