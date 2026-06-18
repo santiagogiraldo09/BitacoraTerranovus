@@ -1683,7 +1683,7 @@ def get_campos_globales():
     try:
         with db_connection() as (conn, cursor):
             cursor.execute("""
-                SELECT id, nombre, tipo, requerido, opciones, configuracion
+                SELECT id, nombre, tipo, opciones, configuracion
                 FROM campos_globales
                 WHERE empresa_id = %s
                 ORDER BY created_at ASC
@@ -1694,9 +1694,8 @@ def get_campos_globales():
                     'id':            row[0],
                     'nombre':        row[1],
                     'tipo':          row[2],
-                    'requerido':     row[3],
-                    'opciones':      row[4] or [],
-                    'configuracion': row[5] or {}
+                    'opciones':      row[3] or [],
+                    'configuracion': row[4] or {}
                 })
             return jsonify({'campos': campos})
     except Exception as e:
