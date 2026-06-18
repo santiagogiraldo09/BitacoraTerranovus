@@ -260,12 +260,17 @@
                     <label>Tipo de campo *</label>
                     <select id="campo-tipo" onchange="onTipoCampoChange()">
                         <option value="">Selecciona un tipo</option>
-                        <option value="texto_corto">Texto corto</option>
-                        <option value="multi_linea">Multi línea</option>
+                        <option value="texto_corto">Única línea</option>
+                        <option value="texto_largo">Multi-línea</option>
                         <option value="numero">Número</option>
                         <option value="imagen">Imagen</option>
                         <option value="fecha">Fecha</option>
-                        <option value="seleccion">Selección (opciones)</option>
+                        <option value="seleccion">Selección múltiple</option>
+                        <option value="seleccion_unica">Selección única</option>
+                        <option value="adjunto">Adjunto</option>
+                        <option value="booleano">Sí / No</option>
+                        <option value="moneda">Moneda</option>
+                        <option value="porcentaje">Porcentaje</option>
                     </select>
                 </div>
 
@@ -459,21 +464,31 @@
     let dragSrcIndex          = null;
 
     const tipoIconos = {
-        texto_corto: 'fa-font',
-        multi_linea: 'fa-align-left',
-        numero:      'fa-hashtag',
-        imagen:      'fa-image',
-        fecha:       'fa-calendar',
-        seleccion:   'fa-list'
+        texto_corto:    'fa-font',
+        texto_largo:    'fa-align-left',
+        numero:         'fa-hashtag',
+        imagen:         'fa-image',
+        fecha:          'fa-calendar',
+        seleccion:      'fa-list',
+        seleccion_unica:'fa-dot-circle',
+        adjunto:        'fa-paperclip',
+        booleano:       'fa-toggle-on',
+        moneda:         'fa-dollar-sign',
+        porcentaje:     'fa-percent'
     };
 
     const tipoLabels = {
-        texto_corto: 'Texto corto',
-        multi_linea: 'Multi línea',
-        numero:      'Número',
-        imagen:      'Imagen',
-        fecha:       'Fecha',
-        seleccion:   'Selección'
+        texto_corto:    'Texto corto',
+        texto_largo:    'Texto largo',
+        numero:         'Número',
+        imagen:         'Imagen',
+        fecha:          'Fecha',
+        seleccion:      'Selección múltiple',
+        seleccion_unica:'Selección única',
+        adjunto:        'Adjunto',
+        booleano:       'Sí / No',
+        moneda:         'Moneda',
+        porcentaje:     'Porcentaje'
     };
 
     async function abrirBuilder(formId) {
@@ -684,16 +699,50 @@
     }
 
     function previsualizarCampo(campo) {
-        switch(campo.tipo) {
-            case 'texto_corto': return `<input type="text" placeholder="${campo.nombre}..." disabled style="width:100%;padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;">`;
-            case 'multi_linea': return `<textarea disabled placeholder="${campo.nombre}..." style="width:100%;padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;resize:none;height:40px;"></textarea>`;
-            case 'numero':      return `<input type="number" placeholder="0" disabled style="width:80px;padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;">`;
-            case 'fecha':       return `<input type="date" disabled style="padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;">`;
-            case 'imagen':      return `<span style="font-size:11px;color:#6b7280;"><i class="fas fa-image"></i> Campo de imagen</span>`;
-            case 'seleccion':
+        const baseInput = 'width:100%;padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;';
+        const baseSpan  = 'font-size:11px;color:#6b7280;';
+
+        switch (campo.tipo) {
+            case 'texto_corto':
+                return `<input type="text" placeholder="${campo.nombre}..." disabled style="${baseInput}">`;
+            case 'texto_largo':
+                return `<textarea disabled placeholder="${campo.nombre}..." style="${baseInput}resize:none;height:40px;"></textarea>`;
+            case 'numero':
+                return `<input type="number" placeholder="0" disabled style="width:80px;padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;">`;
+            case 'fecha':
+                return `<input type="date" disabled style="padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;">`;
+            case 'imagen':
+                return `<span style="${baseSpan}"><i class="fas fa-image"></i> Campo de imagen</span>`;
+            case 'seleccion': {
                 const opts = (campo.opciones || []).slice(0, 3).map(o => `<option>${o}</option>`).join('');
                 return `<select disabled style="padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;">${opts}</select>`;
-            default: return `<span style="font-size:11px;color:#6b7280;">${campo.tipo}</span>`;
+            }
+            case 'seleccion_unica': {
+                const radios = (campo.opciones || []).slice(0, 3).map(o =>
+                    `<label style="display:flex;align-items:center;gap:4px;font-size:11px;">
+                        <input type="radio" disabled> ${o}
+                    </label>`
+                ).join('');
+                return `<div style="display:flex;flex-direction:column;gap:2px;">${radios || '<span style="' + baseSpan + '">Sin opciones</span>'}</div>`;
+            }
+            case 'adjunto':
+                return `<span style="${baseSpan}"><i class="fas fa-paperclip"></i> Campo de adjunto</span>`;
+            case 'booleano':
+                return `<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:#6b7280;">
+                            <input type="checkbox" disabled> Sí / No
+                        </label>`;
+            case 'moneda':
+                return `<div style="display:flex;align-items:center;gap:4px;">
+                            <span style="font-size:11px;color:#6b7280;">$</span>
+                            <input type="number" placeholder="0.00" disabled style="width:80px;padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;">
+                        </div>`;
+            case 'porcentaje':
+                return `<div style="display:flex;align-items:center;gap:4px;">
+                            <input type="number" placeholder="0" min="0" max="100" disabled style="width:70px;padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;">
+                            <span style="font-size:11px;color:#6b7280;">%</span>
+                        </div>`;
+            default:
+                return `<span style="${baseSpan}">${campo.tipo}</span>`;
         }
     }
 
@@ -1186,9 +1235,9 @@
     function onTipoCampoChange() {
         const tipo = document.getElementById('campo-tipo').value;
         document.getElementById('campo-max-chars-group').style.display =
-            ['texto_corto', 'multi_linea'].includes(tipo) ? '' : 'none';
+            ['texto_corto', 'texto_largo'].includes(tipo) ? '' : 'none';
         document.getElementById('campo-opciones-group').style.display =
-            tipo === 'seleccion' ? '' : 'none';
+            ['seleccion', 'seleccion_unica'].includes(tipo) ? '' : 'none';
     }
 
     function agregarOpcion() {
