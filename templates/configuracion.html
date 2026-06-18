@@ -368,6 +368,15 @@
                         <h4 class="builder-panel-title">
                             <i class="fas fa-database"></i> Campos globales
                         </h4>
+                        <div style="padding: 0 0 10px 0;">
+                            <input
+                                type="text"
+                                id="builder-buscar-campo"
+                                class="input-busqueda"
+                                placeholder="Buscar campo global..."
+                                oninput="renderCamposDisponibles()"
+                            >
+                        </div>
                         <div id="campos-disponibles-list"></div>
                     </div>
 
@@ -480,6 +489,7 @@
         document.getElementById('vista-form-builder').style.display      = '';
         document.getElementById('builder-nombre').value      = '';
         document.getElementById('builder-descripcion').value = '';
+        document.getElementById('builder-buscar-campo').value = '';
 
         // Resetear paneles antes de cambiar tab
         document.getElementById('panel-disponibles').classList.remove('panel-oculto');
@@ -528,17 +538,31 @@
 
     function renderCamposDisponibles() {
         const lista = document.getElementById('campos-disponibles-list');
+
+        // ── Filtro de búsqueda ──
+        const q = (document.getElementById('builder-buscar-campo')?.value || '')
+                    .toLowerCase().trim();
+        const camposFiltrados = q
+            ? builderCamposGlobales.filter(c => c.nombre.toLowerCase().includes(q))
+            : builderCamposGlobales;
+        // ───────────────────────
+
         if (builderCamposGlobales.length === 0) {
             lista.innerHTML = '<p style="color:var(--gris-texto);font-size:13px;">No hay campos globales creados aún.</p>';
             return;
         }
+        if (camposFiltrados.length === 0) {
+            lista.innerHTML = '<p style="color:var(--gris-texto);font-size:13px;">No se encontraron campos.</p>';
+            return;
+        }
+
         lista.innerHTML = '';
-        builderCamposGlobales.forEach(campo => {
+        camposFiltrados.forEach(campo => {
             const div = document.createElement('div');
-            div.className   = 'campo-disponible';
-            div.draggable   = true;
-            div.dataset.id  = campo.id;
-            div.innerHTML   = `
+            div.className  = 'campo-disponible';
+            div.draggable  = true;
+            div.dataset.id = campo.id;
+            div.innerHTML  = `
                 <div class="campo-disp-info">
                     <div class="campo-disp-icon">
                         <i class="fas ${tipoIconos[campo.tipo] || 'fa-field'}"></i>
