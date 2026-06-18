@@ -2282,6 +2282,91 @@ def detalleContacto(id_contacto):
         return redirect(url_for('registros'))
 
 
+# ── Tipos de Proyecto ──────────────────────────────────────────
+
+@app.route('/api/tipos-proyecto', methods=['GET'])
+def obtener_tipos_proyecto():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT id, nombre, descripcion, campos
+                FROM tipos_proyecto
+                WHERE empresa_id = %s
+                ORDER BY created_at DESC
+            """, (session.get('empresa_id'),))
+            rows = cursor.fetchall()
+            tipos = [
+                {'id': r[0], 'nombre': r[1], 'descripcion': r[2], 'campos': r[3] or []}
+                for r in rows
+            ]
+            return jsonify({'tipos': tipos})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tipos-proyecto', methods=['POST'])
+def crear_tipo_proyecto():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        data        = request.get_json()
+        nombre      = data.get('nombre', '').strip()
+        descripcion = data.get('descripcion', '')
+        campos      = data.get('campos', [])
+
+        if not nombre:
+            return jsonify({'error': 'El nombre es obligatorio'}), 400
+
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                INSERT INTO tipos_proyecto (empresa_id, nombre, descripcion, campos)
+                VALUES (%s, %s, %s, %s)
+                RETURNING id
+            """, (session.get('empresa_id'), nombre, descripcion, json.dumps(campos)))
+            nuevo_id = cursor.fetchone()[0]
+            return jsonify({'success': True, 'id': nuevo_id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tipos-proyecto/<int:tipo_id>', methods=['PUT'])
+def actualizar_tipo_proyecto(tipo_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        data        = request.get_json()
+        nombre      = data.get('nombre', '').strip()
+        descripcion = data.get('descripcion', '')
+        campos      = data.get('campos', [])
+
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                UPDATE tipos_proyecto
+                SET nombre = %s, descripcion = %s, campos = %s
+                WHERE id = %s AND empresa_id = %s
+            """, (nombre, descripcion, json.dumps(campos), tipo_id, session.get('empresa_id')))
+            return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/tipos-proyecto/<int:tipo_id>', methods=['DELETE'])
+def eliminar_tipo_proyecto(tipo_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                DELETE FROM tipos_proyecto
+                WHERE id = %s AND empresa_id = %s
+            """, (tipo_id, session.get('empresa_id')))
+            return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/formContacto')
 def form_contacto():
     if 'user_id' not in session:

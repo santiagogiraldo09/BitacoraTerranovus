@@ -41,6 +41,10 @@
                 <i class="fas fa-file-alt"></i>
                 <span>Formularios</span>
             </button>
+            <button class="sidebar-nav-item" id="nav-proyectos" onclick="mostrarSeccion('proyectos')">
+                <i class="fas fa-layer-group"></i>
+                <span>Proyectos</span>
+            </button>
         </nav>
         <div class="sidebar-footer">
             <div class="sidebar-user">
@@ -404,6 +408,101 @@
                 </div>
             </div>
         </div>
+        <!-- ── SECCIÓN: PROYECTOS ── -->
+        <div id="seccion-proyectos" class="cfg-seccion" style="display:none;">
+
+            <!-- Lista de tipos de proyecto -->
+            <div id="vista-lista-proyectos">
+                <div class="cfg-card">
+                    <div class="cfg-card-title">
+                        <i class="fas fa-layer-group cfg-icon-orange"></i>
+                        <span>Tipos de Proyecto</span>
+                    </div>
+                    <p class="cfg-card-subtitle">Crea y gestiona plantillas de proyecto con campos personalizados.</p>
+
+                    <div class="buscador-seccion">
+                        <i class="fas fa-search buscador-icon"></i>
+                        <input type="text" id="buscar-tipos-proyecto" class="buscador-input"
+                            placeholder="Buscar tipo de proyecto..."
+                            oninput="filtrarTiposProyecto(this.value)">
+                    </div>
+
+                    <div id="lista-tipos-proyecto"></div>
+                    <button class="btn-nuevo-campo" onclick="abrirBuilderProyecto(null)">
+                        <i class="fas fa-plus"></i> Nuevo tipo de proyecto
+                    </button>
+                </div>
+            </div>
+
+            <!-- Builder de tipo de proyecto -->
+            <div id="vista-proyecto-builder" style="display:none;">
+
+                <!-- Header -->
+                <div class="builder-header">
+                    <button class="btn-back" onclick="cerrarBuilderProyecto()">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <input type="text" id="proyecto-builder-nombre"
+                        class="builder-nombre-input"
+                        placeholder="Nombre del tipo de proyecto *">
+                    <button class="btn-guardar-form" onclick="guardarTipoProyecto()">
+                        <i class="fas fa-save"></i> <span>Guardar</span>
+                    </button>
+                </div>
+
+                <!-- Descripción -->
+                <div class="builder-desc-row">
+                    <input type="text" id="proyecto-builder-descripcion"
+                        class="field-input"
+                        placeholder="Descripción opcional...">
+                </div>
+
+                <!-- Tabs móvil -->
+                <div class="builder-tabs">
+                    <button class="builder-tab active" id="tab-proyecto-disponibles"
+                            onclick="cambiarTabProyecto('disponibles')">
+                        Campos disponibles
+                    </button>
+                    <button class="builder-tab" id="tab-proyecto-canvas"
+                            onclick="cambiarTabProyecto('canvas')">
+                        Mi tipo de proyecto (<span id="contador-campos-proyecto">0</span>)
+                    </button>
+                </div>
+
+                <!-- Layout dos columnas -->
+                <div class="builder-layout">
+
+                    <!-- Panel izquierdo: campos disponibles -->
+                    <div class="builder-panel" id="panel-proyecto-disponibles">
+                        <h4 class="builder-panel-title">
+                            <i class="fas fa-database"></i> Campos de proyecto
+                        </h4>
+                        <div style="padding: 0 0 10px 0;">
+                            <input type="text"
+                                id="proyecto-buscar-campo"
+                                class="input-busqueda"
+                                placeholder="Buscar campo..."
+                                oninput="renderCamposDisponiblesProyecto()">
+                        </div>
+                        <div id="campos-proyecto-disponibles-list"></div>
+                    </div>
+
+                    <!-- Panel derecho: canvas -->
+                    <div class="builder-panel" id="panel-proyecto-canvas">
+                        <h4 class="builder-panel-title">
+                            <i class="fas fa-eye"></i> Vista previa
+                        </h4>
+                        <div id="canvas-proyecto">
+                            <div class="canvas-empty" id="canvas-proyecto-empty">
+                                <i class="fas fa-hand-point-left"></i>
+                                <p>Agrega campos desde el panel izquierdo</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
 
     </main>
 </div>
@@ -425,6 +524,10 @@
     <button class="nav-item" id="bnav-formularios" onclick="mostrarSeccion('formularios')">
         <i class="fas fa-file-alt"></i>
         <span>Formularios</span>
+    </button>
+    <button class="nav-item" id="bnav-proyectos" onclick="mostrarSeccion('proyectos')">
+        <i class="fas fa-layer-group"></i>
+        <span>Proyectos</span>
     </button>
 </nav>
 
@@ -457,12 +560,13 @@
 
 <script>
 
-    const secciones = ['identidad', 'usuarios', 'campos', 'formularios'];
+    const secciones = ['identidad', 'usuarios', 'campos', 'formularios', 'proyectos'];
     const titulos   = {
         'identidad':   'Identidad Visual',
         'usuarios':    'Gestión de Usuarios',
         'campos':      'Gestión de Campos',
-        'formularios': 'Formularios'
+        'formularios': 'Formularios',
+        'proyectos':   'Proyectos'
     };
 
     // ── Form Builder ──
@@ -470,6 +574,303 @@
     let builderCamposForm     = [];
     let builderFormId         = null;
     let dragSrcIndex          = null;
+
+    // ── Builder de Tipos de Proyecto ──
+    let proyectoCamposGlobales = [];
+    let proyectoCamposForm     = [];
+    let proyectoBuilderFormId  = null;
+    let proyectoDragSrcIndex   = null;
+
+    async function abrirBuilderProyecto(tipoId) {
+        proyectoBuilderFormId = tipoId;
+        proyectoCamposForm    = [];
+
+        document.getElementById('vista-lista-proyectos').style.display    = 'none';
+        document.getElementById('vista-proyecto-builder').style.display   = '';
+        document.getElementById('proyecto-builder-nombre').value          = '';
+        document.getElementById('proyecto-builder-descripcion').value     = '';
+        document.getElementById('proyecto-buscar-campo').value            = '';
+        cambiarTabProyecto('disponibles');
+
+        // Cargar solo campos de objeto 'proyecto'
+        try {
+            const res  = await fetch('/api/campos-globales?objeto=proyecto');
+            const data = await res.json();
+            proyectoCamposGlobales = data.campos || [];
+        } catch { proyectoCamposGlobales = []; }
+
+        // Si es edición cargar datos existentes
+        if (tipoId) {
+            try {
+                const res  = await fetch('/api/tipos-proyecto');
+                const data = await res.json();
+                const tipo = (data.tipos || []).find(t => t.id === tipoId);
+                if (tipo) {
+                    document.getElementById('proyecto-builder-nombre').value      = tipo.nombre;
+                    document.getElementById('proyecto-builder-descripcion').value = tipo.descripcion || '';
+                    proyectoCamposForm = tipo.campos.map(item => {
+                        const id        = typeof item === 'object' ? item.id : item;
+                        const requerido = typeof item === 'object' ? (item.requerido || false) : false;
+                        const campo     = proyectoCamposGlobales.find(c => c.id === id);
+                        return campo ? { ...campo, requerido } : null;
+                    }).filter(Boolean);
+                }
+            } catch {}
+        }
+
+        renderCamposDisponiblesProyecto();
+        renderCanvasProyecto();
+    }
+
+    function cerrarBuilderProyecto() {
+        document.getElementById('vista-proyecto-builder').style.display = 'none';
+        document.getElementById('vista-lista-proyectos').style.display  = '';
+        cargarTiposProyecto();
+    }
+
+    function cambiarTabProyecto(tab) {
+        document.getElementById('tab-proyecto-disponibles').classList.toggle('active', tab === 'disponibles');
+        document.getElementById('tab-proyecto-canvas').classList.toggle('active', tab === 'canvas');
+        document.getElementById('panel-proyecto-disponibles').style.display = tab === 'disponibles' ? '' : 'none';
+        document.getElementById('panel-proyecto-canvas').style.display      = tab === 'canvas'      ? '' : 'none';
+    }
+
+    function renderCamposDisponiblesProyecto() {
+        const lista = document.getElementById('campos-proyecto-disponibles-list');
+        const q     = (document.getElementById('proyecto-buscar-campo')?.value || '').toLowerCase().trim();
+        const filtrados = q
+            ? proyectoCamposGlobales.filter(c => c.nombre.toLowerCase().includes(q))
+            : proyectoCamposGlobales;
+
+        if (proyectoCamposGlobales.length === 0) {
+            lista.innerHTML = '<p style="color:var(--gris-texto);font-size:13px;">No hay campos de proyecto creados aún.</p>';
+            return;
+        }
+        if (filtrados.length === 0) {
+            lista.innerHTML = '<p style="color:var(--gris-texto);font-size:13px;">No se encontraron campos.</p>';
+            return;
+        }
+
+        lista.innerHTML = '';
+        filtrados.forEach(campo => {
+            const div = document.createElement('div');
+            div.className  = 'campo-disponible';
+            div.draggable  = true;
+            div.dataset.id = campo.id;
+            div.innerHTML  = `
+                <div class="campo-disp-info">
+                    <div class="campo-disp-icon">
+                        <i class="fas ${tipoIconos[campo.tipo] || 'fa-field'}"></i>
+                    </div>
+                    <div>
+                        <div class="campo-disp-nombre">${campo.nombre}</div>
+                        <div class="campo-disp-tipo">${tipoLabels[campo.tipo] || campo.tipo}</div>
+                    </div>
+                </div>
+                <button class="btn-agregar-campo" onclick="agregarCampoAlProyecto(${campo.id})" title="Agregar">
+                    <i class="fas fa-plus"></i>
+                </button>`;
+
+            div.addEventListener('dragstart', () => {
+                div.classList.add('dragging');
+                div.dataset.origen = 'disponibles-proyecto';
+            });
+            div.addEventListener('dragend', () => div.classList.remove('dragging'));
+            lista.appendChild(div);
+        });
+    }
+
+    function agregarCampoAlProyecto(campoId) {
+        const campo = proyectoCamposGlobales.find(c => c.id === campoId);
+        if (!campo) return;
+        if (proyectoCamposForm.find(c => c.id === campoId)) {
+            mostrarToast('⚠️ Este campo ya está en el tipo de proyecto');
+            return;
+        }
+        proyectoCamposForm.push({ ...campo, requerido: false });
+        renderCanvasProyecto();
+        if (window.innerWidth <= 768) cambiarTabProyecto('canvas');
+        mostrarToast('✅ Campo agregado');
+    }
+
+    function toggleRequeridoProyecto(idx) {
+        proyectoCamposForm[idx].requerido = !proyectoCamposForm[idx].requerido;
+        renderCanvasProyecto();
+    }
+
+    function moverCampoProyecto(idx, dir) {
+        const nuevo = idx + dir;
+        if (nuevo < 0 || nuevo >= proyectoCamposForm.length) return;
+        [proyectoCamposForm[idx], proyectoCamposForm[nuevo]] = [proyectoCamposForm[nuevo], proyectoCamposForm[idx]];
+        renderCanvasProyecto();
+    }
+
+    function quitarCampoProyecto(idx) {
+        proyectoCamposForm.splice(idx, 1);
+        renderCanvasProyecto();
+    }
+
+    function renderCanvasProyecto() {
+        const canvas   = document.getElementById('canvas-proyecto');
+        const empty    = document.getElementById('canvas-proyecto-empty');
+        const contador = document.getElementById('contador-campos-proyecto');
+        contador.textContent = proyectoCamposForm.length;
+
+        if (proyectoCamposForm.length === 0) {
+            canvas.innerHTML = '';
+            canvas.appendChild(empty);
+            empty.style.display = 'flex';
+            return;
+        }
+
+        empty.style.display = 'none';
+        Array.from(canvas.children).forEach(c => { if (c !== empty) c.remove(); });
+
+        proyectoCamposForm.forEach((campo, idx) => {
+            const div = document.createElement('div');
+            div.className     = 'canvas-campo';
+            div.draggable     = true;
+            div.dataset.index = idx;
+
+            const preview   = previsualizarCampo(campo);
+            const requerido = campo.requerido || false;
+
+            div.innerHTML = `
+                <i class="fas fa-grip-vertical canvas-campo-handle"></i>
+                <div class="canvas-campo-info">
+                    <span class="canvas-campo-nombre">${campo.nombre}${requerido ? ' *' : ''}</span>
+                    <span class="canvas-campo-preview">${preview}</span>
+                </div>
+                <div class="canvas-campo-actions">
+                    <button class="icon-btn ${requerido ? 'active-required' : ''}"
+                            onclick="toggleRequeridoProyecto(${idx})"
+                            title="${requerido ? 'Obligatorio (clic para quitar)' : 'Marcar como obligatorio'}">
+                        <i class="fas fa-asterisk"></i>
+                    </button>
+                    <button class="icon-btn" onclick="moverCampoProyecto(${idx}, -1)" title="Subir"
+                            ${idx === 0 ? 'disabled' : ''}>
+                        <i class="fas fa-chevron-up"></i>
+                    </button>
+                    <button class="icon-btn" onclick="moverCampoProyecto(${idx}, 1)" title="Bajar"
+                            ${idx === proyectoCamposForm.length - 1 ? 'disabled' : ''}>
+                        <i class="fas fa-chevron-down"></i>
+                    </button>
+                    <button class="icon-btn danger" onclick="quitarCampoProyecto(${idx})" title="Quitar">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>`;
+
+            div.addEventListener('dragstart', () => { proyectoDragSrcIndex = idx; });
+            div.addEventListener('dragover',  (e) => { e.preventDefault(); div.classList.add('drag-over-campo'); });
+            div.addEventListener('dragleave', () => div.classList.remove('drag-over-campo'));
+            div.addEventListener('drop', (e) => {
+                e.preventDefault();
+                div.classList.remove('drag-over-campo');
+                if (proyectoDragSrcIndex === null || proyectoDragSrcIndex === idx) return;
+                const moved = proyectoCamposForm.splice(proyectoDragSrcIndex, 1)[0];
+                proyectoCamposForm.splice(idx, 0, moved);
+                proyectoDragSrcIndex = null;
+                renderCanvasProyecto();
+            });
+
+            canvas.appendChild(div);
+        });
+
+        canvas.addEventListener('dragover', (e) => e.preventDefault());
+        canvas.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const campoId = parseInt(e.dataTransfer?.getData('text') || 0);
+            if (campoId) agregarCampoAlProyecto(campoId);
+        });
+    }
+
+    async function cargarTiposProyecto() {
+        const lista = document.getElementById('lista-tipos-proyecto');
+        if (!lista) return;
+        try {
+            const res  = await fetch('/api/tipos-proyecto');
+            const data = await res.json();
+            if (!data.tipos || data.tipos.length === 0) {
+                lista.innerHTML = '<p style="color:var(--gris-texto);font-size:13px;">Aún no hay tipos de proyecto creados.</p>';
+                return;
+            }
+            lista.innerHTML = '';
+            data.tipos.forEach(tipo => {
+                const div = document.createElement('div');
+                div.className = 'form-item';
+                div.innerHTML = `
+                    <div class="form-item-info">
+                        <span class="form-item-nombre">${tipo.nombre}</span>
+                        <span class="form-item-meta">${tipo.campos?.length || 0} campos${tipo.descripcion ? ' · ' + tipo.descripcion : ''}</span>
+                    </div>
+                    <div class="form-item-actions">
+                        <button class="icon-btn" onclick="abrirBuilderProyecto(${tipo.id})" title="Editar">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                        <button class="icon-btn danger" onclick="eliminarTipoProyecto(${tipo.id})" title="Eliminar">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>`;
+                lista.appendChild(div);
+            });
+        } catch {
+            lista.innerHTML = '<p style="color:var(--gris-texto);">Error al cargar tipos de proyecto.</p>';
+        }
+    }
+
+    function filtrarTiposProyecto(q) {
+        const items = document.querySelectorAll('#lista-tipos-proyecto .form-item');
+        const txt   = q.toLowerCase();
+        items.forEach(item => {
+            const nombre = item.querySelector('.form-item-nombre')?.textContent.toLowerCase() || '';
+            item.style.display = nombre.includes(txt) ? '' : 'none';
+        });
+    }
+
+    async function guardarTipoProyecto() {
+        const nombre      = document.getElementById('proyecto-builder-nombre').value.trim();
+        const descripcion = document.getElementById('proyecto-builder-descripcion').value.trim();
+
+        if (!nombre) {
+            mostrarToast('⚠️ El nombre es obligatorio');
+            return;
+        }
+
+        const campos = proyectoCamposForm.map(c => ({ id: c.id, requerido: c.requerido || false }));
+
+        try {
+            const url    = proyectoBuilderFormId ? `/api/tipos-proyecto/${proyectoBuilderFormId}` : '/api/tipos-proyecto';
+            const method = proyectoBuilderFormId ? 'PUT' : 'POST';
+            const res    = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ nombre, descripcion, campos })
+            });
+            const data = await res.json();
+            if (data.success) {
+                cerrarBuilderProyecto();
+                mostrarToast('✅ Tipo de proyecto guardado');
+            } else {
+                mostrarToast('❌ ' + (data.error || 'Error al guardar'));
+            }
+        } catch {
+            mostrarToast('❌ Error de conexión');
+        }
+    }
+
+    async function eliminarTipoProyecto(id) {
+        if (!confirm('¿Eliminar este tipo de proyecto?')) return;
+        try {
+            const res  = await fetch(`/api/tipos-proyecto/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                cargarTiposProyecto();
+                mostrarToast('✅ Tipo de proyecto eliminado');
+            }
+        } catch {
+            mostrarToast('❌ Error al eliminar');
+        }
+    }
 
     const tipoIconos = {
         texto_corto:    'fa-font',
@@ -934,6 +1335,10 @@
 
         //Cargar Formulario
         cargarFormularios();
+
+
+        //Cargar Tipos de Proyecto
+        cargarTiposProyecto();
     });
 
     // Subir logo nuevo
