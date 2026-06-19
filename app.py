@@ -455,6 +455,89 @@ def generar_slug(nombre_empresa):
     slug = re.sub(r'\s+', '-', slug.strip())
     return slug
  
+
+# ── Formulario Lote: GET ────────────────────────────────────────
+@app.route('/formulario-lote')
+def formulario_lote():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    project_id = request.args.get('project_id')
+    if not project_id:
+        return redirect(url_for('registros'))
+
+    color_primario   = '#FFAF33'
+    color_secundario = '#E3E3E3'
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT color_primario, color_secundario
+                FROM empresas WHERE id = %s
+            """, (session.get('empresa_id'),))
+            row = cursor.fetchone()
+            if row:
+                color_primario   = row[0] or '#FFAF33'
+                color_secundario = row[1] or '#E3E3E3'
+    except Exception as e:
+        print(f"Error en formulario-lote GET: {e}")
+
+    return render_template('formLote.html',
+                           project_id=project_id,
+                           color_primario=color_primario,
+                           color_secundario=color_secundario)
+
+
+# ── Formulario Lote: POST ───────────────────────────────────────
+@app.route('/api/registros-lote', methods=['POST'])
+def crear_registro_lote():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    try:
+        data = request.get_json()
+
+        campos_requeridos = [
+            'project_id', 'fecha_produccion', 'turno', 'planta_linea',
+            'orden_produccion', 'codigo_producto', 'numero_lote',
+            'cantidad_programada', 'cantidad_real_producida',
+            'responsable_produccion', 'supervisor'
+        ]
+        for campo in campos_requeridos:
+            if not data.get(campo):
+                return jsonify({'error': f'El campo {campo} es obligatorio'}), 400
+
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                INSERT INTO registros_lote (
+                    proyecto_id, empresa_id, user_id,
+                    fecha_produccion, turno, planta_linea,
+                    orden_produccion, codigo_producto, numero_lote,
+                    cantidad_programada, cantidad_real_producida,
+                    responsable_produccion, supervisor
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (
+                data['project_id'],
+                session.get('empresa_id'),
+                session['user_id'],
+                data['fecha_produccion'],
+                data['turno'],
+                data['planta_linea'],
+                data['orden_produccion'],
+                data['codigo_producto'],
+                data['numero_lote'],
+                data['cantidad_programada'],
+                data['cantidad_real_producida'],
+                data['responsable_produccion'],
+                data['supervisor']
+            ))
+            nuevo_id = cursor.fetchone()[0]
+            return jsonify({'success': True, 'id': nuevo_id})
+
+    except Exception as e:
+        print(f"Error en registro lote: {e}")
+        return jsonify({'error': str(e)}), 500
+
  
 # ── Ruta GET: mostrar formulario ────────────────────────────────
 @app.route('/registroEmpresa', methods=['GET'])

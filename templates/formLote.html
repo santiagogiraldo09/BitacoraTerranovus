@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Información General del Lote</title>
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Estilos -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='formLote.css') }}">
+
+    <script>
+        // Aplicar color primario dinámico
+        (function() {
+            const p = "{{ color_primario | default('#FFAF33') }}";
+            document.documentElement.style.setProperty('--naranja', p);
+        })();
+    </script>
+</head>
+<body>
+
+    <input type="hidden" id="project-id" value="{{ project_id }}">
+
+    <!-- ── Header ────────────────────────────────────── -->
+    <header class="form-header">
+        <button class="btn-volver" onclick="window.history.back()" title="Volver">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <h1>Información General del Lote</h1>
+    </header>
+
+    <!-- ── Contenido ─────────────────────────────────── -->
+    <main class="form-container">
+
+        <!-- Sección 1: Identificación del lote -->
+        <div class="form-section">
+            <div class="section-title">
+                <div class="section-icon">
+                    <i class="fas fa-tag"></i>
+                </div>
+                <h2>Identificación</h2>
+            </div>
+
+            <!-- Fecha de producción -->
+            <div class="field-group">
+                <label class="field-label">
+                    Fecha de producción <span class="required">*</span>
+                </label>
+                <input type="date" id="fecha-produccion" class="field-input" required>
+            </div>
+
+            <!-- Turno -->
+            <div class="field-group">
+                <label class="field-label">
+                    Turno <span class="required">*</span>
+                </label>
+                <select id="turno" class="field-select" required>
+                    <option value="">Selecciona un turno</option>
+                    <option value="Mañana">Mañana</option>
+                    <option value="Tarde">Tarde</option>
+                    <option value="Noche">Noche</option>
+                </select>
+            </div>
+
+            <!-- Planta / línea de producción -->
+            <div class="field-group">
+                <label class="field-label">
+                    Planta / línea de producción <span class="required">*</span>
+                </label>
+                <select id="planta-linea" class="field-select" required>
+                    <option value="">Selecciona una línea</option>
+                    <option value="Línea de concentrados">Línea de concentrados</option>
+                    <option value="Premezclas">Premezclas</option>
+                    <option value="Molienda">Molienda</option>
+                    <option value="Peletizado">Peletizado</option>
+                </select>
+            </div>
+
+            <!-- Orden de producción -->
+            <div class="field-group">
+                <label class="field-label">
+                    Orden de producción <span class="required">*</span>
+                </label>
+                <div class="input-with-mic">
+                    <input type="text" id="orden-produccion" class="field-input"
+                        placeholder="Código interno de la orden">
+                    <button type="button" class="mic-button" data-target="orden-produccion" title="Dictar por voz">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Código del producto -->
+            <div class="field-group">
+                <label class="field-label">
+                    Código del producto <span class="required">*</span>
+                </label>
+                <div class="input-with-mic">
+                    <input type="text" id="codigo-producto" class="field-input"
+                        placeholder="Referencia o SKU">
+                    <button type="button" class="mic-button" data-target="codigo-producto" title="Dictar por voz">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Número de lote -->
+            <div class="field-group">
+                <label class="field-label">
+                    Número de lote <span class="required">*</span>
+                </label>
+                <div class="input-with-mic">
+                    <input type="text" id="numero-lote" class="field-input"
+                        placeholder="Código único de trazabilidad">
+                    <button type="button" class="mic-button" data-target="numero-lote" title="Dictar por voz">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección 2: Producción -->
+        <div class="form-section">
+            <div class="section-title">
+                <div class="section-icon">
+                    <i class="fas fa-industry"></i>
+                </div>
+                <h2>Producción</h2>
+            </div>
+
+            <!-- Cantidad programada & Cantidad real (en fila) -->
+            <div class="fields-row">
+                <div class="field-group">
+                    <label class="field-label">
+                        Cantidad programada <span class="required">*</span>
+                    </label>
+                    <input type="number" id="cantidad-programada" class="field-input"
+                        placeholder="0" min="0" step="any">
+                </div>
+                <div class="field-group">
+                    <label class="field-label">
+                        Cantidad real producida <span class="required">*</span>
+                    </label>
+                    <input type="number" id="cantidad-real" class="field-input"
+                        placeholder="0" min="0" step="any">
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección 3: Responsables -->
+        <div class="form-section">
+            <div class="section-title">
+                <div class="section-icon">
+                    <i class="fas fa-user-tie"></i>
+                </div>
+                <h2>Responsables</h2>
+            </div>
+
+            <!-- Responsable de producción -->
+            <div class="field-group">
+                <label class="field-label">
+                    Responsable de producción <span class="required">*</span>
+                </label>
+                <div class="input-with-mic">
+                    <input type="text" id="responsable-produccion" class="field-input"
+                        placeholder="Operario o líder encargado">
+                    <button type="button" class="mic-button" data-target="responsable-produccion" title="Dictar por voz">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Supervisor -->
+            <div class="field-group">
+                <label class="field-label">
+                    Supervisor <span class="required">*</span>
+                </label>
+                <div class="input-with-mic">
+                    <input type="text" id="supervisor" class="field-input"
+                        placeholder="Persona que valida el registro">
+                    <button type="button" class="mic-button" data-target="supervisor" title="Dictar por voz">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ── Footer fijo con botón guardar ─────────────── -->
+    <footer class="form-footer">
+        <button class="btn-guardar" id="btn-guardar" onclick="guardarLote()">
+            <i class="fas fa-save"></i> Guardar registro
+        </button>
+    </footer>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <!-- ── JavaScript ────────────────────────────────── -->
+    <script>
+        // ── Toast ──
+        function mostrarToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 2500);
+        }
+
+        // ── Voz: Azure Speech SDK vía /transcribe-audio ──
+        let mediaRecorder = null;
+        let audioChunks   = [];
+
+        document.querySelectorAll('.mic-button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const targetId = btn.dataset.target;
+                const input    = document.getElementById(targetId);
+                if (!input) return;
+
+                if (btn.classList.contains('recording')) {
+                    // Detener grabación
+                    if (mediaRecorder && mediaRecorder.state === 'recording') {
+                        mediaRecorder.stop();
+                    }
+                    return;
+                }
+
+                // Iniciar grabación
+                navigator.mediaDevices.getUserMedia({ audio: true })
+                    .then(stream => {
+                        audioChunks   = [];
+                        mediaRecorder = new MediaRecorder(stream);
+                        btn.classList.add('recording');
+                        btn.querySelector('i').className = 'fas fa-stop';
+
+                        mediaRecorder.ondataavailable = e => {
+                            if (e.data.size > 0) audioChunks.push(e.data);
+                        };
+
+                        mediaRecorder.onstop = async () => {
+                            btn.classList.remove('recording');
+                            btn.querySelector('i').className = 'fas fa-microphone';
+                            stream.getTracks().forEach(t => t.stop());
+
+                            const blob     = new Blob(audioChunks, { type: 'audio/webm' });
+                            const formData = new FormData();
+                            formData.append('audio', blob, 'audio.webm');
+
+                            try {
+                                btn.disabled = true;
+                                btn.querySelector('i').className = 'fas fa-spinner fa-spin';
+                                const res  = await fetch('/transcribe-audio', { method: 'POST', body: formData });
+                                const data = await res.json();
+                                if (data.text) {
+                                    input.value = input.value
+                                        ? input.value + ' ' + data.text
+                                        : data.text;
+                                    mostrarToast('✅ Texto transcrito');
+                                } else {
+                                    mostrarToast('⚠️ No se detectó audio');
+                                }
+                            } catch {
+                                mostrarToast('❌ Error al transcribir');
+                            } finally {
+                                btn.disabled = false;
+                                btn.querySelector('i').className = 'fas fa-microphone';
+                            }
+                        };
+
+                        mediaRecorder.start();
+                    })
+                    .catch(() => mostrarToast('❌ No se pudo acceder al micrófono'));
+            });
+        });
+
+        // ── Fecha por defecto: hoy ──
+        (function() {
+            const hoy   = new Date();
+            const yyyy  = hoy.getFullYear();
+            const mm    = String(hoy.getMonth() + 1).padStart(2, '0');
+            const dd    = String(hoy.getDate()).padStart(2, '0');
+            document.getElementById('fecha-produccion').value = `${yyyy}-${mm}-${dd}`;
+        })();
+
+        // ── Guardar ──
+        async function guardarLote() {
+            const campos = {
+                project_id:              document.getElementById('project-id').value,
+                fecha_produccion:        document.getElementById('fecha-produccion').value,
+                turno:                   document.getElementById('turno').value,
+                planta_linea:            document.getElementById('planta-linea').value,
+                orden_produccion:        document.getElementById('orden-produccion').value.trim(),
+                codigo_producto:         document.getElementById('codigo-producto').value.trim(),
+                numero_lote:             document.getElementById('numero-lote').value.trim(),
+                cantidad_programada:     document.getElementById('cantidad-programada').value,
+                cantidad_real_producida: document.getElementById('cantidad-real').value,
+                responsable_produccion:  document.getElementById('responsable-produccion').value.trim(),
+                supervisor:              document.getElementById('supervisor').value.trim()
+            };
+
+            // Validación
+            const faltantes = [];
+            if (!campos.fecha_produccion)        faltantes.push('Fecha de producción');
+            if (!campos.turno)                   faltantes.push('Turno');
+            if (!campos.planta_linea)            faltantes.push('Planta / línea');
+            if (!campos.orden_produccion)        faltantes.push('Orden de producción');
+            if (!campos.codigo_producto)         faltantes.push('Código del producto');
+            if (!campos.numero_lote)             faltantes.push('Número de lote');
+            if (!campos.cantidad_programada)     faltantes.push('Cantidad programada');
+            if (!campos.cantidad_real_producida) faltantes.push('Cantidad real producida');
+            if (!campos.responsable_produccion)  faltantes.push('Responsable de producción');
+            if (!campos.supervisor)              faltantes.push('Supervisor');
+
+            if (faltantes.length > 0) {
+                mostrarToast(`⚠️ Completa: ${faltantes[0]}`);
+                return;
+            }
+
+            const btn = document.getElementById('btn-guardar');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+
+            try {
+                const res = await fetch('/api/registros-lote', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify(campos)
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    mostrarToast('✅ Registro guardado correctamente');
+                    setTimeout(() => window.history.back(), 1200);
+                } else {
+                    mostrarToast('❌ ' + (data.error || 'Error al guardar'));
+                }
+            } catch {
+                mostrarToast('❌ Error de conexión');
+            } finally {
+                btn.disabled  = false;
+                btn.innerHTML = '<i class="fas fa-save"></i> Guardar registro';
+            }
+        }
+    </script>
+
+</body>
+</html>

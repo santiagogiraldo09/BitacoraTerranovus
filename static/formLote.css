@@ -1,0 +1,322 @@
+/* ── Reset & Base ─────────────────────────────────── */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+    --naranja: #FFAF33;
+    --naranja-hover: #e69a1e;
+    --fondo: #f3f4f6;
+    --blanco: #ffffff;
+    --texto: #1f2937;
+    --gris-texto: #6b7280;
+    --borde: #e5e7eb;
+    --verde: #22c55e;
+    --rojo: #ef4444;
+    --radius: 10px;
+    --sombra: 0 1px 3px rgba(0,0,0,0.06);
+}
+
+body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--fondo);
+    color: var(--texto);
+    min-height: 100vh;
+}
+
+/* ── Header ──────────────────────────────────────── */
+.form-header {
+    background: var(--blanco);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 1px solid var(--borde);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.btn-volver {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: var(--fondo);
+    color: var(--texto);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.btn-volver:hover {
+    background: var(--borde);
+}
+
+.form-header h1 {
+    font-family: 'Sora', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--texto);
+}
+
+/* ── Contenedor principal ────────────────────────── */
+.form-container {
+    max-width: 720px;
+    margin: 24px auto;
+    padding: 0 16px 100px;
+}
+
+/* ── Sección / Card ──────────────────────────────── */
+.form-section {
+    background: var(--blanco);
+    border-radius: var(--radius);
+    box-shadow: var(--sombra);
+    padding: 24px;
+    margin-bottom: 20px;
+}
+
+.section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--borde);
+}
+
+.section-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #FFF5E0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--naranja);
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.section-title h2 {
+    font-family: 'Sora', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--texto);
+}
+
+/* ── Campos del formulario ───────────────────────── */
+.field-group {
+    margin-bottom: 18px;
+}
+
+.field-group:last-child {
+    margin-bottom: 0;
+}
+
+.field-label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--texto);
+    margin-bottom: 6px;
+}
+
+.field-label .required {
+    color: var(--rojo);
+    margin-left: 2px;
+}
+
+.input-with-mic {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.input-with-mic.textarea-wrapper {
+    align-items: flex-start;
+}
+
+.field-input {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1.5px solid var(--borde);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--texto);
+    background: var(--blanco);
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+}
+
+.field-input:focus {
+    border-color: var(--naranja);
+}
+
+.field-input::placeholder {
+    color: #c5c8cd;
+}
+
+.field-select {
+    flex: 1;
+    padding: 10px 14px;
+    border: 1.5px solid var(--borde);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--texto);
+    background: var(--blanco);
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+}
+
+.field-select:focus {
+    border-color: var(--naranja);
+}
+
+/* ── Botón micrófono ─────────────────────────────── */
+.mic-button {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    border-radius: 50%;
+    background: var(--fondo);
+    border: 1.5px solid var(--borde);
+    color: var(--naranja);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    padding: 0;
+}
+
+.mic-button:hover {
+    background: #FFF5E0;
+    border-color: var(--naranja);
+}
+
+.mic-button.recording {
+    background: var(--rojo);
+    border-color: var(--rojo);
+    color: var(--blanco);
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+}
+
+/* ── Campos numéricos en fila ────────────────────── */
+.fields-row {
+    display: flex;
+    gap: 16px;
+}
+
+.fields-row .field-group {
+    flex: 1;
+}
+
+/* ── Botón guardar (footer fijo) ─────────────────── */
+.form-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--blanco);
+    border-top: 1px solid var(--borde);
+    padding: 14px 20px;
+    display: flex;
+    justify-content: center;
+    z-index: 100;
+}
+
+.btn-guardar {
+    background: var(--naranja);
+    color: var(--blanco);
+    border: none;
+    border-radius: 8px;
+    padding: 12px 40px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: background 0.2s;
+    max-width: 720px;
+    width: 100%;
+    justify-content: center;
+}
+
+.btn-guardar:hover {
+    background: var(--naranja-hover);
+}
+
+.btn-guardar:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* ── Toast ───────────────────────────────────────── */
+.toast {
+    position: fixed;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #1f2937;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    opacity: 0;
+    transition: all 0.3s;
+    z-index: 200;
+    pointer-events: none;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+/* ── Responsive ──────────────────────────────────── */
+@media (max-width: 768px) {
+    .form-header h1 {
+        font-size: 16px;
+    }
+
+    .form-container {
+        margin: 16px auto;
+        padding: 0 12px 100px;
+    }
+
+    .form-section {
+        padding: 18px 16px;
+    }
+
+    .fields-row {
+        flex-direction: column;
+        gap: 0;
+    }
+
+    .btn-guardar {
+        padding: 12px 24px;
+    }
+}
