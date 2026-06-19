@@ -1672,25 +1672,25 @@ def create_synchro_form():
 
 # Obtener campos globales de la empresa
 @app.route('/api/campos-globales', methods=['GET'])
-def get_campos_globales():
+def obtener_campos_globales():
     if 'user_id' not in session:
         return jsonify({'error': 'No autorizado'}), 401
     try:
-        objeto = request.args.get('objeto')  # opcional
+        objeto = request.args.get('objeto')
         with db_connection() as (conn, cursor):
             if objeto:
                 cursor.execute("""
-                    SELECT id, nombre, tipo, objeto, opciones, configuracion
+                    SELECT id, nombre, tipo, objeto, opciones, configuracion, es_sistema
                     FROM campos_globales
                     WHERE empresa_id = %s AND objeto = %s
-                    ORDER BY created_at DESC
+                    ORDER BY es_sistema DESC, created_at DESC
                 """, (session.get('empresa_id'), objeto))
             else:
                 cursor.execute("""
-                    SELECT id, nombre, tipo, objeto, opciones, configuracion
+                    SELECT id, nombre, tipo, objeto, opciones, configuracion, es_sistema
                     FROM campos_globales
                     WHERE empresa_id = %s
-                    ORDER BY created_at DESC
+                    ORDER BY es_sistema DESC, created_at DESC
                 """, (session.get('empresa_id'),))
             rows = cursor.fetchall()
             campos = [
@@ -1700,7 +1700,8 @@ def get_campos_globales():
                     'tipo':          r[2],
                     'objeto':        r[3],
                     'opciones':      r[4] or [],
-                    'configuracion': r[5] or {}
+                    'configuracion': r[5] or {},
+                    'es_sistema':    r[6] or False
                 }
                 for r in rows
             ]

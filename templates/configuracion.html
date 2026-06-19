@@ -585,11 +585,11 @@
         proyectoBuilderFormId = tipoId;
         proyectoCamposForm    = [];
 
-        document.getElementById('vista-lista-proyectos').style.display    = 'none';
-        document.getElementById('vista-proyecto-builder').style.display   = '';
-        document.getElementById('proyecto-builder-nombre').value          = '';
-        document.getElementById('proyecto-builder-descripcion').value     = '';
-        document.getElementById('proyecto-buscar-campo').value            = '';
+        document.getElementById('vista-lista-proyectos').style.display  = 'none';
+        document.getElementById('vista-proyecto-builder').style.display  = '';
+        document.getElementById('proyecto-builder-nombre').value         = '';
+        document.getElementById('proyecto-builder-descripcion').value    = '';
+        document.getElementById('proyecto-buscar-campo').value           = '';
         cambiarTabProyecto('disponibles');
 
         // Cargar solo campos de objeto 'proyecto'
@@ -618,6 +618,18 @@
             } catch {}
         }
 
+        // ── Inyectar campos del sistema si no están ya ──
+        const camposSistema = proyectoCamposGlobales.filter(c => c.es_sistema);
+        camposSistema.forEach(cs => {
+            if (!proyectoCamposForm.find(c => c.id === cs.id)) {
+                proyectoCamposForm.unshift({ ...cs, requerido: true });
+            } else {
+                // Si ya está, forzar que sea requerido
+                const existente = proyectoCamposForm.find(c => c.id === cs.id);
+                existente.requerido = true;
+            }
+        });
+
         renderCamposDisponiblesProyecto();
         renderCanvasProyecto();
     }
@@ -638,11 +650,15 @@
     function renderCamposDisponiblesProyecto() {
         const lista = document.getElementById('campos-proyecto-disponibles-list');
         const q     = (document.getElementById('proyecto-buscar-campo')?.value || '').toLowerCase().trim();
-        const filtrados = q
-            ? proyectoCamposGlobales.filter(c => c.nombre.toLowerCase().includes(q))
-            : proyectoCamposGlobales;
 
-        if (proyectoCamposGlobales.length === 0) {
+        // Excluir campos del sistema de la lista de disponibles
+        const camposNoSistema = proyectoCamposGlobales.filter(c => !c.es_sistema);
+
+        const filtrados = q
+            ? camposNoSistema.filter(c => c.nombre.toLowerCase().includes(q))
+            : camposNoSistema;
+
+        if (camposNoSistema.length === 0) {
             lista.innerHTML = '<p style="color:var(--gris-texto);font-size:13px;">No hay campos de proyecto creados aún.</p>';
             return;
         }
@@ -734,6 +750,7 @@
 
             const preview   = previsualizarCampo(campo);
             const requerido = campo.requerido || false;
+            const esSistema = campo.es_sistema || false;
 
             div.innerHTML = `
                 <i class="fas fa-grip-vertical canvas-campo-handle"></i>
@@ -742,11 +759,16 @@
                     <span class="canvas-campo-preview">${preview}</span>
                 </div>
                 <div class="canvas-campo-actions">
-                    <button class="icon-btn ${requerido ? 'active-required' : ''}"
-                            onclick="toggleRequeridoProyecto(${idx})"
-                            title="${requerido ? 'Obligatorio (clic para quitar)' : 'Marcar como obligatorio'}">
-                        <i class="fas fa-asterisk"></i>
-                    </button>
+                    ${esSistema
+                        ? `<span class="icon-btn active-required" title="Siempre obligatorio" style="cursor:default;">
+                                <i class="fas fa-asterisk"></i>
+                        </span>`
+                        : `<button class="icon-btn ${requerido ? 'active-required' : ''}"
+                                onclick="toggleRequeridoProyecto(${idx})"
+                                title="${requerido ? 'Obligatorio (clic para quitar)' : 'Marcar como obligatorio'}">
+                                <i class="fas fa-asterisk"></i>
+                        </button>`
+                    }
                     <button class="icon-btn" onclick="moverCampoProyecto(${idx}, -1)" title="Subir"
                             ${idx === 0 ? 'disabled' : ''}>
                         <i class="fas fa-chevron-up"></i>
@@ -755,9 +777,12 @@
                             ${idx === proyectoCamposForm.length - 1 ? 'disabled' : ''}>
                         <i class="fas fa-chevron-down"></i>
                     </button>
-                    <button class="icon-btn danger" onclick="quitarCampoProyecto(${idx})" title="Quitar">
-                        <i class="fas fa-times"></i>
-                    </button>
+                    ${esSistema
+                        ? ''
+                        : `<button class="icon-btn danger" onclick="quitarCampoProyecto(${idx})" title="Quitar">
+                                <i class="fas fa-times"></i>
+                        </button>`
+                    }
                 </div>`;
 
             div.addEventListener('dragstart', () => { proyectoDragSrcIndex = idx; });
@@ -1745,15 +1770,18 @@
                 div.className = 'campo-item';
                 div.innerHTML = `
                     <div class="campo-item-info">
-                        <span class="campo-item-nombre">${campo.nombre}</span>
+                        <span class="campo-item-nombre">${campo.nombre}${campo.es_sistema ? ' 🔒' : ''}</span>
                         <span class="campo-item-tipo">
                             <span class="campo-tipo-badge">${tipoLabel}</span>
                             <span style="font-size:11px;padding:2px 7px;border-radius:10px;${objetoBadgeColor}">${objetoLabel}</span>
                         </span>
                     </div>
-                    <button class="icon-btn danger" onclick="eliminarCampo(${campo.id})">
-                        <i class="fas fa-trash"></i>
-                    </button>`;
+                    ${campo.es_sistema
+                        ? ''
+                        : `<button class="icon-btn danger" onclick="eliminarCampo(${campo.id})">
+                                <i class="fas fa-trash"></i>
+                        </button>`
+                    }`;
                 lista.appendChild(div);
             });
         } catch {
