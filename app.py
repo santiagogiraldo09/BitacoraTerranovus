@@ -510,16 +510,16 @@ def registro_post():
     password = data.get('password', '')
     cargo    = data.get('cargo', '').strip()
     empresa  = data.get('empresa', '').strip()
- 
+
     if not all([token, nombre, apellido, email, password, empresa]):
         return jsonify({'error': 'Faltan campos obligatorios'}), 400
- 
+
     if len(password) < 8:
         return jsonify({'error': 'La contraseña debe tener al menos 8 caracteres'}), 400
- 
+
     try:
         with db_connection() as (conn, cursor):
- 
+
             # 1. Validar token
             cursor.execute("""
                 SELECT id, usado, expira_en
@@ -527,29 +527,29 @@ def registro_post():
                 WHERE token = %s
             """, (token,))
             row = cursor.fetchone()
- 
+
             if not row:
                 return jsonify({'error': 'Token inválido'}), 400
- 
+
             token_id, usado, expira_en = row
- 
+
             if usado:
                 return jsonify({'error': 'Este enlace ya fue utilizado'}), 400
- 
+
             ahora = datetime.now(timezone.utc)
             if expira_en.tzinfo is None:
                 expira_en = expira_en.replace(tzinfo=timezone.utc)
- 
+
             if ahora > expira_en:
                 return jsonify({'error': 'Este enlace ha expirado'}), 400
- 
+
             # 2. Verificar que el email no exista
             cursor.execute(
                 "SELECT user_id FROM usuario WHERE email = %s", (email,)
             )
             if cursor.fetchone():
                 return jsonify({'error': 'Este correo ya está registrado'}), 400
- 
+
             # 3. Generar slug único para la empresa
             slug_base = generar_slug(empresa)
             slug      = slug_base
@@ -562,7 +562,7 @@ def registro_post():
                     break
                 slug = f"{slug_base}-{contador}"
                 contador += 1
- 
+
             # 4. Crear empresa
             cursor.execute("""
                 INSERT INTO empresas (nombre, slug)
@@ -570,7 +570,7 @@ def registro_post():
                 RETURNING id
             """, (empresa, slug))
             empresa_id = cursor.fetchone()[0]
- 
+
             # 5. Crear usuario admin
             hashed = generate_password_hash(password)
             cursor.execute("""
@@ -586,7 +586,7 @@ def registro_post():
             session['user_rol']   = 'admin'
             session['empresa_id'] = empresa_id
             session['user_name']  = nombre
- 
+
             # 6. Marcar token como usado
             cursor.execute("""
                 UPDATE tokens_registro
@@ -594,13 +594,8 @@ def registro_post():
                 WHERE id = %s
             """, (token_id,))
 
-        # Login automático después del registro
-        session['user_id']    = cursor.lastrowid if hasattr(cursor, 'lastrowid') else None
-        session['user_rol']   = 'admin'
-        session['empresa_id'] = empresa_id
-        session['user_name']  = nombre
         return jsonify({'success': True})
- 
+
     except Exception as e:
         print(f"Error en registro: {e}")
         return jsonify({'error': str(e)}), 500
