@@ -238,3 +238,27 @@ input::placeholder { color: #c4c9d4; }
     .btn-guardar { width: auto; min-width: 200px; }
     .btn-cancelar { width: auto; min-width: 120px; }
 }
+
+/* Campos dinámicos del tipo de proyecto */
+.field-input-dyn {
+    width: 100%;
+    padding: 11px 14px;
+    border: 1.5px solid var(--gris-borde);
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    color: var(--texto);
+    background: var(--blanco);
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.field-input-dyn:focus {
+    border-color: var(--naranja);
+    box-shadow: 0 0 0 3px rgba(255,175,51,0.12);
+}
+
+.field-textarea {
+    resize: vertical;
+    min-height: 80px;
+}

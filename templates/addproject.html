@@ -9,6 +9,78 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        .field-select {
+            width: 100%;
+            padding: 11px 14px;
+            border: 1.5px solid var(--gris-borde);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'DM Sans', sans-serif;
+            color: var(--texto);
+            background: var(--blanco);
+            outline: none;
+            transition: border-color 0.2s;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            padding-right: 36px;
+        }
+        .field-select:focus {
+            border-color: var(--naranja);
+            box-shadow: 0 0 0 3px rgba(255,175,51,0.12);
+        }
+
+        .empty-tipos {
+            text-align: center;
+            padding: 24px 16px;
+            color: var(--gris-texto);
+        }
+        .empty-tipos i.fa-exclamation-circle {
+            font-size: 32px;
+            color: var(--naranja);
+            margin-bottom: 12px;
+            display: block;
+        }
+        .empty-tipos p {
+            font-size: 14px;
+            margin-bottom: 6px;
+        }
+        .empty-tipos .empty-hint {
+            font-size: 13px;
+            color: #9ca3af;
+            margin-bottom: 16px;
+        }
+        .btn-ir-config {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 20px;
+            background: var(--naranja);
+            color: var(--blanco);
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: background 0.2s;
+        }
+        .btn-ir-config:hover {
+            background: var(--naranja-dark);
+        }
+
+        .campo-dinamico-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gris-texto);
+            margin-bottom: 5px;
+        }
+        .campo-requerido-mark {
+            color: #ef4444;
+            margin-left: 2px;
+        }
+    </style>
 </head>
 <body>
 
@@ -26,39 +98,39 @@
     <div class="form-scroll">
         <form id="project-form">
 
-            <!-- Sección 1: Identificación -->
-            <div class="section">
+            <!-- Sección 1: Tipo de Proyecto -->
+            <div class="section" id="seccion-tipo-proyecto">
                 <div class="section-header">
                     <span class="section-icon">
-                        <i class="fas fa-tag"></i>
+                        <i class="fas fa-layer-group"></i>
                     </span>
-                    <h3 class="section-title">Identificación</h3>
+                    <h3 class="section-title">Tipo de Proyecto</h3>
                 </div>
+
+                {% if tipos_proyecto %}
                 <div class="field-group">
-                    <label for="project-name">Nombre del proyecto</label>
-                    <input type="text" id="project-name" name="project-name" required
-                           placeholder="Ej. Mantenimiento Planta Norte">
+                    <label for="tipo-proyecto">Selecciona el tipo de proyecto *</label>
+                    <select id="tipo-proyecto" class="field-select" onchange="onTipoProyectoChange()" required>
+                        <option value="">— Selecciona un tipo —</option>
+                        {% for tipo in tipos_proyecto %}
+                        <option value="{{ tipo.id }}">{{ tipo.nombre }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
-                <div class="field-group">
-                    <label for="cliente">Cliente</label>
-                    <input type="text" id="cliente" name="cliente" required
-                           placeholder="Nombre del cliente">
+
+                <!-- Campos dinámicos del tipo seleccionado -->
+                <div id="campos-dinamicos" style="display:none;"></div>
+
+                {% else %}
+                <div class="empty-tipos">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <p>No has creado ningún tipo de proyecto aún.</p>
+                    <p class="empty-hint">Para crear un proyecto primero debes definir al menos un tipo de proyecto desde Configuración.</p>
+                    <a href="/configuracion#proyectos" class="btn-ir-config">
+                        <i class="fas fa-cog"></i> Ir a Configuración
+                    </a>
                 </div>
-                <div class="field-group">
-                    <label for="contratista">Contratista</label>
-                    <input type="text" id="contratista" name="contratista" required
-                           placeholder="Nombre del contratista">
-                </div>
-                <div class="field-group">
-                    <label for="orden-trabajo">Orden de Trabajo</label>
-                    <input type="text" id="orden-trabajo" name="orden-trabajo" required
-                           placeholder="Ej: OT-2026-001">
-                </div>
-                <div class="field-group">
-                    <label for="location">Ubicación / Municipio</label>
-                    <input type="text" id="location" name="location" required
-                           placeholder="Ej: Medellín, Antioquia">
-                </div>
+                {% endif %}
             </div>
 
             <!-- Sección 2: Cronograma -->
@@ -113,10 +185,40 @@
                 </div>
             </div>
 
+            <!-- Sección 4: Formularios -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-icon">
+                        <i class="fas fa-file-alt"></i>
+                    </span>
+                    <h3 class="section-title">Formularios</h3>
+                </div>
+                <p class="section-hint">Selecciona los formularios que estarán disponibles en este proyecto.</p>
+                <div class="team-list" id="formularios-list">
+                    {% if formularios %}
+                        {% for f in formularios %}
+                        <div class="team-member" onclick="toggleFormularioSelect(this, {{ f.id }})"
+                             data-id="{{ f.id }}">
+                            <div class="member-avatar" style="font-size:15px;">
+                                <i class="fas fa-file-alt"></i>
+                            </div>
+                            <div class="member-info">
+                                <span class="member-name">{{ f.nombre }}</span>
+                                <span class="member-role">{{ f.descripcion or 'Sin descripción' }}</span>
+                            </div>
+                            <div class="member-check">
+                                <i class="fas fa-check"></i>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="no-users">No hay formularios creados aún.</p>
+                    {% endif %}
+                </div>
+            </div>
+
         </form>
     </div>
-
-    
 
 </div>
 
@@ -131,8 +233,13 @@
 </div>
 
 <script>
-    const selectedMembers = new Set();
+    // ── Variables globales ──
+    const selectedMembers     = new Set();
+    const selectedFormularios = new Set();
+    const tiposProyecto       = {{ tipos_proyecto | tojson | safe }};
+    const camposProyecto      = {{ campos_proyecto | tojson | safe }};
 
+    // ── Equipo: toggle miembro ──
     function toggleMember(el, userId) {
         if (selectedMembers.has(userId)) {
             selectedMembers.delete(userId);
@@ -143,17 +250,200 @@
         }
     }
 
-    async function saveProject() {
-        const form = document.getElementById('project-form');
-        const formData = new FormData(form);
-        const data = {};
-        formData.forEach((value, key) => { data[key] = value; });
-        data['miembros'] = Array.from(selectedMembers);
+    // ── Formularios: toggle selección ──
+    function toggleFormularioSelect(el, formId) {
+        if (selectedFormularios.has(formId)) {
+            selectedFormularios.delete(formId);
+            el.classList.remove('selected');
+        } else {
+            selectedFormularios.add(formId);
+            el.classList.add('selected');
+        }
+    }
 
-        if (!data['project-name'] || !data['cliente'] || !data['location']) {
-            alert("Por favor, completa los campos obligatorios: Nombre, Cliente y Ubicación.");
+    // ── Tipo de proyecto: renderizar campos dinámicos ──
+    function onTipoProyectoChange() {
+        const tipoId    = parseInt(document.getElementById('tipo-proyecto').value);
+        const container = document.getElementById('campos-dinamicos');
+
+        if (!tipoId) {
+            container.style.display = 'none';
+            container.innerHTML     = '';
             return;
         }
+
+        const tipo = tiposProyecto.find(t => t.id === tipoId);
+        if (!tipo) return;
+
+        container.style.display = '';
+        container.innerHTML     = '';
+
+        // Resolver campos del tipo
+        const camposTipo = tipo.campos.map(item => {
+            const id        = typeof item === 'object' ? item.id : item;
+            const requerido = typeof item === 'object' ? (item.requerido || false) : false;
+            const campo     = camposProyecto.find(c => c.id === id);
+            return campo ? { ...campo, requerido } : null;
+        }).filter(Boolean);
+
+        camposTipo.forEach(campo => {
+            const group = document.createElement('div');
+            group.className = 'field-group';
+
+            const reqMark = campo.requerido || campo.es_sistema
+                ? '<span class="campo-requerido-mark">*</span>' : '';
+
+            let inputHtml = '';
+            switch (campo.tipo) {
+                case 'texto_corto':
+                    inputHtml = `<input type="text" class="field-input-dyn"
+                        data-campo-id="${campo.id}" placeholder="${campo.nombre}..."
+                        ${campo.requerido || campo.es_sistema ? 'required' : ''}>`;
+                    break;
+                case 'texto_largo':
+                    inputHtml = `<textarea class="field-input-dyn field-textarea"
+                        data-campo-id="${campo.id}" placeholder="${campo.nombre}..." rows="3"
+                        ${campo.requerido || campo.es_sistema ? 'required' : ''}></textarea>`;
+                    break;
+                case 'numero':
+                    inputHtml = `<input type="number" class="field-input-dyn"
+                        data-campo-id="${campo.id}" placeholder="0" step="any"
+                        ${campo.requerido || campo.es_sistema ? 'required' : ''}>`;
+                    break;
+                case 'fecha':
+                    inputHtml = `<input type="date" class="field-input-dyn"
+                        data-campo-id="${campo.id}"
+                        ${campo.requerido || campo.es_sistema ? 'required' : ''}>`;
+                    break;
+                case 'seleccion':
+                case 'seleccion_unica':
+                    const opts = (campo.opciones || []).map(o => `<option value="${o}">${o}</option>`).join('');
+                    inputHtml = `<select class="field-input-dyn field-select" data-campo-id="${campo.id}"
+                        ${campo.requerido || campo.es_sistema ? 'required' : ''}>
+                        <option value="">Selecciona...</option>${opts}</select>`;
+                    break;
+                case 'booleano':
+                    inputHtml = `<label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;">
+                        <input type="checkbox" class="field-input-dyn" data-campo-id="${campo.id}"
+                        style="width:18px;height:18px;accent-color:var(--naranja);cursor:pointer;">
+                        Sí</label>`;
+                    break;
+                case 'moneda':
+                    inputHtml = `<div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:14px;color:var(--gris-texto);font-weight:600;">$</span>
+                        <input type="number" class="field-input-dyn" data-campo-id="${campo.id}"
+                        placeholder="0.00" step="0.01"
+                        ${campo.requerido || campo.es_sistema ? 'required' : ''}>
+                    </div>`;
+                    break;
+                case 'porcentaje':
+                    inputHtml = `<div style="display:flex;align-items:center;gap:6px;">
+                        <input type="number" class="field-input-dyn" data-campo-id="${campo.id}"
+                        placeholder="0" min="0" max="100"
+                        ${campo.requerido || campo.es_sistema ? 'required' : ''}>
+                        <span style="font-size:14px;color:var(--gris-texto);font-weight:600;">%</span>
+                    </div>`;
+                    break;
+                case 'imagen':
+                    inputHtml = `<input type="file" class="field-input-dyn" data-campo-id="${campo.id}"
+                        accept="image/*">`;
+                    break;
+                case 'adjunto':
+                    inputHtml = `<input type="file" class="field-input-dyn" data-campo-id="${campo.id}">`;
+                    break;
+                default:
+                    inputHtml = `<input type="text" class="field-input-dyn"
+                        data-campo-id="${campo.id}" placeholder="${campo.nombre}...">`;
+            }
+
+            group.innerHTML = `
+                <label class="campo-dinamico-label">${campo.nombre}${reqMark}</label>
+                ${inputHtml}
+            `;
+            container.appendChild(group);
+        });
+    }
+
+    // ── Guardar proyecto ──
+    async function saveProject() {
+        const tipoSelect = document.getElementById('tipo-proyecto');
+
+        // Validar que exista el dropdown
+        if (!tipoSelect) {
+            alert("Debes crear un tipo de proyecto antes de poder registrar proyectos.");
+            return;
+        }
+
+        const tipoId = tipoSelect.value;
+        if (!tipoId) {
+            alert("Selecciona un tipo de proyecto.");
+            return;
+        }
+
+        // Recoger datos dinámicos
+        const camposDyn = document.querySelectorAll('.field-input-dyn');
+        const datosTipo = {};
+        let nombreProyecto = '';
+        let faltantes = [];
+
+        camposDyn.forEach(input => {
+            const campoId = input.dataset.campoId;
+            const campo   = camposProyecto.find(c => c.id === parseInt(campoId));
+            if (!campo) return;
+
+            let valor;
+            if (input.type === 'checkbox') {
+                valor = input.checked;
+            } else {
+                valor = input.value.trim ? input.value.trim() : input.value;
+            }
+
+            // Detectar campo sistema "Nombre del proyecto"
+            if (campo.es_sistema && campo.nombre === 'Nombre del proyecto') {
+                nombreProyecto = valor;
+            }
+
+            datosTipo[campoId] = valor;
+
+            // Validar requeridos
+            const esRequerido = campo.es_sistema || false;
+            const tipoData    = tiposProyecto.find(t => t.id === parseInt(tipoId));
+            if (tipoData) {
+                const campoEnTipo = tipoData.campos.find(c =>
+                    (typeof c === 'object' ? c.id : c) === campo.id
+                );
+                if (campoEnTipo && typeof campoEnTipo === 'object' && campoEnTipo.requerido) {
+                    if (!valor && valor !== false) faltantes.push(campo.nombre);
+                }
+            }
+            if (esRequerido && !valor && valor !== false) {
+                if (!faltantes.includes(campo.nombre)) faltantes.push(campo.nombre);
+            }
+        });
+
+        if (!nombreProyecto) {
+            alert("El nombre del proyecto es obligatorio.");
+            return;
+        }
+
+        if (faltantes.length > 0) {
+            alert("Completa los campos obligatorios: " + faltantes.join(', '));
+            return;
+        }
+
+        // Fechas
+        const startDate = document.getElementById('start-date')?.value;
+        const endDate   = document.getElementById('end-date')?.value;
+
+        const data = {
+            'project-name':     nombreProyecto,
+            'start-date':       startDate || null,
+            'end-date':         endDate || null,
+            'tipo_proyecto_id': parseInt(tipoId),
+            'datos_tipo':       datosTipo,
+            'miembros':         Array.from(selectedMembers),
+            'formularios':      Array.from(selectedFormularios)
+        };
 
         try {
             const response = await fetch('/add_project', {
@@ -174,6 +464,7 @@
         }
     }
 
+    // ── Color primario dinámico ──
     (function() {
         const primario = "{{ color_primario }}";
 
@@ -199,7 +490,6 @@
 
         aplicarColorPrimario(primario);
     })();
-
 </script>
 </body>
 </html>

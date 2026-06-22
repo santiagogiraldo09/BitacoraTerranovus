@@ -2640,18 +2640,24 @@ def add_project():
             with db_connection() as (conn, cursor):
                 cursor.execute("""
                     INSERT INTO proyectos (
-                        nombre_proyecto, fecha_inicio, fecha_fin, cliente, contratista, 
-                        orden_de_trabajo, ubicacion, user_id, empresa_id
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s) 
+                        nombre_proyecto, fecha_inicio, fecha_fin,
+                        tipo_proyecto_id, datos_tipo,
+                        user_id, empresa_id
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                 """, (
-                    data.get('project-name'), data.get('start-date'), data.get('end-date'),
-                    data.get('cliente'), data.get('contratista'), data.get('orden-trabajo'),
-                    data.get('location'), session['user_id'], empresa_id
+                    data.get('project-name'),
+                    data.get('start-date'),
+                    data.get('end-date'),
+                    data.get('tipo_proyecto_id'),
+                    json.dumps(data.get('datos_tipo', {})),
+                    session['user_id'],
+                    empresa_id
                 ))
 
                 nuevo_id = cursor.fetchone()[0]
 
+                # Miembros del equipo
                 miembros = data.get('miembros', [])
                 if not miembros:
                     miembros = [session['user_id']]
@@ -2661,6 +2667,14 @@ def add_project():
                         INSERT INTO proyecto_usuarios (id_proyecto, user_id, empresa_id)
                         VALUES (%s, %s, %s)
                     """, (nuevo_id, uid, empresa_id))
+
+                # Formularios asociados
+                formularios_ids = data.get('formularios', [])
+                for fid in formularios_ids:
+                    cursor.execute("""
+                        INSERT INTO proyecto_formularios (proyecto_id, formulario_id, empresa_id)
+                        VALUES (%s, %s, %s)
+                    """, (nuevo_id, fid, empresa_id))
 
             return jsonify({"status": "success", "message": "Proyecto registrado exitosamente"}), 201
 
@@ -2697,12 +2711,50 @@ def add_project():
             if empresa_row:
                 color_primario   = empresa_row[0] or '#FFAF33'
                 color_secundario = empresa_row[1] or '#E3E3E3'
+                # Cargar tipos de proyecto
+                cursor.execute("""
+                    SELECT id, nombre, descripcion, campos
+                    FROM tipos_proyecto
+                    WHERE empresa_id = %s
+                    ORDER BY nombre ASC
+                """, (session.get('empresa_id'),))
+                tipos_proyecto = [
+                    {'id': r[0], 'nombre': r[1], 'descripcion': r[2], 'campos': r[3] or []}
+                    for r in cursor.fetchall()
+                ]
+
+                # Cargar formularios disponibles
+                cursor.execute("""
+                    SELECT id, nombre, descripcion
+                    FROM formularios
+                    WHERE empresa_id = %s
+                    ORDER BY nombre ASC
+                """, (session.get('empresa_id'),))
+                formularios = [
+                    {'id': r[0], 'nombre': r[1], 'descripcion': r[2] or ''}
+                    for r in cursor.fetchall()
+                ]
+
+                # Cargar campos globales de proyecto para resolver los tipos
+                cursor.execute("""
+                    SELECT id, nombre, tipo, opciones, configuracion, es_sistema
+                    FROM campos_globales
+                    WHERE empresa_id = %s AND objeto = 'proyecto'
+                    ORDER BY es_sistema DESC, created_at DESC
+                """, (session.get('empresa_id'),))
+                campos_proyecto = [
+                    {'id': r[0], 'nombre': r[1], 'tipo': r[2], 'opciones': r[3] or [], 'configuracion': r[4] or {}, 'es_sistema': r[5] or False}
+                    for r in cursor.fetchall()
+                ]
     except Exception as e:
         print(f"Error en add_project GET: {e}")
 
     return render_template('addproject.html', usuarios=usuarios,
                         color_primario=color_primario,
-                        color_secundario=color_secundario)
+                        color_secundario=color_secundario,
+                        tipos_proyecto=tipos_proyecto,
+                        formularios=formularios,
+                        campos_proyecto=campos_proyecto)
 
 
 #@app.route('/generar-hash')
