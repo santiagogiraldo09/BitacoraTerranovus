@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ formulario.nombre }} — Bitácora IAC</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='formContacto.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        .field-select {
+            width: 100%;
+            padding: 11px 14px;
+            border: 1.5px solid var(--gris-borde, #e5e7eb);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'DM Sans', sans-serif;
+            color: var(--texto, #1a1a1a);
+            background: #fff;
+            outline: none;
+            transition: border-color 0.2s;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            padding-right: 36px;
+        }
+        .field-select:focus {
+            border-color: var(--naranja, #FFAF33);
+            box-shadow: 0 0 0 3px rgba(255,175,51,0.12);
+        }
+        .campo-check-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 0;
+        }
+        .campo-check-wrapper input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--naranja, #FFAF33);
+            cursor: pointer;
+        }
+        .campo-check-wrapper label {
+            font-size: 14px;
+            cursor: pointer;
+            color: var(--texto, #1a1a1a);
+        }
+        .moneda-wrapper, .porcentaje-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            width: 100%;
+        }
+        .moneda-wrapper .field-input,
+        .porcentaje-wrapper .field-input {
+            flex: 1;
+        }
+        .unit-symbol {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--gris-texto, #6b7280);
+            flex-shrink: 0;
+        }
+    </style>
+    <script>
+        (function() {
+            const p = "{{ color_primario | default('#FFAF33') }}";
+            document.documentElement.style.setProperty('--naranja', p);
+        })();
+    </script>
+</head>
+<body>
+<div class="page-wrapper">
+
+    <!-- Header fijo -->
+    <header class="page-header">
+        <button class="btn-back" onclick="window.history.back()">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <div class="header-center">
+            <img src="{{ logo_actual or url_for('static', filename='logo.png') }}" alt="Logo" class="header-logo">
+            <span class="header-title">{{ formulario.nombre }}</span>
+        </div>
+    </header>
+
+    <!-- Contenido con scroll -->
+    <div class="content-scroll">
+
+        <input type="hidden" id="project-id" value="{{ project_id }}">
+        <input type="hidden" id="formulario-id" value="{{ formulario.id }}">
+
+        <!-- Sección principal -->
+        <div class="section">
+            <div class="section-header">
+                <span class="section-icon">
+                    <i class="fas fa-file-alt"></i>
+                </span>
+                <h3 class="section-title">{{ formulario.nombre }}</h3>
+            </div>
+
+            {% if formulario.descripcion %}
+            <p class="section-hint">{{ formulario.descripcion }}</p>
+            {% endif %}
+
+            {% for campo in campos %}
+            <div class="field-group form-group">
+                <label class="field-label">
+                    {{ campo.nombre }}{% if campo.requerido %} *{% endif %}
+                </label>
+
+                {% if campo.tipo == 'texto_corto' %}
+                <div class="input-with-icon">
+                    <input type="text" class="field-input campo-respuesta"
+                           data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                           placeholder="{{ campo.nombre }}...">
+                    <button class="record-btn" type="button" data-target-id="{{ campo.id }}">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="stop-btn" type="button" data-target-id="{{ campo.id }}" style="display:none;">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                </div>
+
+                {% elif campo.tipo == 'texto_largo' %}
+                <div class="input-with-icon" style="align-items:flex-start;">
+                    <textarea class="field-input campo-respuesta" rows="3"
+                              data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                              placeholder="{{ campo.nombre }}..." style="resize:vertical;min-height:80px;"></textarea>
+                    <button class="record-btn" type="button" data-target-id="{{ campo.id }}">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="stop-btn" type="button" data-target-id="{{ campo.id }}" style="display:none;">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                </div>
+
+                {% elif campo.tipo == 'numero' %}
+                <input type="number" class="field-input campo-respuesta"
+                       data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                       placeholder="0" step="any">
+
+                {% elif campo.tipo == 'fecha' %}
+                <input type="date" class="field-input campo-respuesta"
+                       data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}">
+
+                {% elif campo.tipo == 'seleccion' or campo.tipo == 'seleccion_unica' %}
+                <select class="field-select campo-respuesta"
+                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}">
+                    <option value="">Selecciona...</option>
+                    {% for op in campo.opciones %}
+                    <option value="{{ op }}">{{ op }}</option>
+                    {% endfor %}
+                </select>
+
+                {% elif campo.tipo == 'booleano' %}
+                <div class="campo-check-wrapper">
+                    <input type="checkbox" id="campo-{{ campo.id }}" class="campo-respuesta"
+                           data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}">
+                    <label for="campo-{{ campo.id }}">Sí</label>
+                </div>
+
+                {% elif campo.tipo == 'moneda' %}
+                <div class="moneda-wrapper">
+                    <span class="unit-symbol">$</span>
+                    <input type="number" class="field-input campo-respuesta"
+                           data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                           placeholder="0.00" step="0.01">
+                </div>
+
+                {% elif campo.tipo == 'porcentaje' %}
+                <div class="porcentaje-wrapper">
+                    <input type="number" class="field-input campo-respuesta"
+                           data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                           placeholder="0" min="0" max="100">
+                    <span class="unit-symbol">%</span>
+                </div>
+
+                {% elif campo.tipo == 'imagen' %}
+                <input type="file" class="field-input campo-respuesta"
+                       data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                       accept="image/*">
+
+                {% elif campo.tipo == 'adjunto' %}
+                <input type="file" class="field-input campo-respuesta"
+                       data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}">
+
+                {% else %}
+                <div class="input-with-icon">
+                    <input type="text" class="field-input campo-respuesta"
+                           data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                           placeholder="{{ campo.nombre }}...">
+                    <button class="record-btn" type="button" data-target-id="{{ campo.id }}">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="stop-btn" type="button" data-target-id="{{ campo.id }}" style="display:none;">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+        </div>
+
+        <!-- Botón guardar -->
+        <div class="bottom-bar">
+            <button class="btn-save" id="btn-guardar" onclick="guardarRespuesta()">
+                <i class="fas fa-save"></i> Guardar registro
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+    // ── Toast ──
+    function mostrarToast(msg) {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2500);
+    }
+
+    // ── Voz: Azure Speech SDK vía /transcribe-audio ──
+    let mediaRecorder = null;
+    let audioChunks   = [];
+
+    document.querySelectorAll('.record-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const campoId = btn.dataset.targetId;
+            const input   = document.querySelector(`.campo-respuesta[data-campo-id="${campoId}"]`);
+            const stopBtn = document.querySelector(`.stop-btn[data-target-id="${campoId}"]`);
+            if (!input) return;
+
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    audioChunks   = [];
+                    mediaRecorder = new MediaRecorder(stream);
+                    btn.style.display     = 'none';
+                    stopBtn.style.display = '';
+
+                    mediaRecorder.ondataavailable = e => {
+                        if (e.data.size > 0) audioChunks.push(e.data);
+                    };
+
+                    mediaRecorder.onstop = async () => {
+                        stopBtn.style.display = 'none';
+                        btn.style.display     = '';
+                        stream.getTracks().forEach(t => t.stop());
+
+                        const blob     = new Blob(audioChunks, { type: 'audio/webm' });
+                        const formData = new FormData();
+                        formData.append('audio', blob, 'audio.webm');
+
+                        try {
+                            btn.disabled = true;
+                            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                            const res  = await fetch('/transcribe-audio', { method: 'POST', body: formData });
+                            const data = await res.json();
+                            if (data.text) {
+                                input.value = input.value
+                                    ? input.value + ' ' + data.text
+                                    : data.text;
+                                mostrarToast('✅ Texto transcrito');
+                            } else {
+                                mostrarToast('⚠️ No se detectó audio');
+                            }
+                        } catch {
+                            mostrarToast('❌ Error al transcribir');
+                        } finally {
+                            btn.disabled  = false;
+                            btn.innerHTML = '<i class="fas fa-microphone"></i>';
+                        }
+                    };
+
+                    mediaRecorder.start();
+                })
+                .catch(() => mostrarToast('❌ No se pudo acceder al micrófono'));
+        });
+    });
+
+    document.querySelectorAll('.stop-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+            }
+        });
+    });
+
+    // ── Guardar respuesta ──
+    async function guardarRespuesta() {
+        const projectId    = document.getElementById('project-id').value;
+        const formularioId = document.getElementById('formulario-id').value;
+        const campos       = document.querySelectorAll('.campo-respuesta');
+        const respuestas   = {};
+        const faltantes    = [];
+
+        campos.forEach(input => {
+            const campoId   = input.dataset.campoId;
+            const requerido = input.dataset.requerido === 'True';
+            let valor;
+
+            if (input.type === 'checkbox') {
+                valor = input.checked;
+            } else if (input.type === 'file') {
+                valor = input.files.length > 0 ? input.files[0].name : '';
+            } else {
+                valor = input.value.trim ? input.value.trim() : input.value;
+            }
+
+            respuestas[campoId] = valor;
+
+            if (requerido && !valor && valor !== false) {
+                const label = input.closest('.field-group')?.querySelector('.field-label')?.textContent.replace(' *', '').trim();
+                faltantes.push(label || 'Campo requerido');
+            }
+        });
+
+        if (faltantes.length > 0) {
+            mostrarToast('⚠️ Completa: ' + faltantes[0]);
+            return;
+        }
+
+        const btn = document.getElementById('btn-guardar');
+        btn.disabled  = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+
+        try {
+            const res = await fetch('/api/respuestas-formulario', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({
+                    formulario_id: parseInt(formularioId),
+                    project_id:    parseInt(projectId),
+                    respuestas:    respuestas
+                })
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                mostrarToast('✅ Registro guardado correctamente');
+                setTimeout(() => window.history.back(), 1200);
+            } else {
+                mostrarToast('❌ ' + (data.error || 'Error al guardar'));
+            }
+        } catch {
+            mostrarToast('❌ Error de conexión');
+        } finally {
+            btn.disabled  = false;
+            btn.innerHTML = '<i class="fas fa-save"></i> Guardar registro';
+        }
+    }
+</script>
+</body>
+</html>

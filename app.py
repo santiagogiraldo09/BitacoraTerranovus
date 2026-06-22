@@ -1869,6 +1869,127 @@ def get_formularios():
         return jsonify({'error': str(e)}), 500
 
 
+# ── Formulario Dinámico: GET ────────────────────────────────────
+@app.route('/formulario-dinamico')
+def formulario_dinamico():
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    project_id    = request.args.get('project_id')
+    formulario_id = request.args.get('formulario_id')
+
+    if not project_id or not formulario_id:
+        return redirect(url_for('registros'))
+
+    formulario     = None
+    campos         = []
+    logo_actual    = None
+    color_primario = '#FFAF33'
+
+    try:
+        with db_connection() as (conn, cursor):
+            # Obtener formulario
+            cursor.execute("""
+                SELECT id, nombre, descripcion, campos
+                FROM formularios
+                WHERE id = %s AND empresa_id = %s
+            """, (formulario_id, session.get('empresa_id')))
+            row = cursor.fetchone()
+
+            if not row:
+                return redirect(url_for('registros'))
+
+            formulario = {
+                'id':          row[0],
+                'nombre':      row[1],
+                'descripcion': row[2] or '',
+                'campos_config': row[3] or []
+            }
+
+            # Obtener campos globales referenciados
+            campo_ids = [
+                (item['id'] if isinstance(item, dict) else item)
+                for item in formulario['campos_config']
+            ]
+
+            if campo_ids:
+                cursor.execute("""
+                    SELECT id, nombre, tipo, opciones, configuracion
+                    FROM campos_globales
+                    WHERE id = ANY(%s) AND empresa_id = %s
+                """, (campo_ids, session.get('empresa_id')))
+
+                campos_db = {r[0]: {
+                    'id': r[0], 'nombre': r[1], 'tipo': r[2],
+                    'opciones': r[3] or [], 'configuracion': r[4] or {}
+                } for r in cursor.fetchall()}
+
+                # Construir lista ordenada con requerido
+                for item in formulario['campos_config']:
+                    cid       = item['id'] if isinstance(item, dict) else item
+                    requerido = item.get('requerido', False) if isinstance(item, dict) else False
+                    if cid in campos_db:
+                        campo = campos_db[cid].copy()
+                        campo['requerido'] = requerido
+                        campos.append(campo)
+
+            # Colores y logo
+            cursor.execute("""
+                SELECT logo_url, color_primario
+                FROM empresas WHERE id = %s
+            """, (session.get('empresa_id'),))
+            emp = cursor.fetchone()
+            if emp:
+                logo_actual    = emp[0]
+                color_primario = emp[1] or '#FFAF33'
+
+    except Exception as e:
+        print(f"Error en formulario-dinamico GET: {e}")
+        return redirect(url_for('registros'))
+
+    return render_template('formDinamico.html',
+                           project_id=project_id,
+                           formulario=formulario,
+                           campos=campos,
+                           logo_actual=logo_actual,
+                           color_primario=color_primario)
+
+
+# ── Formulario Dinámico: POST ───────────────────────────────────
+@app.route('/api/respuestas-formulario', methods=['POST'])
+def guardar_respuesta_formulario():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    try:
+        data          = request.get_json()
+        formulario_id = data.get('formulario_id')
+        project_id    = data.get('project_id')
+        respuestas    = data.get('respuestas', {})
+
+        if not formulario_id or not project_id:
+            return jsonify({'error': 'Faltan datos obligatorios'}), 400
+
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                INSERT INTO respuestas_formulario
+                    (formulario_id, id_proyecto, user_id, respuestas)
+                VALUES (%s, %s, %s, %s)
+                RETURNING id
+            """, (
+                formulario_id,
+                project_id,
+                session['user_id'],
+                json.dumps(respuestas)
+            ))
+            nuevo_id = cursor.fetchone()[0]
+            return jsonify({'success': True, 'id': nuevo_id})
+
+    except Exception as e:
+        print(f"Error al guardar respuesta: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 # Crear formulario
 @app.route('/api/formularios', methods=['POST'])
 def crear_formulario():
