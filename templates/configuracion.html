@@ -821,12 +821,13 @@
             }
             lista.innerHTML = '';
             data.tipos.forEach(tipo => {
+                const numCampos = tipo.campos?.length || 0;
                 const div = document.createElement('div');
                 div.className = 'form-item';
                 div.innerHTML = `
                     <div class="form-item-info">
                         <span class="form-item-nombre">${tipo.nombre}</span>
-                        <span class="form-item-meta">${tipo.campos?.length || 0} campos${tipo.descripcion ? ' · ' + tipo.descripcion : ''}</span>
+                        <span class="form-item-meta">${numCampos} campos${tipo.descripcion ? ' · ' + tipo.descripcion : ''}</span>
                     </div>
                     <div class="form-item-actions">
                         <button class="icon-btn" onclick="abrirBuilderProyecto(${tipo.id})" title="Editar">
