@@ -206,10 +206,13 @@
 
         </div>
 
-        <!-- Botón guardar -->
-        <div class="bottom-bar">
-            <button class="btn-save" id="btn-guardar" onclick="guardarRespuesta()">
+        <!-- Botones fijos abajo -->
+        <div class="bottom-actions">
+            <button type="button" id="btn-guardar" onclick="guardarRespuesta()" class="btn-guardar">
                 <i class="fas fa-save"></i> Guardar registro
+            </button>
+            <button type="button" onclick="window.history.back()" class="btn-cancelar">
+                Cancelar
             </button>
         </div>
 
