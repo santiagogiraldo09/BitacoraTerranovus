@@ -1176,7 +1176,6 @@ def get_db_connection():
 def get_user_projects(user_id):
     try:
         with db_connection() as (conn, cursor):
-        
             cursor.execute("""
                 SELECT 
                     p.id, 
@@ -1193,42 +1192,41 @@ def get_user_projects(user_id):
                 GROUP BY p.id, p.nombre_proyecto, 
                         p.fecha_inicio, p.cliente, p.user_id, p.estado
                 ORDER BY p.fecha_inicio DESC
-            """, (user_id,)
-            )
-
-            '''
-            cursor.execute("""
-                SELECT 
-                    p.id, 
-                    p.nombre_proyecto, 
-                    p.fecha_inicio, 
-                    p.cliente, 
-                    p.user_id,
-                    p.estado,
-                    COUNT(r.id) as total_registros
-                FROM proyectos p
-                INNER JOIN proyecto_usuarios pu ON pu.id_proyecto = p.id
-                LEFT JOIN registros r ON r.id_proyecto = p.id
-                WHERE pu.user_id = %s 
-                GROUP BY p.id, p.nombre_proyecto, 
-                        p.fecha_inicio, p.cliente, p.user_id, p.estado
-                ORDER BY p.fecha_inicio DESC
-            """, (user_id,)
-            )
-            '''
+            """, (user_id,))
             
             projects = []
+            project_ids = []
             for row in cursor.fetchall():
                 projects.append({
                     'id_proyecto':      row[0],
                     'name':             row[1],
-                    'fecha_inicio':     row[2].strftime('%Y-%m-%d'),
+                    'fecha_inicio':     row[2].strftime('%Y-%m-%d') if row[2] else '',
                     'cliente':          row[3],
                     'user_id':          row[4],
                     'estado':           row[5] or 'En Curso',
                     'total_registros':  row[6],
+                    'formularios':      []
                 })
-            
+                project_ids.append(row[0])
+
+            # Cargar formularios asociados a cada proyecto
+            if project_ids:
+                cursor.execute("""
+                    SELECT pf.proyecto_id, f.id, f.nombre
+                    FROM proyecto_formularios pf
+                    INNER JOIN formularios f ON f.id = pf.formulario_id
+                    WHERE pf.proyecto_id = ANY(%s)
+                    ORDER BY f.nombre ASC
+                """, (project_ids,))
+
+                for row in cursor.fetchall():
+                    proyecto = next((p for p in projects if p['id_proyecto'] == row[0]), None)
+                    if proyecto:
+                        proyecto['formularios'].append({
+                            'id':     row[1],
+                            'nombre': row[2]
+                        })
+
             return projects
     except Exception as e:
         print(f"Error al obtener proyectos: {e}")
