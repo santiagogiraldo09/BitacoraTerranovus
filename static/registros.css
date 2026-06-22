@@ -434,24 +434,26 @@ button { font-family: inherit; cursor: pointer; }
     position: fixed;
     bottom: 88px;
     right: 24px;
-    width: 52px;
-    height: 52px;
-    border-radius: 50%;
+    padding: 14px 22px;
+    border-radius: 12px;
     background: var(--naranja);
     color: var(--blanco);
     border: none;
-    font-size: 22px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
     box-shadow: 0 4px 16px rgba(255,175,51,0.5);
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 8px;
     z-index: 200;
     transition: background 0.2s, transform 0.15s;
 }
 
 .fab-button:hover {
     background: var(--naranja-dark);
-    transform: scale(1.08);
+    transform: scale(1.03);
 }
 
 /* En desktop el FAB va en la esquina inferior derecha sin espacio del nav */

@@ -2370,14 +2370,20 @@ def obtener_tipos_proyecto():
     try:
         with db_connection() as (conn, cursor):
             cursor.execute("""
-                SELECT id, nombre, descripcion, campos
+                SELECT id, nombre, descripcion, campos, created_at
                 FROM tipos_proyecto
                 WHERE empresa_id = %s
                 ORDER BY created_at DESC
             """, (session.get('empresa_id'),))
             rows = cursor.fetchall()
             tipos = [
-                {'id': r[0], 'nombre': r[1], 'descripcion': r[2], 'campos': r[3] or []}
+                {
+                    'id': r[0],
+                    'nombre': r[1],
+                    'descripcion': r[2],
+                    'campos': r[3] or [],
+                    'created_at': r[4].strftime('%d/%m/%Y') if r[4] else ''
+                }
                 for r in rows
             ]
             return jsonify({'tipos': tipos})
