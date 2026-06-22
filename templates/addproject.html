@@ -133,6 +133,7 @@
                 {% endif %}
             </div>
 
+            {% if tipos_proyecto %}
             <!-- Sección 2: Cronograma -->
             <div class="section">
                 <div class="section-header">
@@ -216,6 +217,7 @@
                     {% endif %}
                 </div>
             </div>
+            {% endif %}
 
         </form>
     </div>
@@ -223,6 +225,7 @@
 </div>
 
 <!-- Botones fijos abajo -->
+{% if tipos_proyecto %}
 <div class="bottom-actions">
     <button type="button" onclick="saveProject()" class="btn-guardar">
         Guardar Proyecto
@@ -231,6 +234,13 @@
         Cancelar
     </button>
 </div>
+{% else %}
+<div class="bottom-actions">
+    <button type="button" onclick="window.location.href='/registros'" class="btn-cancelar">
+        Volver
+    </button>
+</div>
+{% endif %}
 
 <script>
     // ── Variables globales ──
