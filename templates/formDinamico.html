@@ -139,13 +139,29 @@
                 </div>
 
                 {% elif campo.tipo == 'numero' %}
-                <input type="number" class="field-input campo-respuesta"
-                       data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                       placeholder="0" step="any">
+                <div class="input-with-icon">
+                    <input type="number" class="field-input campo-respuesta"
+                           data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                           placeholder="0" step="any">
+                    <button class="record-btn" type="button" data-target-id="{{ campo.id }}" data-tipo="numero">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="stop-btn" type="button" data-target-id="{{ campo.id }}" style="display:none;">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                </div>
 
                 {% elif campo.tipo == 'fecha' %}
-                <input type="date" class="field-input campo-respuesta"
-                       data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}">
+                <div class="input-with-icon">
+                    <input type="date" class="field-input campo-respuesta"
+                           data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}">
+                    <button class="record-btn" type="button" data-target-id="{{ campo.id }}" data-tipo="fecha">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="stop-btn" type="button" data-target-id="{{ campo.id }}" style="display:none;">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                </div>
 
                 {% elif campo.tipo == 'seleccion' or campo.tipo == 'seleccion_unica' %}
                 <select class="field-select campo-respuesta"
@@ -176,6 +192,12 @@
                     <input type="number" class="field-input campo-respuesta"
                            data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
                            placeholder="0" min="0" max="100">
+                    <button class="record-btn" type="button" data-target-id="{{ campo.id }}" data-tipo="numero">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                    <button class="stop-btn" type="button" data-target-id="{{ campo.id }}" style="display:none;">
+                        <i class="fas fa-stop"></i>
+                    </button>
                     <span class="unit-symbol">%</span>
                 </div>
 
@@ -268,10 +290,25 @@
                             const res  = await fetch('/transcribe-audio', { method: 'POST', body: formData });
                             const data = await res.json();
                             if (data.text) {
-                                input.value = input.value
-                                    ? input.value + ' ' + data.text
-                                    : data.text;
-                                mostrarToast('✅ Texto transcrito');
+                                const tipo = btn.dataset.tipo;
+                                if (tipo === 'numero') {
+                                    const num = data.text.replace(/[^\d.,]/g, '').replace(',', '.');
+                                    input.value = num || data.text;
+                                    mostrarToast('✅ Valor transcrito');
+                                } else if (tipo === 'fecha') {
+                                    const parsed = new Date(data.text);
+                                    if (!isNaN(parsed)) {
+                                        input.value = parsed.toISOString().split('T')[0];
+                                        mostrarToast('✅ Fecha transcrita');
+                                    } else {
+                                        mostrarToast('⚠️ No se reconoció la fecha, escríbela manualmente');
+                                    }
+                                } else {
+                                    input.value = input.value
+                                        ? input.value + ' ' + data.text
+                                        : data.text;
+                                    mostrarToast('✅ Texto transcrito');
+                                }
                             } else {
                                 mostrarToast('⚠️ No se detectó audio');
                             }
