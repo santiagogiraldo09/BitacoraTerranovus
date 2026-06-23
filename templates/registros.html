@@ -105,9 +105,24 @@
 
                         <div class="card-top">
                             <h3 class="card-title">{{ proyecto.name }}</h3>
-                            <span class="status-badge {{ proyecto.estado | lower | replace(' ', '-') }}">
-                                {{ proyecto.estado }}
-                            </span>
+                            <div class="card-top-right">
+                                <span class="status-badge {{ proyecto.estado | lower | replace(' ', '-') }}">
+                                    {{ proyecto.estado }}
+                                </span>
+                                <div class="card-menu-wrapper">
+                                    <button class="card-menu-btn" onclick="toggleCardMenu(event, '{{ proyecto.id_proyecto }}')" title="Más opciones">
+                                        <i class="fas fa-ellipsis-v"></i>
+                                    </button>
+                                    <div class="card-menu-dropdown" id="card-menu-{{ proyecto.id_proyecto }}">
+                                        <a class="dropdown-item" onclick="window.location.href='/edit_project/{{ proyecto.id_proyecto }}'">
+                                            <i class="fas fa-pen"></i> Editar proyecto
+                                        </a>
+                                        <a class="dropdown-item danger" onclick="eliminarProyecto('{{ proyecto.id_proyecto }}', '{{ proyecto.name }}')">
+                                            <i class="fas fa-trash"></i> Eliminar
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="card-meta">
@@ -521,6 +536,32 @@
             document.querySelectorAll('.formularios-dropdown.open')
                     .forEach(d => d.classList.remove('open'));
             if (!isOpen) dropdown.classList.add('open');
+        }
+
+        function toggleCardMenu(event, projectId) {
+            event.stopPropagation();
+            document.querySelectorAll('.card-menu-dropdown').forEach(d => {
+                if (d.id !== 'card-menu-' + projectId) d.classList.remove('show');
+            });
+            document.getElementById('card-menu-' + projectId).classList.toggle('show');
+        }
+
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.card-menu-dropdown').forEach(d => d.classList.remove('show'));
+        });
+
+        async function eliminarProyecto(projectId, nombre) {
+            if (!confirm(`¿Eliminar el proyecto "${nombre}"? Esta acción no se puede deshacer.`)) return;
+            try {
+                const res = await fetch('/edit_project/' + projectId, { method: 'DELETE' });
+                if (res.ok) {
+                    location.reload();
+                } else {
+                    alert('Error al eliminar el proyecto');
+                }
+            } catch {
+                alert('Error de conexión');
+            }
         }
 
         function redirectToSynchro(projectId) {

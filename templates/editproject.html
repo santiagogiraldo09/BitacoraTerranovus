@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editar Proyecto — Bitácora IAC</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='addproject.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        .field-select {
+            width: 100%;
+            padding: 11px 14px;
+            border: 1.5px solid var(--gris-borde);
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'DM Sans', sans-serif;
+            color: var(--texto);
+            background: var(--blanco);
+            outline: none;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            padding-right: 36px;
+        }
+        .campo-dinamico-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--gris-texto);
+            margin-bottom: 5px;
+        }
+        .campo-requerido-mark {
+            color: #ef4444;
+            margin-left: 2px;
+        }
+        .tipo-proyecto-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: var(--naranja-light);
+            color: var(--naranja-dark);
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+<div class="page-wrapper">
+
+    <header class="page-header">
+        <button class="btn-back" onclick="window.location.href='/registros'">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <span class="page-title">Editar Proyecto</span>
+    </header>
+
+    <div class="form-scroll">
+        <form id="project-form">
+
+            <!-- Tipo de Proyecto (solo informativo, no editable) -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-icon">
+                        <i class="fas fa-layer-group"></i>
+                    </span>
+                    <h3 class="section-title">Tipo de Proyecto</h3>
+                </div>
+
+                {% set tipo_actual = tipos_proyecto | selectattr('id', 'equalto', proyecto.tipo_proyecto_id) | first %}
+                <div class="tipo-proyecto-badge">
+                    <i class="fas fa-tag"></i> {{ tipo_actual.nombre if tipo_actual else 'Sin tipo' }}
+                </div>
+                <p class="section-hint" style="margin-top:8px;">El tipo de proyecto no se puede cambiar después de creado.</p>
+
+                <!-- Campos dinámicos pre-cargados con valores actuales -->
+                <div id="campos-dinamicos"></div>
+            </div>
+
+            <!-- Cronograma -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-icon">
+                        <i class="fas fa-calendar-alt"></i>
+                    </span>
+                    <h3 class="section-title">Cronograma</h3>
+                </div>
+                <div class="date-row">
+                    <div class="field-group">
+                        <label for="start-date">Fecha de inicio</label>
+                        <input type="date" id="start-date" name="start-date"
+                               value="{{ proyecto.fecha_inicio }}" required>
+                    </div>
+                    <div class="field-group">
+                        <label for="end-date">Fecha de fin</label>
+                        <input type="date" id="end-date" name="end-date"
+                               value="{{ proyecto.fecha_fin }}" required>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Equipo -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-icon">
+                        <i class="fas fa-users"></i>
+                    </span>
+                    <h3 class="section-title">Equipo</h3>
+                </div>
+                <p class="section-hint">Selecciona los miembros que participarán en este proyecto.</p>
+                <div class="team-list" id="team-list">
+                    {% if usuarios %}
+                        {% for u in usuarios %}
+                        <div class="team-member {% if u.user_id in miembros_actuales %}selected{% endif %}"
+                             onclick="toggleMember(this, {{ u.user_id }})"
+                             data-id="{{ u.user_id }}">
+                            <div class="member-avatar">
+                                {{ u.name[0] | upper }}{{ u.apellido[0] | upper }}
+                            </div>
+                            <div class="member-info">
+                                <span class="member-name">{{ u.name }} {{ u.apellido }}</span>
+                                <span class="member-role">{{ u.cargo }}</span>
+                            </div>
+                            <div class="member-check">
+                                <i class="fas fa-check"></i>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="no-users">No hay usuarios disponibles.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Formularios -->
+            <div class="section">
+                <div class="section-header">
+                    <span class="section-icon">
+                        <i class="fas fa-file-alt"></i>
+                    </span>
+                    <h3 class="section-title">Formularios</h3>
+                </div>
+                <p class="section-hint">Selecciona los formularios disponibles en este proyecto.</p>
+                <div class="team-list" id="formularios-list">
+                    {% if formularios %}
+                        {% for f in formularios %}
+                        <div class="team-member {% if f.id in formularios_actuales %}selected{% endif %}"
+                             onclick="toggleFormularioSelect(this, {{ f.id }})"
+                             data-id="{{ f.id }}">
+                            <div class="member-avatar" style="font-size:15px;">
+                                <i class="fas fa-file-alt"></i>
+                            </div>
+                            <div class="member-info">
+                                <span class="member-name">{{ f.nombre }}</span>
+                                <span class="member-role">{{ f.descripcion or 'Sin descripción' }}</span>
+                            </div>
+                            <div class="member-check">
+                                <i class="fas fa-check"></i>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="no-users">No hay formularios creados aún.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+        </form>
+    </div>
+</div>
+
+<div class="bottom-actions">
+    <button type="button" onclick="updateProject()" class="btn-guardar">
+        Guardar Cambios
+    </button>
+    <button type="button" onclick="window.location.href='/registros'" class="btn-cancelar">
+        Cancelar
+    </button>
+</div>
+
+<script>
+    const proyectoActual      = {{ proyecto | tojson | safe }};
+    const tiposProyecto       = {{ tipos_proyecto | tojson | safe }};
+    const camposProyecto      = {{ campos_proyecto | tojson | safe }};
+    const selectedMembers     = new Set({{ miembros_actuales | tojson | safe }});
+    const selectedFormularios = new Set({{ formularios_actuales | tojson | safe }});
+
+    function toggleMember(el, userId) {
+        if (selectedMembers.has(userId)) {
+            selectedMembers.delete(userId);
+            el.classList.remove('selected');
+        } else {
+            selectedMembers.add(userId);
+            el.classList.add('selected');
+        }
+    }
+
+    function toggleFormularioSelect(el, formId) {
+        if (selectedFormularios.has(formId)) {
+            selectedFormularios.delete(formId);
+            el.classList.remove('selected');
+        } else {
+            selectedFormularios.add(formId);
+            el.classList.add('selected');
+        }
+    }
+
+    // ── Renderizar campos dinámicos con valores precargados ──
+    function renderCamposDinamicos() {
+        const container = document.getElementById('campos-dinamicos');
+        const tipo      = tiposProyecto.find(t => t.id === proyectoActual.tipo_proyecto_id);
+        if (!tipo) return;
+
+        const camposTipo = tipo.campos.map(item => {
+            const id        = typeof item === 'object' ? item.id : item;
+            const requerido = typeof item === 'object' ? (item.requerido || false) : false;
+            const campo     = camposProyecto.find(c => c.id === id);
+            return campo ? { ...campo, requerido } : null;
+        }).filter(Boolean);
+
+        camposTipo.forEach(campo => {
+            const group = document.createElement('div');
+            group.className = 'field-group';
+
+            const reqMark      = campo.requerido || campo.es_sistema
+                ? '<span class="campo-requerido-mark">*</span>' : '';
+            const valorActual  = proyectoActual.datos_tipo[campo.id] || '';
+            const requeridoAttr = campo.requerido || campo.es_sistema ? 'required' : '';
+
+            let inputHtml = '';
+            switch (campo.tipo) {
+                case 'texto_corto':
+                    inputHtml = `<input type="text" class="field-input-dyn"
+                        data-campo-id="${campo.id}" value="${escapeHtml(valorActual)}" ${requeridoAttr}>`;
+                    break;
+                case 'texto_largo':
+                    inputHtml = `<textarea class="field-input-dyn field-textarea"
+                        data-campo-id="${campo.id}" rows="3" ${requeridoAttr}>${escapeHtml(valorActual)}</textarea>`;
+                    break;
+                case 'numero':
+                    inputHtml = `<input type="number" class="field-input-dyn"
+                        data-campo-id="${campo.id}" value="${valorActual}" step="any" ${requeridoAttr}>`;
+                    break;
+                case 'fecha':
+                    inputHtml = `<input type="date" class="field-input-dyn"
+                        data-campo-id="${campo.id}" value="${valorActual}" ${requeridoAttr}>`;
+                    break;
+                case 'seleccion':
+                case 'seleccion_unica':
+                    const opts = (campo.opciones || []).map(o =>
+                        `<option value="${escapeHtml(o)}" ${o === valorActual ? 'selected' : ''}>${escapeHtml(o)}</option>`
+                    ).join('');
+                    inputHtml = `<select class="field-input-dyn field-select" data-campo-id="${campo.id}" ${requeridoAttr}>
+                        <option value="">Selecciona...</option>${opts}</select>`;
+                    break;
+                case 'booleano':
+                    inputHtml = `<label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer;">
+                        <input type="checkbox" class="field-input-dyn" data-campo-id="${campo.id}"
+                        ${valorActual === true || valorActual === 'true' ? 'checked' : ''}
+                        style="width:18px;height:18px;accent-color:var(--naranja);cursor:pointer;">
+                        Sí</label>`;
+                    break;
+                case 'moneda':
+                    inputHtml = `<div style="display:flex;align-items:center;gap:6px;">
+                        <span style="font-size:14px;color:var(--gris-texto);font-weight:600;">$</span>
+                        <input type="number" class="field-input-dyn" data-campo-id="${campo.id}"
+                        value="${valorActual}" step="0.01" ${requeridoAttr}>
+                    </div>`;
+                    break;
+                case 'porcentaje':
+                    inputHtml = `<div style="display:flex;align-items:center;gap:6px;">
+                        <input type="number" class="field-input-dyn" data-campo-id="${campo.id}"
+                        value="${valorActual}" min="0" max="100" ${requeridoAttr}>
+                        <span style="font-size:14px;color:var(--gris-texto);font-weight:600;">%</span>
+                    </div>`;
+                    break;
+                default:
+                    inputHtml = `<input type="text" class="field-input-dyn"
+                        data-campo-id="${campo.id}" value="${escapeHtml(valorActual)}">`;
+            }
+
+            group.innerHTML = `
+                <label class="campo-dinamico-label">${campo.nombre}${reqMark}</label>
+                ${inputHtml}
+            `;
+            container.appendChild(group);
+        });
+    }
+
+    function escapeHtml(str) {
+        if (typeof str !== 'string') return str;
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    // ── Actualizar proyecto ──
+    async function updateProject() {
+        const camposDyn = document.querySelectorAll('.field-input-dyn');
+        const datosTipo = {};
+        let nombreProyecto = '';
+        let faltantes = [];
+
+        camposDyn.forEach(input => {
+            const campoId = input.dataset.campoId;
+            const campo   = camposProyecto.find(c => c.id === parseInt(campoId));
+            if (!campo) return;
+
+            let valor;
+            if (input.type === 'checkbox') {
+                valor = input.checked;
+            } else {
+                valor = input.value.trim ? input.value.trim() : input.value;
+            }
+
+            if (campo.es_sistema && campo.nombre === 'Nombre del proyecto') {
+                nombreProyecto = valor;
+            }
+
+            datosTipo[campoId] = valor;
+
+            if ((campo.es_sistema || campo.requerido) && !valor && valor !== false) {
+                if (!faltantes.includes(campo.nombre)) faltantes.push(campo.nombre);
+            }
+        });
+
+        if (!nombreProyecto) {
+            alert("El nombre del proyecto es obligatorio.");
+            return;
+        }
+
+        if (faltantes.length > 0) {
+            alert("Completa los campos obligatorios: " + faltantes.join(', '));
+            return;
+        }
+
+        const data = {
+            'project-name':  nombreProyecto,
+            'start-date':    document.getElementById('start-date').value || null,
+            'end-date':      document.getElementById('end-date').value || null,
+            'datos_tipo':    datosTipo,
+            'miembros':      Array.from(selectedMembers),
+            'formularios':   Array.from(selectedFormularios)
+        };
+
+        try {
+            const response = await fetch('/edit_project/' + proyectoActual.id, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            if (response.ok) {
+                alert("Proyecto actualizado correctamente");
+                window.location.href = '/registros';
+            } else {
+                throw new Error(result.error || "Error al actualizar");
+            }
+        } catch (error) {
+            alert("Error: " + error.message);
+        }
+    }
+
+    // ── Color primario ──
+    (function() {
+        const primario = "{{ color_primario }}";
+        document.documentElement.style.setProperty('--naranja', primario);
+        const r = parseInt(primario.slice(1,3), 16);
+        const g = parseInt(primario.slice(3,5), 16);
+        const b = parseInt(primario.slice(5,7), 16);
+        document.documentElement.style.setProperty('--naranja-light', `rgba(${r},${g},${b},0.12)`);
+        document.documentElement.style.setProperty('--naranja-dark', `#${Math.max(0,r-20).toString(16).padStart(2,'0')}${Math.max(0,g-20).toString(16).padStart(2,'0')}${Math.max(0,b-20).toString(16).padStart(2,'0')}`);
+    })();
+
+    // Cargar campos al iniciar
+    renderCamposDinamicos();
+</script>
+</body>
+</html>

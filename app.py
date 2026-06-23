@@ -2888,6 +2888,211 @@ def add_project():
     #return generate_password_hash('Bitacora2026*')
 
 
+@app.route('/edit_project/<int:project_id>', methods=['GET', 'PUT', 'DELETE'])
+def edit_project(project_id):
+    if 'user_id' not in session:
+        return jsonify({"error": "No autorizado"}), 401
+
+    empresa_id = session.get('empresa_id')
+
+    # ── PUT: actualizar proyecto ──
+    if request.method == 'PUT':
+        try:
+            data = request.json
+            with db_connection() as (conn, cursor):
+                # Verificar que el proyecto pertenece a la empresa
+                cursor.execute("""
+                    SELECT id FROM proyectos
+                    WHERE id = %s AND empresa_id = %s
+                """, (project_id, empresa_id))
+                if not cursor.fetchone():
+                    return jsonify({"error": "Proyecto no encontrado"}), 404
+
+                # Actualizar proyecto
+                cursor.execute("""
+                    UPDATE proyectos
+                    SET nombre_proyecto = %s,
+                        fecha_inicio    = %s,
+                        fecha_fin       = %s,
+                        datos_tipo      = %s
+                    WHERE id = %s AND empresa_id = %s
+                """, (
+                    data.get('project-name'),
+                    data.get('start-date'),
+                    data.get('end-date'),
+                    json.dumps(data.get('datos_tipo', {})),
+                    project_id, empresa_id
+                ))
+
+                # Reemplazar miembros: borrar e insertar
+                cursor.execute("""
+                    DELETE FROM proyecto_usuarios
+                    WHERE id_proyecto = %s
+                """, (project_id,))
+
+                miembros = data.get('miembros', [])
+                if not miembros:
+                    miembros = [session['user_id']]
+
+                for uid in miembros:
+                    cursor.execute("""
+                        INSERT INTO proyecto_usuarios (id_proyecto, user_id, empresa_id)
+                        VALUES (%s, %s, %s)
+                    """, (project_id, uid, empresa_id))
+
+                # Reemplazar formularios: borrar e insertar
+                cursor.execute("""
+                    DELETE FROM proyecto_formularios
+                    WHERE proyecto_id = %s
+                """, (project_id,))
+
+                for fid in data.get('formularios', []):
+                    cursor.execute("""
+                        INSERT INTO proyecto_formularios (proyecto_id, formulario_id, empresa_id)
+                        VALUES (%s, %s, %s)
+                    """, (project_id, fid, empresa_id))
+
+            return jsonify({"status": "success", "message": "Proyecto actualizado"}), 200
+
+        except Exception as e:
+            print(f"Error al actualizar proyecto: {e}")
+            return jsonify({"status": "error", "error": str(e)}), 500
+
+    # ── DELETE: eliminar proyecto ──
+    if request.method == 'DELETE':
+        try:
+            with db_connection() as (conn, cursor):
+                cursor.execute("""
+                    DELETE FROM proyectos
+                    WHERE id = %s AND empresa_id = %s
+                """, (project_id, empresa_id))
+            return jsonify({"status": "success"}), 200
+        except Exception as e:
+            return jsonify({"status": "error", "error": str(e)}), 500
+
+    # ── GET: cargar página de edición ──
+    proyecto         = None
+    usuarios         = []
+    miembros_actuales = []
+    formularios_actuales = []
+    color_primario   = '#FFAF33'
+    color_secundario = '#E3E3E3'
+    tipos_proyecto   = []
+    formularios      = []
+    campos_proyecto  = []
+
+    try:
+        with db_connection() as (conn, cursor):
+            # Cargar el proyecto
+            cursor.execute("""
+                SELECT id, nombre_proyecto, fecha_inicio, fecha_fin,
+                       tipo_proyecto_id, datos_tipo
+                FROM proyectos
+                WHERE id = %s AND empresa_id = %s
+            """, (project_id, empresa_id))
+            row = cursor.fetchone()
+            if not row:
+                return redirect(url_for('registros'))
+
+            proyecto = {
+                'id':               row[0],
+                'nombre':           row[1],
+                'fecha_inicio':     row[2].strftime('%Y-%m-%d') if row[2] else '',
+                'fecha_fin':        row[3].strftime('%Y-%m-%d') if row[3] else '',
+                'tipo_proyecto_id': row[4],
+                'datos_tipo':       row[5] or {}
+            }
+
+            # Miembros actuales
+            cursor.execute("""
+                SELECT user_id FROM proyecto_usuarios
+                WHERE id_proyecto = %s
+            """, (project_id,))
+            miembros_actuales = [r[0] for r in cursor.fetchall()]
+
+            # Formularios actuales
+            cursor.execute("""
+                SELECT formulario_id FROM proyecto_formularios
+                WHERE proyecto_id = %s
+            """, (project_id,))
+            formularios_actuales = [r[0] for r in cursor.fetchall()]
+
+            # Usuarios disponibles
+            cursor.execute("""
+                SELECT user_id, name, apellido, cargo
+                FROM usuario
+                WHERE estado = 'activo' AND empresa_id = %s
+                ORDER BY name ASC
+            """, (empresa_id,))
+            for r in cursor.fetchall():
+                usuarios.append({
+                    'user_id':  r[0],
+                    'name':     r[1],
+                    'apellido': r[2],
+                    'cargo':    r[3] or 'Sin cargo'
+                })
+
+            # Colores
+            cursor.execute("""
+                SELECT color_primario, color_secundario
+                FROM empresas WHERE id = %s
+            """, (empresa_id,))
+            emp = cursor.fetchone()
+            if emp:
+                color_primario   = emp[0] or '#FFAF33'
+                color_secundario = emp[1] or '#E3E3E3'
+
+            # Tipos de proyecto (para resolver el tipo actual)
+            cursor.execute("""
+                SELECT id, nombre, descripcion, campos
+                FROM tipos_proyecto
+                WHERE empresa_id = %s
+            """, (empresa_id,))
+            tipos_proyecto = [
+                {'id': r[0], 'nombre': r[1], 'descripcion': r[2], 'campos': r[3] or []}
+                for r in cursor.fetchall()
+            ]
+
+            # Formularios disponibles
+            cursor.execute("""
+                SELECT id, nombre, descripcion
+                FROM formularios
+                WHERE empresa_id = %s
+                ORDER BY nombre ASC
+            """, (empresa_id,))
+            formularios = [
+                {'id': r[0], 'nombre': r[1], 'descripcion': r[2] or ''}
+                for r in cursor.fetchall()
+            ]
+
+            # Campos globales de proyecto
+            cursor.execute("""
+                SELECT id, nombre, tipo, opciones, configuracion, es_sistema
+                FROM campos_globales
+                WHERE empresa_id = %s AND objeto = 'proyecto'
+                ORDER BY es_sistema DESC, created_at DESC
+            """, (empresa_id,))
+            campos_proyecto = [
+                {'id': r[0], 'nombre': r[1], 'tipo': r[2], 'opciones': r[3] or [],
+                 'configuracion': r[4] or {}, 'es_sistema': r[5] or False}
+                for r in cursor.fetchall()
+            ]
+
+    except Exception as e:
+        print(f"Error en edit_project GET: {e}")
+        return redirect(url_for('registros'))
+
+    return render_template('editproject.html',
+                           proyecto=proyecto,
+                           usuarios=usuarios,
+                           miembros_actuales=miembros_actuales,
+                           formularios_actuales=formularios_actuales,
+                           tipos_proyecto=tipos_proyecto,
+                           formularios=formularios,
+                           campos_proyecto=campos_proyecto,
+                           color_primario=color_primario,
+                           color_secundario=color_secundario)
+
 @app.route('/ask', methods=['POST'])
 def ask_question_route():
     data = request.json
