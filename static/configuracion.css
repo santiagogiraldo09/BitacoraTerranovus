@@ -1325,7 +1325,8 @@ button { font-family: inherit; cursor: pointer; }
     flex-shrink: 0;
 }
 
-/* Lista de formularios */
+/* Lista de items (formularios y tipos de proyecto) */
+.form-item,
 .formulario-item {
     display: flex;
     align-items: center;
@@ -1338,24 +1339,29 @@ button { font-family: inherit; cursor: pointer; }
     transition: all 0.2s;
 }
 
+.form-item:hover,
 .formulario-item:hover {
     border-color: var(--naranja);
     background: var(--naranja-light);
 }
 
+.form-item-info,
 .formulario-item-info { display: flex; flex-direction: column; gap: 3px; }
 
+.form-item-nombre,
 .formulario-item-nombre {
     font-size: 14px;
     font-weight: 700;
     color: var(--texto);
 }
 
+.form-item-meta,
 .formulario-item-meta {
     font-size: 12px;
     color: var(--gris-texto);
 }
 
+.form-item-actions,
 .formulario-item-actions {
     display: flex;
     gap: 8px;
