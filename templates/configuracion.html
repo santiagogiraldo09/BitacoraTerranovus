@@ -233,13 +233,14 @@
                         placeholder="Buscar campo..."
                         oninput="filtrarCampos(this.value)">
                 </div>
-                <!-- Lista de campos existentes -->
-                <div id="lista-campos"></div>
-
                 <!-- Botón abrir modal -->
                 <button class="btn-nuevo-campo" onclick="abrirModalCampo()">
                     <i class="fas fa-plus"></i> Nuevo campo
                 </button>
+                <!-- Lista de campos existentes -->
+                <div id="lista-campos"></div>
+
+                
             </div>
 
         </div>
@@ -329,11 +330,11 @@
                             placeholder="Buscar formulario..."
                             oninput="filtrarFormularios(this.value)">
                     </div>
-                    
-                    <div id="lista-formularios"></div>
                     <button class="btn-nuevo-campo" onclick="abrirBuilder(null)">
                         <i class="fas fa-plus"></i> Nuevo formulario
                     </button>
+                    <div id="lista-formularios"></div>
+                    
                 </div>
             </div>
 
@@ -426,11 +427,11 @@
                             placeholder="Buscar tipo de proyecto..."
                             oninput="filtrarTiposProyecto(this.value)">
                     </div>
-
-                    <div id="lista-tipos-proyecto"></div>
                     <button class="btn-nuevo-campo" onclick="abrirBuilderProyecto(null)">
                         <i class="fas fa-plus"></i> Nuevo tipo de proyecto
                     </button>
+                    <div id="lista-tipos-proyecto"></div>
+                    
                 </div>
             </div>
 
