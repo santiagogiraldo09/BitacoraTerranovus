@@ -1010,6 +1010,7 @@ button { font-family: inherit; cursor: pointer; }
     justify-content: center;
     gap: 6px;
     transition: background 0.2s;
+    margin-bottom: 12px;
 }
 .btn-nuevo-campo:hover { background: var(--naranja-light); }
 
