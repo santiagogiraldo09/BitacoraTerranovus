@@ -213,6 +213,26 @@
         {% endif %}
     </nav>
 
+    <!-- Modal de confirmación -->
+    <div class="modal-overlay" id="modal-confirmar">
+        <div class="modal-box">
+            <div class="modal-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h3 class="modal-title">Eliminar proyecto</h3>
+            <p class="modal-text" id="modal-confirmar-text">¿Eliminar este proyecto?</p>
+            <p class="modal-warning">Esta acción no se puede deshacer.</p>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-cancel" onclick="cerrarModalConfirmar()">Cancelar</button>
+                <button class="modal-btn modal-btn-confirm" id="modal-confirmar-btn">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+
     <!-- ===== MODAL: INVITAR USUARIOS ===== -->
     {% if session.get('user_rol') == 'admin' %}
     <div class="invite-overlay" id="invite-overlay">
@@ -550,19 +570,44 @@
             document.querySelectorAll('.card-menu-dropdown').forEach(d => d.classList.remove('show'));
         });
 
-        async function eliminarProyecto(projectId, nombre) {
-            if (!confirm(`¿Eliminar el proyecto "${nombre}"? Esta acción no se puede deshacer.`)) return;
+        let proyectoIdAEliminar = null;
+
+        function mostrarToast(msg, tipo = '') {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.className = 'toast show ' + tipo;
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        function eliminarProyecto(projectId, nombre) {
+            proyectoIdAEliminar = projectId;
+            document.getElementById('modal-confirmar-text').textContent = `¿Eliminar el proyecto "${nombre}"?`;
+            document.getElementById('modal-confirmar').classList.add('active');
+        }
+
+        function cerrarModalConfirmar() {
+            document.getElementById('modal-confirmar').classList.remove('active');
+            proyectoIdAEliminar = null;
+        }
+
+        document.getElementById('modal-confirmar-btn').addEventListener('click', async () => {
+            if (!proyectoIdAEliminar) return;
+
             try {
-                const res = await fetch('/edit_project/' + projectId, { method: 'DELETE' });
+                const res = await fetch('/edit_project/' + proyectoIdAEliminar, { method: 'DELETE' });
+                cerrarModalConfirmar();
+
                 if (res.ok) {
-                    location.reload();
+                    mostrarToast('✅ Proyecto eliminado correctamente', 'success');
+                    setTimeout(() => location.reload(), 1200);
                 } else {
-                    alert('Error al eliminar el proyecto');
+                    mostrarToast('❌ Error al eliminar el proyecto', 'error');
                 }
             } catch {
-                alert('Error de conexión');
+                cerrarModalConfirmar();
+                mostrarToast('❌ Error de conexión', 'error');
             }
-        }
+        });
 
         function redirectToSynchro(projectId) {
             window.location.href = `/formulario?project_id=${projectId}`;
