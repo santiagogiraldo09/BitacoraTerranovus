@@ -242,7 +242,20 @@
 </div>
 {% endif %}
 
+<!-- Toast notification -->
+<div class="toast" id="toast"></div>
+
 <script>
+
+    function mostrarToast(msg, tipo = '') {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast show ' + tipo;
+        setTimeout(() => {
+            t.classList.remove('show');
+        }, 3000);
+    }
+
     // ── Variables globales ──
     const selectedMembers     = new Set();
     const selectedFormularios = new Set();
@@ -380,13 +393,13 @@
 
         // Validar que exista el dropdown
         if (!tipoSelect) {
-            alert("Debes crear un tipo de proyecto antes de poder registrar proyectos.");
+            mostrarToast("Debes crear un tipo de proyecto antes de poder registrar proyectos.", "error");
             return;
         }
 
         const tipoId = tipoSelect.value;
         if (!tipoId) {
-            alert("Selecciona un tipo de proyecto.");
+            mostrarToast("Selecciona un tipo de proyecto.", "error");
             return;
         }
 
@@ -432,12 +445,11 @@
         });
 
         if (!nombreProyecto) {
-            alert("El nombre del proyecto es obligatorio.");
-            return;
+            mostrarToast("El nombre del proyecto es obligatorio.", "error");
         }
 
         if (faltantes.length > 0) {
-            alert("Completa los campos obligatorios: " + faltantes.join(', '));
+            mostrarToast("Completa los campos obligatorios: " + faltantes.join(', '), "error");
             return;
         }
 
@@ -463,13 +475,15 @@
             });
             const result = await response.json();
             if (response.ok) {
-                alert("Proyecto registrado exitosamente");
-                window.location.href = '/registros';
+                mostrarToast("✅ Proyecto registrado exitosamente", "success");
+                setTimeout(() => {
+                    window.location.href = '/registros';
+                }, 1500);
             } else {
                 throw new Error(result.error || "Error al procesar la solicitud");
             }
         } catch (error) {
-            alert("Error: " + error.message);
+            mostrarToast("❌ " + error.message, "error");
             console.error("Error:", error);
         }
     }
