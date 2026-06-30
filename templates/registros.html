@@ -100,80 +100,55 @@
                 {% if db_projects %}
                     {% for proyecto in db_projects %}
                     <div class="project-card"
-                         data-name="{{ proyecto.name | lower }}"
-                         data-estado="{{ proyecto.estado | lower }}">
+                        data-name="{{ proyecto.name | lower }}"
+                        data-estado="{{ proyecto.estado | lower }}">
 
+                        <!-- Top: nombre + menú -->
                         <div class="card-top">
                             <h3 class="card-title">{{ proyecto.name }}</h3>
-                            <div class="card-top-right">
-                                <span class="status-badge {{ proyecto.estado | lower | replace(' ', '-') }}">
-                                    {{ proyecto.estado }}
-                                </span>
-                                <div class="card-menu-wrapper">
-                                    <button class="card-menu-btn" onclick="toggleCardMenu(event, '{{ proyecto.id_proyecto }}')" title="Más opciones">
-                                        <i class="fas fa-ellipsis-v"></i>
-                                    </button>
-                                    <div class="card-menu-dropdown" id="card-menu-{{ proyecto.id_proyecto }}">
-                                        <a class="dropdown-item" onclick="window.location.href='/edit_project/{{ proyecto.id_proyecto }}'">
-                                            <i class="fas fa-pen"></i> Editar proyecto
-                                        </a>
-                                        <a class="dropdown-item danger" onclick="eliminarProyecto('{{ proyecto.id_proyecto }}', '{{ proyecto.name }}')">
-                                            <i class="fas fa-trash"></i> Eliminar
-                                        </a>
-                                    </div>
+                            <div class="card-menu-wrapper">
+                                <button class="card-menu-btn" onclick="toggleCardMenu(event, '{{ proyecto.id_proyecto }}')" title="Más opciones">
+                                    <i class="fas fa-ellipsis-v"></i>
+                                </button>
+                                <div class="card-menu-dropdown" id="card-menu-{{ proyecto.id_proyecto }}">
+                                    <a class="dropdown-item" onclick="window.location.href='/edit_project/{{ proyecto.id_proyecto }}'">
+                                        <i class="fas fa-pen"></i> Editar proyecto
+                                    </a>
+                                    <a class="dropdown-item danger" onclick="eliminarProyecto('{{ proyecto.id_proyecto }}', '{{ proyecto.name }}')">
+                                        <i class="fas fa-trash"></i> Eliminar
+                                    </a>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="card-meta">
-                            <div class="meta-item">
-                                <i class="fas fa-calendar-alt"></i>
-                                <div>
-                                    <span class="meta-label">INICIO</span>
-                                    <span class="meta-value">{{ proyecto.fecha_inicio }}</span>
-                                </div>
-                            </div>
-                            <div class="meta-item">
-                                <i class="fas fa-clipboard-list"></i>
-                                <div>
-                                    <span class="meta-label">REGISTROS</span>
-                                    <span class="meta-value">{{ proyecto.total_registros }} entradas</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="card-footer">
-                            <span class="ver-detalles" onclick="redirectToProjectDetails('{{ proyecto.name }}', '{{ proyecto.id_proyecto }}')">
-                                Ver Detalles <i class="fas fa-chevron-right"></i>
+                        <!-- Estado + Ver proyecto -->
+                        <div class="card-status-row">
+                            <span class="status-badge {{ proyecto.estado | lower | replace(' ', '-') }}">
+                                {{ proyecto.estado }}
                             </span>
-                            <div class="formularios-wrapper">
-                                <span class="ver-detalles" onclick="toggleFormularios(event, '{{ proyecto.id_proyecto }}')">
-                                    Formularios <i class="fas fa-chevron-down"></i>
-                                </span>
-                                <div class="formularios-dropdown" id="formularios-{{ proyecto.id_proyecto }}">
-                                    <!-- Formularios fijos -->
-                                    <a class="dropdown-item" onclick="window.location.href='/formContacto?project_id={{ proyecto.id_proyecto }}'">
-                                        <i class="fas fa-address-book"></i> Registro de Contactos
-                                    </a>
-                                    <a class="dropdown-item" onclick="redirectToSynchro('{{ proyecto.id_proyecto }}')">
-                                        <i class="fas fa-tasks"></i> Synchro Control
-                                    </a>
-                                    <a class="dropdown-item" onclick="window.location.href='/formulario-lote?project_id={{ proyecto.id_proyecto }}'">
-                                        <i class="fas fa-clipboard-list"></i> Información General del Lote
-                                    </a>
+                            <span class="btn-ver-proyecto" onclick="window.location.href='/proyecto/{{ proyecto.id_proyecto }}'">
+                                Ver proyecto <i class="fas fa-chevron-right"></i>
+                            </span>
+                        </div>
 
-                                    <!-- Formularios dinámicos asignados al proyecto -->
-                                    {% if proyecto.formularios %}
-                                    <div style="border-top:1px solid #e5e7eb;margin:6px 0;"></div>
-                                    {% for f in proyecto.formularios %}
-                                    <a class="dropdown-item" onclick="window.location.href='/formulario-dinamico?project_id={{ proyecto.id_proyecto }}&formulario_id={{ f.id }}'">
-                                        <i class="fas fa-file-alt"></i> {{ f.nombre }}
-                                    </a>
-                                    {% endfor %}
-                                    {% endif %}
+                        <!-- Formularios activados -->
+                        {% if proyecto.formularios %}
+                        <div class="card-formularios-section">
+                            <span class="formularios-section-title">TUS FORMULARIOS</span>
+                            <div class="formularios-scroll-list">
+                                {% for f in proyecto.formularios %}
+                                <div class="formulario-card {% if f.es_ultimo %}formulario-destacado{% endif %}"
+                                    onclick="window.location.href='/formulario-dinamico?project_id={{ proyecto.id_proyecto }}&formulario_id={{ f.id }}'">
+                                    <div class="formulario-card-info">
+                                        <span class="formulario-card-nombre">{{ f.nombre }}</span>
+                                        <span class="formulario-card-subtexto">{{ f.subtexto }}</span>
+                                    </div>
+                                    <i class="fas fa-chevron-right formulario-card-arrow"></i>
                                 </div>
+                                {% endfor %}
                             </div>
                         </div>
+                        {% endif %}
                     </div>
                     {% endfor %}
                 {% else %}

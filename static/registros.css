@@ -970,3 +970,124 @@ button { font-family: inherit; cursor: pointer; }
 .toast.error {
     background: #dc2626;
 }
+
+/* ── Card status row (estado + ver proyecto) ── */
+.card-status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 10px 0 14px;
+}
+
+.btn-ver-proyecto {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gris-texto, #6b7280);
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.btn-ver-proyecto:hover {
+    color: var(--naranja);
+}
+
+.btn-ver-proyecto i {
+    font-size: 10px;
+}
+
+/* ── Formularios section ── */
+.card-formularios-section {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid #f1f1f1;
+}
+
+.formularios-section-title {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    color: #9ca3af;
+    letter-spacing: 1px;
+    margin-bottom: 10px;
+}
+
+.formularios-scroll-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.formularios-scroll-list::-webkit-scrollbar {
+    width: 4px;
+}
+
+.formularios-scroll-list::-webkit-scrollbar-thumb {
+    background: #e5e7eb;
+    border-radius: 2px;
+}
+
+/* ── Formulario card individual ── */
+.formulario-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-radius: 10px;
+    background: #f9fafb;
+    border: 1.5px solid transparent;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.formulario-card:hover {
+    background: #f3f4f6;
+}
+
+.formulario-card.formulario-destacado {
+    background: var(--naranja-light, rgba(255, 175, 51, 0.12));
+    border-color: var(--naranja, #FFAF33);
+}
+
+.formulario-card-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+    min-width: 0;
+}
+
+.formulario-card-nombre {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--texto, #1a1a1a);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.formulario-card-subtexto {
+    font-size: 12px;
+    color: var(--gris-texto, #6b7280);
+}
+
+.formulario-destacado .formulario-card-subtexto {
+    color: var(--naranja, #FFAF33);
+    font-weight: 600;
+}
+
+.formulario-card-arrow {
+    color: #9ca3af;
+    font-size: 12px;
+    margin-left: 8px;
+    flex-shrink: 0;
+}
+
+.formulario-destacado .formulario-card-arrow {
+    color: var(--naranja, #FFAF33);
+}

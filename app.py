@@ -1184,14 +1184,16 @@ def get_user_projects(user_id):
                     p.cliente, 
                     p.user_id,
                     p.estado,
-                    COUNT(c.id) as total_registros
+                    COUNT(c.id) as total_registros,
+                    MAX(rf.created_at) as ultima_actividad
                 FROM proyectos p
                 INNER JOIN proyecto_usuarios pu ON pu.id_proyecto = p.id
                 LEFT JOIN contactos c ON c.id_proyecto = p.id
+                LEFT JOIN respuestas_formulario rf ON rf.id_proyecto = p.id
                 WHERE pu.user_id = %s 
                 GROUP BY p.id, p.nombre_proyecto, 
                         p.fecha_inicio, p.cliente, p.user_id, p.estado
-                ORDER BY p.fecha_inicio DESC
+                ORDER BY COALESCE(MAX(rf.created_at), p.fecha_inicio) DESC
             """, (user_id,))
             
             projects = []
@@ -1205,26 +1207,62 @@ def get_user_projects(user_id):
                     'user_id':          row[4],
                     'estado':           row[5] or 'En Curso',
                     'total_registros':  row[6],
+                    'ultima_actividad': row[7].strftime('%Y-%m-%d %H:%M') if row[7] else None,
                     'formularios':      []
                 })
                 project_ids.append(row[0])
 
-            # Cargar formularios asociados a cada proyecto
+            # Cargar formularios activados con estadísticas
             if project_ids:
                 cursor.execute("""
-                    SELECT pf.proyecto_id, f.id, f.nombre
+                    SELECT 
+                        pf.proyecto_id,
+                        f.id,
+                        f.nombre,
+                        COUNT(rf.id) FILTER (WHERE rf.created_at::date = CURRENT_DATE) AS registros_hoy,
+                        MAX(rf.created_at) AS ultimo_uso
                     FROM proyecto_formularios pf
                     INNER JOIN formularios f ON f.id = pf.formulario_id
+                    LEFT JOIN respuestas_formulario rf 
+                        ON rf.formulario_id = pf.formulario_id 
+                        AND rf.id_proyecto = pf.proyecto_id
                     WHERE pf.proyecto_id = ANY(%s)
-                    ORDER BY f.nombre ASC
+                    GROUP BY pf.proyecto_id, f.id, f.nombre
+                    ORDER BY MAX(rf.created_at) DESC NULLS LAST, f.nombre ASC
                 """, (project_ids,))
 
+                # Trackear el último formulario usado por cada proyecto
+                ultimo_por_proyecto = {}
+
                 for row in cursor.fetchall():
-                    proyecto = next((p for p in projects if p['id_proyecto'] == row[0]), None)
+                    proyecto_id   = row[0]
+                    formulario_id = row[1]
+                    nombre        = row[2]
+                    registros_hoy = row[3]
+                    ultimo_uso    = row[4]
+
+                    # Determinar subtexto
+                    if ultimo_uso and proyecto_id not in ultimo_por_proyecto:
+                        subtexto = '⭐ Último usado'
+                        ultimo_por_proyecto[proyecto_id] = formulario_id
+                        es_ultimo = True
+                    elif registros_hoy > 0:
+                        subtexto = f'{registros_hoy} {"registro" if registros_hoy == 1 else "registros"} hoy'
+                        es_ultimo = False
+                    elif ultimo_uso:
+                        subtexto = f'Último uso: {ultimo_uso.strftime("%d/%m/%Y")}'
+                        es_ultimo = False
+                    else:
+                        subtexto = 'Sin registros aún'
+                        es_ultimo = False
+
+                    proyecto = next((p for p in projects if p['id_proyecto'] == proyecto_id), None)
                     if proyecto:
                         proyecto['formularios'].append({
-                            'id':     row[1],
-                            'nombre': row[2]
+                            'id':        formulario_id,
+                            'nombre':    nombre,
+                            'subtexto':  subtexto,
+                            'es_ultimo': es_ultimo
                         })
 
             return projects
