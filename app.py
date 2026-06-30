@@ -1216,20 +1216,21 @@ def get_user_projects(user_id):
             if project_ids:
                 cursor.execute("""
                     SELECT 
-                        pf.proyecto_id,
+                        pfa.proyecto_id,
                         f.id,
                         f.nombre,
                         COUNT(rf.id) FILTER (WHERE rf.created_at::date = CURRENT_DATE) AS registros_hoy,
                         MAX(rf.created_at) AS ultimo_uso
-                    FROM proyecto_formularios pf
-                    INNER JOIN formularios f ON f.id = pf.formulario_id
+                    FROM proyecto_formularios_activos pfa
+                    INNER JOIN formularios f ON f.id = pfa.formulario_id
                     LEFT JOIN respuestas_formulario rf 
-                        ON rf.formulario_id = pf.formulario_id 
-                        AND rf.id_proyecto = pf.proyecto_id
-                    WHERE pf.proyecto_id = ANY(%s)
-                    GROUP BY pf.proyecto_id, f.id, f.nombre
+                        ON rf.formulario_id = pfa.formulario_id 
+                        AND rf.id_proyecto = pfa.proyecto_id
+                    WHERE pfa.proyecto_id = ANY(%s)
+                      AND pfa.user_id = %s
+                    GROUP BY pfa.proyecto_id, f.id, f.nombre
                     ORDER BY MAX(rf.created_at) DESC NULLS LAST, f.nombre ASC
-                """, (project_ids,))
+                """, (project_ids, user_id))
 
                 # Trackear el último formulario usado por cada proyecto
                 ultimo_por_proyecto = {}

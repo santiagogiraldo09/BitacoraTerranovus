@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ proyecto.nombre }} — Bitácora IAC</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vistaProyecto.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+    <script>
+        (function() {
+            const p = "{{ color_primario | default('#FFAF33') }}";
+            document.documentElement.style.setProperty('--naranja', p);
+            const r = parseInt(p.slice(1,3), 16);
+            const g = parseInt(p.slice(3,5), 16);
+            const b = parseInt(p.slice(5,7), 16);
+            document.documentElement.style.setProperty('--naranja-light', `rgba(${r},${g},${b},0.12)`);
+        })();
+    </script>
+</head>
+<body>
+
+<div class="page-wrapper">
+
+    <!-- Header -->
+    <header class="page-header">
+        <button class="btn-back" onclick="window.location.href='/registros'">
+            <i class="fas fa-chevron-left"></i>
+        </button>
+        <div class="header-content">
+            <h1 class="header-title">{{ proyecto.nombre }}</h1>
+            <span class="header-subtitle status-{{ proyecto.estado | lower | replace(' ', '-') }}">
+                {{ proyecto.estado }}
+            </span>
+        </div>
+    </header>
+
+    <!-- Pestañas -->
+    <nav class="tabs-nav">
+        <button class="tab-btn active" data-tab="registros" onclick="cambiarTab('registros')">
+            Registros
+        </button>
+        <button class="tab-btn" data-tab="formularios" onclick="cambiarTab('formularios')">
+            Formularios
+        </button>
+    </nav>
+
+    <!-- ════════════════════════════════════════════ -->
+    <!-- TAB: REGISTROS                               -->
+    <!-- ════════════════════════════════════════════ -->
+    <div class="tab-content active" id="tab-registros">
+
+        <!-- Chips de filtro -->
+        <div class="filter-chips" id="filter-chips">
+            <button class="chip chip-active" data-filter="todos" onclick="filtrarPorFormulario('todos')">
+                Todos
+            </button>
+            <!-- Los chips de formularios se cargan dinámicamente -->
+        </div>
+
+        <!-- Lista de registros -->
+        <div id="registros-list" class="registros-list">
+            <div class="loading-state">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Cargando registros...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════ -->
+    <!-- TAB: FORMULARIOS                             -->
+    <!-- ════════════════════════════════════════════ -->
+    <div class="tab-content" id="tab-formularios">
+
+        <p class="tab-hint">
+            Activa los formularios que quieres ver en la tarjeta del proyecto en la pantalla principal.
+        </p>
+
+        <div class="formularios-list">
+            {% if formularios_proy %}
+                {% for f in formularios_proy %}
+                <div class="formulario-toggle-card">
+                    <div class="formulario-info">
+                        <span class="formulario-nombre">{{ f.nombre }}</span>
+                        <span class="formulario-desc">{{ f.descripcion or 'Sin descripción' }}</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox"
+                               {% if f.activo %}checked{% endif %}
+                               onchange="toggleFormulario({{ f.id }}, this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                {% endfor %}
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-file-alt"></i>
+                <p>Este proyecto no tiene formularios asignados.</p>
+                <p class="empty-hint">Edita el proyecto desde la pantalla principal para agregar formularios.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<!-- FAB nuevo registro -->
+<button class="fab-button" id="fab-nuevo-registro" onclick="abrirNuevoRegistro()" title="Nuevo registro">
+    <i class="fas fa-microphone"></i> <span>Nuevo registro</span>
+</button>
+
+<!-- Modal: seleccionar formulario para nuevo registro -->
+<div class="modal-overlay" id="modal-seleccionar-form">
+    <div class="modal-box">
+        <h3 class="modal-title">¿En qué formulario registrar?</h3>
+        <p class="modal-subtitle">Selecciona un formulario para crear el registro.</p>
+        <div class="modal-formularios" id="modal-formularios-list"></div>
+        <button class="modal-btn modal-btn-cancel" onclick="cerrarModalSeleccionar()">Cancelar</button>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+    const proyectoId        = {{ proyecto.id }};
+    const formulariosProy   = {{ formularios_proy | tojson | safe }};
+    let registrosCache      = [];
+    let filtroActual        = 'todos';
+
+    // ── Toast ──
+    function mostrarToast(msg, tipo = '') {
+        const t = document.getElementById('toast');
+        t.textContent = msg;
+        t.className = 'toast show ' + tipo;
+        setTimeout(() => t.classList.remove('show'), 3000);
+    }
+
+    // ── Tabs ──
+    function cambiarTab(tab) {
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.getElementById('tab-' + tab).classList.add('active');
+
+        // Mostrar/ocultar FAB según pestaña
+        document.getElementById('fab-nuevo-registro').style.display = tab === 'registros' ? '' : 'none';
+    }
+
+    // ── Cargar registros ──
+    async function cargarRegistros(formularioId = null) {
+        const lista = document.getElementById('registros-list');
+        lista.innerHTML = '<div class="loading-state"><i class="fas fa-spinner fa-spin"></i><p>Cargando...</p></div>';
+
+        try {
+            const url = formularioId
+                ? `/api/proyecto/${proyectoId}/registros?formulario_id=${formularioId}`
+                : `/api/proyecto/${proyectoId}/registros`;
+            const res  = await fetch(url);
+            const data = await res.json();
+            registrosCache = data.registros || [];
+            renderRegistros();
+        } catch {
+            lista.innerHTML = '<p class="error-state">Error al cargar registros.</p>';
+        }
+    }
+
+    // ── Renderizar registros agrupados por día ──
+    function renderRegistros() {
+        const lista = document.getElementById('registros-list');
+
+        if (registrosCache.length === 0) {
+            lista.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-clipboard-list"></i>
+                    <p>Aún no hay registros en este proyecto.</p>
+                    <p class="empty-hint">Toca el botón "Nuevo registro" para empezar.</p>
+                </div>`;
+            return;
+        }
+
+        // Agrupar por fecha
+        const grupos = {};
+        registrosCache.forEach(r => {
+            const fecha     = new Date(r.created_at);
+            const labelDia  = etiquetaDia(fecha);
+            if (!grupos[labelDia]) grupos[labelDia] = [];
+            grupos[labelDia].push(r);
+        });
+
+        let html = '';
+        for (const [dia, registros] of Object.entries(grupos)) {
+            html += `<div class="grupo-dia"><span class="grupo-dia-label">${dia}</span></div>`;
+            registros.forEach(r => {
+                const hora = new Date(r.created_at).toLocaleTimeString('es-CO', {hour: '2-digit', minute: '2-digit'});
+                const iniciales = (r.autor || '?').split(' ').map(s => s[0]).join('').slice(0,2).toUpperCase();
+                html += `
+                    <div class="registro-card" onclick="abrirRegistro(${r.id}, ${r.formulario_id})">
+                        <div class="registro-card-top">
+                            <span class="registro-formulario-tag">
+                                <span class="tag-dot"></span> ${r.formulario_nombre}
+                            </span>
+                            <span class="registro-hora">${hora}</span>
+                        </div>
+                        <p class="registro-preview">"${r.preview || 'Sin contenido visible'}"</p>
+                        <div class="registro-card-footer">
+                            <div class="registro-autor">
+                                <span class="registro-avatar">${iniciales}</span>
+                                <span class="registro-autor-nombre">${r.autor}</span>
+                            </div>
+                        </div>
+                    </div>`;
+            });
+        }
+        lista.innerHTML = html;
+    }
+
+    function etiquetaDia(fecha) {
+        const hoy   = new Date(); hoy.setHours(0,0,0,0);
+        const ayer  = new Date(hoy); ayer.setDate(ayer.getDate() - 1);
+        const f     = new Date(fecha); f.setHours(0,0,0,0);
+        if (f.getTime() === hoy.getTime())  return 'HOY';
+        if (f.getTime() === ayer.getTime()) return 'AYER';
+        return f.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' }).toUpperCase();
+    }
+
+    // ── Filtro por formulario ──
+    function filtrarPorFormulario(filter) {
+        filtroActual = filter;
+        document.querySelectorAll('#filter-chips .chip').forEach(c => {
+            c.classList.toggle('chip-active', c.dataset.filter === String(filter));
+        });
+        const formId = filter === 'todos' ? null : parseInt(filter);
+        cargarRegistros(formId);
+    }
+
+    // ── Construir chips de filtro ──
+    function construirChips() {
+        const chips = document.getElementById('filter-chips');
+        formulariosProy.forEach(f => {
+            const btn = document.createElement('button');
+            btn.className     = 'chip';
+            btn.dataset.filter = f.id;
+            btn.textContent   = f.nombre;
+            btn.onclick       = () => filtrarPorFormulario(f.id);
+            chips.appendChild(btn);
+        });
+    }
+
+    // ── Toggle formulario activo ──
+    async function toggleFormulario(formularioId, activar) {
+        try {
+            const res = await fetch(`/api/proyecto/${proyectoId}/formulario/${formularioId}/toggle`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ activar })
+            });
+            const data = await res.json();
+            if (data.success) {
+                mostrarToast(activar ? '✅ Formulario activado' : '✅ Formulario desactivado', 'success');
+            } else {
+                mostrarToast('❌ Error al actualizar', 'error');
+            }
+        } catch {
+            mostrarToast('❌ Error de conexión', 'error');
+        }
+    }
+
+    // ── Nuevo registro ──
+    function abrirNuevoRegistro() {
+        const modal = document.getElementById('modal-seleccionar-form');
+        const lista = document.getElementById('modal-formularios-list');
+
+        if (formulariosProy.length === 0) {
+            mostrarToast('⚠️ Este proyecto no tiene formularios disponibles', 'error');
+            return;
+        }
+
+        lista.innerHTML = '';
+        formulariosProy.forEach(f => {
+            const item = document.createElement('div');
+            item.className = 'modal-form-item';
+            item.innerHTML = `
+                <i class="fas fa-file-alt"></i>
+                <div>
+                    <span class="modal-form-nombre">${f.nombre}</span>
+                    <span class="modal-form-desc">${f.descripcion || 'Sin descripción'}</span>
+                </div>
+                <i class="fas fa-chevron-right"></i>`;
+            item.onclick = () => {
+                window.location.href = `/formulario-dinamico?project_id=${proyectoId}&formulario_id=${f.id}`;
+            };
+            lista.appendChild(item);
+        });
+
+        modal.classList.add('active');
+    }
+
+    function cerrarModalSeleccionar() {
+        document.getElementById('modal-seleccionar-form').classList.remove('active');
+    }
+
+    // ── Abrir registro (modo edición) ──
+    function abrirRegistro(registroId, formularioId) {
+        window.location.href = `/formulario-dinamico?project_id=${proyectoId}&formulario_id=${formularioId}&registro_id=${registroId}`;
+    }
+
+    // ── Init ──
+    construirChips();
+    cargarRegistros();
+</script>
+
+</body>
+</html>
