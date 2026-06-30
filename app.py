@@ -1666,6 +1666,172 @@ def update_synchro_data():
         return jsonify({'error': f'Error interno del servidor: {str(e)}'}), 500
 
 
+# ── Vista de proyecto: GET ──────────────────────────────────────
+@app.route('/proyecto/<int:project_id>')
+def vista_proyecto(project_id):
+    if 'user_id' not in session:
+        return redirect(url_for('login'))
+
+    empresa_id = session.get('empresa_id')
+    user_id    = session['user_id']
+
+    proyecto         = None
+    formularios_proy = []
+    color_primario   = '#FFAF33'
+    logo_actual      = None
+
+    try:
+        with db_connection() as (conn, cursor):
+            # Cargar el proyecto
+            cursor.execute("""
+                SELECT id, nombre_proyecto, estado
+                FROM proyectos
+                WHERE id = %s AND empresa_id = %s
+            """, (project_id, empresa_id))
+            row = cursor.fetchone()
+            if not row:
+                return redirect(url_for('registros'))
+
+            proyecto = {
+                'id':     row[0],
+                'nombre': row[1],
+                'estado': row[2] or 'En Curso'
+            }
+
+            # Formularios disponibles del proyecto + estado de activación para este usuario
+            cursor.execute("""
+                SELECT 
+                    f.id,
+                    f.nombre,
+                    f.descripcion,
+                    CASE WHEN pfa.id IS NOT NULL THEN TRUE ELSE FALSE END AS activo
+                FROM proyecto_formularios pf
+                INNER JOIN formularios f ON f.id = pf.formulario_id
+                LEFT JOIN proyecto_formularios_activos pfa 
+                    ON pfa.formulario_id = pf.formulario_id 
+                    AND pfa.proyecto_id = pf.proyecto_id
+                    AND pfa.user_id = %s
+                WHERE pf.proyecto_id = %s
+                ORDER BY f.nombre ASC
+            """, (user_id, project_id))
+            formularios_proy = [
+                {'id': r[0], 'nombre': r[1], 'descripcion': r[2] or '', 'activo': r[3]}
+                for r in cursor.fetchall()
+            ]
+
+            # Colores y logo
+            cursor.execute("""
+                SELECT logo_url, color_primario
+                FROM empresas WHERE id = %s
+            """, (empresa_id,))
+            emp = cursor.fetchone()
+            if emp:
+                logo_actual    = emp[0]
+                color_primario = emp[1] or '#FFAF33'
+
+    except Exception as e:
+        print(f"Error en vista_proyecto: {e}")
+        return redirect(url_for('registros'))
+
+    return render_template('vistaProyecto.html',
+                           proyecto=proyecto,
+                           formularios_proy=formularios_proy,
+                           logo_actual=logo_actual,
+                           color_primario=color_primario)
+
+
+# ── API: registros del proyecto ─────────────────────────────────
+@app.route('/api/proyecto/<int:project_id>/registros')
+def api_registros_proyecto(project_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    try:
+        formulario_id = request.args.get('formulario_id', type=int)
+
+        with db_connection() as (conn, cursor):
+            base_query = """
+                SELECT 
+                    rf.id,
+                    rf.formulario_id,
+                    f.nombre AS formulario_nombre,
+                    rf.respuestas,
+                    rf.created_at,
+                    u.name,
+                    u.apellido
+                FROM respuestas_formulario rf
+                INNER JOIN formularios f ON f.id = rf.formulario_id
+                LEFT JOIN usuario u ON u.user_id = rf.user_id
+                WHERE rf.id_proyecto = %s
+            """
+            params = [project_id]
+            if formulario_id:
+                base_query += " AND rf.formulario_id = %s"
+                params.append(formulario_id)
+
+            base_query += " ORDER BY rf.created_at DESC LIMIT 100"
+
+            cursor.execute(base_query, params)
+            registros = []
+            for r in cursor.fetchall():
+                # Generar preview del registro
+                respuestas = r[3] or {}
+                preview    = ''
+                if isinstance(respuestas, dict):
+                    valores = [str(v) for v in respuestas.values() if v and isinstance(v, (str, int, float))]
+                    preview = ' · '.join(valores[:3])[:150]
+
+                registros.append({
+                    'id':                r[0],
+                    'formulario_id':     r[1],
+                    'formulario_nombre': r[2],
+                    'preview':           preview,
+                    'created_at':        r[4].isoformat() if r[4] else None,
+                    'autor':             f"{r[5] or ''} {r[6] or ''}".strip() or 'Usuario'
+                })
+
+            return jsonify({'registros': registros})
+
+    except Exception as e:
+        print(f"Error en api_registros_proyecto: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ── API: activar/desactivar formulario ──────────────────────────
+@app.route('/api/proyecto/<int:project_id>/formulario/<int:formulario_id>/toggle', methods=['POST'])
+def toggle_formulario_activo(project_id, formulario_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    try:
+        data       = request.get_json() or {}
+        activar    = data.get('activar', True)
+        empresa_id = session.get('empresa_id')
+        user_id    = session['user_id']
+
+        with db_connection() as (conn, cursor):
+            if activar:
+                cursor.execute("""
+                    INSERT INTO proyecto_formularios_activos 
+                        (proyecto_id, formulario_id, user_id, empresa_id)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (proyecto_id, formulario_id, user_id) DO NOTHING
+                """, (project_id, formulario_id, user_id, empresa_id))
+            else:
+                cursor.execute("""
+                    DELETE FROM proyecto_formularios_activos
+                    WHERE proyecto_id = %s 
+                      AND formulario_id = %s 
+                      AND user_id = %s
+                """, (project_id, formulario_id, user_id))
+
+            return jsonify({'success': True, 'activo': activar})
+
+    except Exception as e:
+        print(f"Error en toggle_formulario_activo: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/get-synchro-project-data')
 def get_synchro_project_data():
     return jsonify({
