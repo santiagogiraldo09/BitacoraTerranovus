@@ -320,12 +320,10 @@
                                 if (tipo === 'numero') {
                                     const num = data.text.replace(/[^\d.,]/g, '').replace(',', '.');
                                     input.value = num || data.text;
-                                    mostrarToast('✅ Valor transcrito');
                                 } else if (tipo === 'fecha') {
                                     const parsed = new Date(data.text);
                                     if (!isNaN(parsed)) {
                                         input.value = parsed.toISOString().split('T')[0];
-                                        mostrarToast('✅ Fecha transcrita');
                                     } else {
                                         mostrarToast('⚠️ No se reconoció la fecha, escríbela manualmente');
                                     }
@@ -333,7 +331,6 @@
                                     input.value = input.value
                                         ? input.value + ' ' + data.text
                                         : data.text;
-                                    mostrarToast('✅ Texto transcrito');
                                 }
                             } else {
                                 mostrarToast('⚠️ No se detectó audio');
