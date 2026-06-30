@@ -344,7 +344,9 @@
 
         campos.forEach(input => {
             const campoId   = input.dataset.campoId;
-            const requerido = input.dataset.requerido === 'True';
+            const requerido = input.hasAttribute('required') || 
+                        input.dataset.requerido === 'True' || 
+                        input.dataset.requerido === 'true';
             let valor;
 
             if (input.type === 'checkbox') {
@@ -386,7 +388,9 @@
 
             if (data.success) {
                 mostrarToast('✅ Registro guardado correctamente');
-                setTimeout(() => window.history.back(), 1200);
+                setTimeout(() => {
+                    window.location.href = '/registros';
+                }, 1200);
             } else {
                 mostrarToast('❌ ' + (data.error || 'Error al guardar'));
             }
