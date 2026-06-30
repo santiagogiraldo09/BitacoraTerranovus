@@ -2082,6 +2082,7 @@ def formulario_dinamico():
 
     project_id    = request.args.get('project_id')
     formulario_id = request.args.get('formulario_id')
+    registro_id   = request.args.get('registro_id')  # ← nuevo
 
     if not project_id or not formulario_id:
         return redirect(url_for('registros'))
@@ -2090,6 +2091,8 @@ def formulario_dinamico():
     campos         = []
     logo_actual    = None
     color_primario = '#FFAF33'
+    registro       = None
+    puede_editar   = True
 
     try:
         with db_connection() as (conn, cursor):
@@ -2111,7 +2114,29 @@ def formulario_dinamico():
                 'campos_config': row[3] or []
             }
 
-            # Obtener campos globales referenciados
+            # Si es edición, cargar el registro
+            if registro_id:
+                cursor.execute("""
+                    SELECT rf.id, rf.respuestas, rf.user_id, u.rol
+                    FROM respuestas_formulario rf
+                    LEFT JOIN usuario u ON u.user_id = %s
+                    WHERE rf.id = %s
+                """, (session['user_id'], registro_id))
+                reg = cursor.fetchone()
+                if reg:
+                    registro = {
+                        'id':         reg[0],
+                        'respuestas': reg[1] or {},
+                        'autor_id':   reg[2]
+                    }
+                    # Verificar permisos: autor o admin
+                    rol_usuario = reg[3] or ''
+                    puede_editar = (
+                        reg[2] == session['user_id'] or
+                        rol_usuario.lower() in ('admin', 'administrador')
+                    )
+
+            # Obtener campos globales
             campo_ids = [
                 (item['id'] if isinstance(item, dict) else item)
                 for item in formulario['campos_config']
@@ -2129,13 +2154,17 @@ def formulario_dinamico():
                     'opciones': r[3] or [], 'configuracion': r[4] or {}
                 } for r in cursor.fetchall()}
 
-                # Construir lista ordenada con requerido
                 for item in formulario['campos_config']:
                     cid       = item['id'] if isinstance(item, dict) else item
                     requerido = item.get('requerido', False) if isinstance(item, dict) else False
                     if cid in campos_db:
                         campo = campos_db[cid].copy()
                         campo['requerido'] = requerido
+                        # Pre-cargar valor si es edición
+                        if registro:
+                            campo['valor'] = registro['respuestas'].get(str(cid)) or registro['respuestas'].get(cid) or ''
+                        else:
+                            campo['valor'] = ''
                         campos.append(campo)
 
             # Colores y logo
@@ -2156,6 +2185,8 @@ def formulario_dinamico():
                            project_id=project_id,
                            formulario=formulario,
                            campos=campos,
+                           registro_id=registro_id,
+                           puede_editar=puede_editar,
                            logo_actual=logo_actual,
                            color_primario=color_primario)
 
@@ -2194,6 +2225,50 @@ def guardar_respuesta_formulario():
         print(f"Error al guardar respuesta: {e}")
         return jsonify({'error': str(e)}), 500
 
+
+@app.route('/api/respuestas-formulario/<int:registro_id>', methods=['PUT'])
+def actualizar_respuesta_formulario(registro_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    try:
+        data       = request.get_json()
+        respuestas = data.get('respuestas', {})
+        user_id    = session['user_id']
+
+        with db_connection() as (conn, cursor):
+            # Verificar permisos: autor o admin
+            cursor.execute("""
+                SELECT rf.user_id, u.rol
+                FROM respuestas_formulario rf
+                LEFT JOIN usuario u ON u.user_id = %s
+                WHERE rf.id = %s
+            """, (user_id, registro_id))
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({'error': 'Registro no encontrado'}), 404
+
+            autor_id  = row[0]
+            rol       = (row[1] or '').lower()
+            es_admin  = rol in ('admin', 'administrador')
+
+            if autor_id != user_id and not es_admin:
+                return jsonify({'error': 'No tienes permiso para editar este registro'}), 403
+
+            # Actualizar
+            cursor.execute("""
+                UPDATE respuestas_formulario
+                SET respuestas = %s,
+                    updated_by = %s,
+                    updated_at = NOW()
+                WHERE id = %s
+            """, (json.dumps(respuestas), user_id, registro_id))
+
+            return jsonify({'success': True})
+
+    except Exception as e:
+        print(f"Error al actualizar respuesta: {e}")
+        return jsonify({'error': str(e)}), 500
 
 # Crear formulario
 @app.route('/api/formularios', methods=['POST'])

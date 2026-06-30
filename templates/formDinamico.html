@@ -113,11 +113,19 @@
         </div>
     </header>
 
+    {% if registro_id and not puede_editar %}
+    <div style="background:#fef3c7;color:#92400e;padding:10px 20px;font-size:13px;text-align:center;">
+        <i class="fas fa-lock"></i> Solo lectura — no eres el autor de este registro
+    </div>
+    {% endif %}
+
     <!-- Contenido con scroll -->
     <div class="content-scroll">
 
         <input type="hidden" id="project-id" value="{{ project_id }}">
         <input type="hidden" id="formulario-id" value="{{ formulario.id }}">
+        <input type="hidden" id="registro-id" value="{{ registro_id or '' }}">
+        <input type="hidden" id="puede-editar" value="{{ 'true' if puede_editar else 'false' }}">
 
         <!-- Sección principal -->
         <div class="section">
@@ -257,7 +265,10 @@
         <!-- Botones fijos abajo -->
         <div class="bottom-actions">
             <button type="button" id="btn-guardar" onclick="guardarRespuesta()" class="btn-guardar">
-                <i class="fas fa-save"></i> Guardar registro
+                <i class="fas fa-save"></i> 
+                <span id="btn-guardar-text">
+                    {% if registro_id %}Guardar cambios{% else %}Guardar registro{% endif %}
+                </span>
             </button>
             <button type="button" onclick="window.history.back()" class="btn-cancelar">
                 Cancelar
@@ -361,6 +372,16 @@
     async function guardarRespuesta() {
         const projectId    = document.getElementById('project-id').value;
         const formularioId = document.getElementById('formulario-id').value;
+        const registroId   = document.getElementById('registro-id').value;
+        const puedeEditar  = document.getElementById('puede-editar').value === 'true';
+        const esEdicion    = registroId !== '';
+
+        // Validar permisos si es edición
+        if (esEdicion && !puedeEditar) {
+            mostrarToast('⚠️ No tienes permiso para editar este registro');
+            return;
+        }
+
         const campos       = document.querySelectorAll('.campo-respuesta');
         const respuestas   = {};
         const faltantes    = [];
@@ -368,8 +389,8 @@
         campos.forEach(input => {
             const campoId   = input.dataset.campoId;
             const requerido = input.hasAttribute('required') || 
-                        input.dataset.requerido === 'True' || 
-                        input.dataset.requerido === 'true';
+                            input.dataset.requerido === 'True' || 
+                            input.dataset.requerido === 'true';
             let valor;
 
             if (input.type === 'checkbox') {
@@ -390,7 +411,7 @@
 
         // Validar que al menos un campo tenga valor
         const algunCampoLleno = Object.values(respuestas).some(v => {
-            if (v === true) return true;                    // checkbox marcado
+            if (v === true) return true;
             if (v === false || v === null || v === undefined) return false;
             if (typeof v === 'string') return v.trim() !== '';
             if (typeof v === 'number') return true;
@@ -402,30 +423,39 @@
             return;
         }
 
-
         if (faltantes.length > 0) {
             mostrarToast('⚠️ Completa: ' + faltantes[0]);
             return;
         }
 
-        const btn = document.getElementById('btn-guardar');
-        btn.disabled  = true;
-        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+        const btn      = document.getElementById('btn-guardar');
+        const btnText  = document.getElementById('btn-guardar-text');
+        const textoOriginal = btnText.textContent;
+        btn.disabled   = true;
+        btn.innerHTML  = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
 
         try {
-            const res = await fetch('/api/respuestas-formulario', {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({
+            const url     = esEdicion 
+                ? `/api/respuestas-formulario/${registroId}`
+                : '/api/respuestas-formulario';
+            const method  = esEdicion ? 'PUT' : 'POST';
+            const body    = esEdicion
+                ? { respuestas }
+                : {
                     formulario_id: parseInt(formularioId),
                     project_id:    parseInt(projectId),
-                    respuestas:    respuestas
-                })
+                    respuestas
+                };
+
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(body)
             });
             const data = await res.json();
 
             if (data.success) {
-                mostrarToast('✅ Registro guardado correctamente');
+                mostrarToast(esEdicion ? '✅ Cambios guardados' : '✅ Registro guardado correctamente');
                 setTimeout(() => {
                     window.location.href = '/registros';
                 }, 1200);
@@ -436,7 +466,7 @@
             mostrarToast('❌ Error de conexión');
         } finally {
             btn.disabled  = false;
-            btn.innerHTML = '<i class="fas fa-save"></i> Guardar registro';
+            btn.innerHTML = `<i class="fas fa-save"></i> <span id="btn-guardar-text">${textoOriginal}</span>`;
         }
     }
 </script>
