@@ -582,13 +582,27 @@ button { font-family: inherit; cursor: pointer; }
 
 /* ── Desktop ────────────────────────────── */
 @media screen and (min-width: 769px) {
-    .tab-content {
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 24px;
-    }
-
     .tabs-nav {
         padding: 0 32px;
+    }
+
+    .tab-content {
+        max-width: 100%;
+        margin: 0;
+        padding: 24px 32px;
+    }
+}
+
+/* ── Pantallas grandes ───────────────── */
+@media screen and (min-width: 1280px) {
+    .tab-content {
+        padding: 32px 80px;
+    }
+}
+
+/* ── Pantallas extra grandes ─────────── */
+@media screen and (min-width: 1600px) {
+    .tab-content {
+        padding: 40px 160px;
     }
 }
