@@ -582,13 +582,127 @@ button { font-family: inherit; cursor: pointer; }
 
 /* ── Desktop ────────────────────────────── */
 @media screen and (min-width: 769px) {
-    .tab-content {
-        max-width: 800px;
-        margin: 0 auto;
-        padding: 24px;
+    .page-header {
+        padding: 20px 40px;
+    }
+
+    .header-title {
+        font-size: 22px;
+    }
+
+    .header-subtitle {
+        font-size: 13px;
     }
 
     .tabs-nav {
-        padding: 0 32px;
+        padding: 0 40px;
+        top: 77px;
+    }
+
+    .tab-btn {
+        font-size: 16px;
+        padding: 16px 4px;
+        margin-right: 32px;
+    }
+
+    .tab-content {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 32px 40px;
+    }
+
+    .tab-hint {
+        font-size: 14px;
+        padding: 14px 18px;
+    }
+
+    /* Chips más grandes y espaciados */
+    .filter-chips {
+        gap: 10px;
+        margin-bottom: 24px;
+    }
+
+    .chip {
+        font-size: 14px;
+        padding: 10px 20px;
+    }
+
+    /* Grilla de 2 columnas para registros */
+    .registros-list {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+
+    /* Las etiquetas de grupo ocupan toda la fila */
+    .grupo-dia {
+        grid-column: 1 / -1;
+        margin: 16px 0 4px;
+    }
+
+    .grupo-dia-label {
+        font-size: 12px;
+    }
+
+    /* Tarjetas más cómodas en desktop */
+    .registro-card {
+        padding: 18px 20px;
+    }
+
+    .registro-preview {
+        font-size: 15px;
+        -webkit-line-clamp: 3;
+    }
+
+    .registro-formulario-tag {
+        font-size: 13px;
+    }
+
+    .registro-hora {
+        font-size: 14px;
+    }
+
+    /* Grilla de 2 columnas para formularios */
+    .formularios-list {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+    }
+
+    .formulario-toggle-card {
+        padding: 18px 20px;
+    }
+
+    .formulario-nombre {
+        font-size: 15px;
+    }
+
+    .formulario-desc {
+        font-size: 13px;
+    }
+
+    /* Estados vacíos centrados */
+    .empty-state, .loading-state {
+        grid-column: 1 / -1;
+        padding: 80px 20px;
+    }
+
+    .empty-state i, .loading-state i {
+        font-size: 48px;
+    }
+
+    .empty-state p, .loading-state p {
+        font-size: 15px;
+    }
+}
+
+/* ── Pantallas muy grandes (XL) ───────── */
+@media screen and (min-width: 1280px) {
+    .registros-list {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .formularios-list {
+        grid-template-columns: repeat(3, 1fr);
     }
 }
