@@ -346,8 +346,20 @@
                             if (data.text) {
                                 const tipo = btn.dataset.tipo;
                                 if (tipo === 'numero') {
-                                    const num = data.text.replace(/[^\d.,]/g, '').replace(',', '.');
-                                    input.value = num || data.text;
+                                    const texto = data.text.replace(',', '.');
+                                    // Contar cuántos dígitos hay en total
+                                    const digitos = texto.replace(/[^\d]/g, '');
+                                    
+                                    if (!digitos) {
+                                        mostrarToast('⚠️ No se reconoció un número, escríbelo manualmente');
+                                    } else if (digitos.length >= 7) {
+                                        // 7+ dígitos → seguramente es identificador (cédula, celular, referencia)
+                                        input.value = digitos;
+                                    } else {
+                                        // Menos de 7 dígitos → puede ser decimal legítimo
+                                        const decimal = texto.match(/\d+\.\d+/);
+                                        input.value = decimal ? decimal[0] : digitos;
+                                    }
                                 } else if (tipo === 'fecha') {
                                     const parsed = new Date(data.text);
                                     if (!isNaN(parsed)) {
