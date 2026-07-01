@@ -46,6 +46,8 @@ import secrets
 import unicodedata
 import re
 from datetime import datetime, timedelta, timezone
+from openai import OpenAI
+import tempfile
 
 
 connection_pool = None
@@ -103,6 +105,9 @@ app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(hours=12)
 app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+# Cliente de OpenAI para Whisper
+openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
 @app.before_request
 def make_session_permanent():
@@ -3625,34 +3630,34 @@ def eliminar_proyecto():
 def transcribe_audio():
     try:
         if 'audio' not in request.files:
-            print("🔴 No se recibió archivo de audio.")
+            print("🔴 [WHISPER] No se recibió archivo de audio.")
             return jsonify({"error": "No se envió el archivo de audio"}), 400
 
         file = request.files['audio']
-        print(f"📥 Recibido archivo: {file.filename}")
+        print(f"📥 [WHISPER] Recibido archivo: {file.filename}")
 
         # Guardar el archivo temporalmente
         temp_input = tempfile.NamedTemporaryFile(delete=False, suffix=".webm")
         file.save(temp_input.name)
-        print(f"💾 Guardado en: {temp_input.name}")
+        print(f"💾 [WHISPER] Guardado en: {temp_input.name}")
 
         temp_wav = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
         formato_detectado = None
 
         try:
-            print("🔍 Intentando decodificar como webm...")
+            print("🔍 [WHISPER] Intentando decodificar como webm...")
             audio = AudioSegment.from_file(temp_input.name, format="webm")
-            print("✅ Decodificado como webm.")
+            print("✅ [WHISPER] Decodificado como webm.")
             formato_detectado = "webm"
         except Exception as e_webm:
-            print("⚠️ Falla al decodificar como webm:", str(e_webm))
+            print("⚠️ [WHISPER] Falla al decodificar como webm:", str(e_webm))
             try:
-                print("🔁 Intentando decodificar como mp4...")
+                print("🔁 [WHISPER] Intentando decodificar como mp4...")
                 audio = AudioSegment.from_file(temp_input.name, format="mp4")
-                print("✅ Decodificado como mp4.")
+                print("✅ [WHISPER] Decodificado como mp4.")
                 formato_detectado = "mp4"
             except Exception as e_mp4:
-                print("❌ Fallo total al decodificar audio.")
+                print("❌ [WHISPER] Fallo total al decodificar audio.")
                 traceback.print_exc()
                 return jsonify({
                     "error": "No se pudo procesar el audio.",
@@ -3660,31 +3665,48 @@ def transcribe_audio():
                     "error_mp4": str(e_mp4)
                 }), 500
 
-        # Exportar a WAV
+        # Exportar a WAV (Whisper acepta mp3, mp4, mpeg, mpga, m4a, wav, webm)
         audio.export(temp_wav.name, format="wav")
-        print("🔄 Exportado a WAV:", temp_wav.name)
+        print("🔄 [WHISPER] Exportado a WAV:", temp_wav.name)
 
-        # Transcribir con Azure
-        speech_config = get_speech_config()
-        audio_config = speechsdk.audio.AudioConfig(filename=temp_wav.name)
-        recognizer = speechsdk.SpeechRecognizer(speech_config=speech_config, audio_config=audio_config)
-        result = recognizer.recognize_once_async().get()
+        # Transcribir con Whisper API de OpenAI
+        try:
+            with open(temp_wav.name, 'rb') as f:
+                transcription = openai_client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=f,
+                    language="es",  # español
+                    prompt="Bitácora industrial IAC. Términos comunes: proyecto, formulario, cliente, contratista, registro, evidencia, observación, actividad."
+                )
+            texto = transcription.text
+            print(f"✅ [WHISPER] Texto reconocido ({len(texto)} caracteres): {texto[:100]}...")
 
-        if result.reason == speechsdk.ResultReason.RecognizedSpeech:
-            print("✅ Texto reconocido:", result.text)
             return jsonify({
-                "text": result.text,
-                "formato_detectado": formato_detectado
+                "text": texto,
+                "formato_detectado": formato_detectado,
+                "servicio": "whisper-api"  # ← marca clara para verificar
             })
-        else:
-            print("⚠️ No se reconoció el audio:", result.reason)
+
+        except Exception as e_whisper:
+            print("❌ [WHISPER] Error al llamar a Whisper API:", str(e_whisper))
+            traceback.print_exc()
             return jsonify({
-                "error": "No se reconoció el audio.",
-                "formato_detectado": formato_detectado
-            }), 400
+                "error": "Error al transcribir con Whisper.",
+                "detalle": str(e_whisper)
+            }), 500
+
+        finally:
+            # Limpiar archivos temporales
+            try:
+                if os.path.exists(temp_input.name):
+                    os.remove(temp_input.name)
+                if os.path.exists(temp_wav.name):
+                    os.remove(temp_wav.name)
+            except Exception as e_cleanup:
+                print(f"⚠️ [WHISPER] Error limpiando temporales: {e_cleanup}")
 
     except Exception as e:
-        print("❌ Error general en transcribe_audio:", str(e))
+        print("❌ [WHISPER] Error general en transcribe_audio:", str(e))
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
