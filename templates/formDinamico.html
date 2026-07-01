@@ -432,7 +432,7 @@
 
             respuestas[campoId] = valor;
 
-            if (requerido && !valor && valor !== false) {
+            if (!esEdicion && requerido && !valor && valor !== false) {
                 const label = input.closest('.field-group')?.querySelector('.field-label')?.textContent.replace(' *', '').trim();
                 faltantes.push(label || 'Campo requerido');
             }
