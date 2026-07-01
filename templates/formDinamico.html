@@ -149,8 +149,9 @@
                 {% if campo.tipo == 'texto_corto' %}
                 <div class="input-with-icon">
                     <input type="text" class="field-input campo-respuesta"
-                           data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                           placeholder="{{ campo.nombre }}...">
+                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                        value="{{ campo.valor }}"
+                        placeholder="{{ campo.nombre }}...">
                     <button class="record-btn" type="button" data-target-id="{{ campo.id }}">
                         <i class="fas fa-microphone"></i>
                     </button>
@@ -162,8 +163,8 @@
                 {% elif campo.tipo == 'texto_largo' %}
                 <div class="input-with-icon" style="align-items:flex-start;">
                     <textarea class="field-input campo-respuesta" rows="3"
-                              data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                              placeholder="{{ campo.nombre }}..." style="resize:vertical;min-height:80px;"></textarea>
+                            data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                            placeholder="{{ campo.nombre }}..." style="resize:vertical;min-height:80px;">{{ campo.valor }}</textarea>
                     <button class="record-btn" type="button" data-target-id="{{ campo.id }}">
                         <i class="fas fa-microphone"></i>
                     </button>
@@ -175,8 +176,9 @@
                 {% elif campo.tipo == 'numero' %}
                 <div class="input-with-icon">
                     <input type="number" class="field-input campo-respuesta"
-                           data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                           placeholder="0" step="any">
+                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                        value="{{ campo.valor }}"
+                        placeholder="0" step="any">
                     <button class="record-btn" type="button" data-target-id="{{ campo.id }}" data-tipo="numero">
                         <i class="fas fa-microphone"></i>
                     </button>
@@ -188,7 +190,8 @@
                 {% elif campo.tipo == 'fecha' %}
                 <div class="input-with-icon">
                     <input type="date" class="field-input campo-respuesta"
-                           data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}">
+                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                        value="{{ campo.valor }}">
                     <button class="record-btn" type="button" data-target-id="{{ campo.id }}" data-tipo="fecha">
                         <i class="fas fa-microphone"></i>
                     </button>
@@ -202,14 +205,15 @@
                         data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}">
                     <option value="">Selecciona...</option>
                     {% for op in campo.opciones %}
-                    <option value="{{ op }}">{{ op }}</option>
+                    <option value="{{ op }}" {% if op == campo.valor %}selected{% endif %}>{{ op }}</option>
                     {% endfor %}
                 </select>
 
                 {% elif campo.tipo == 'booleano' %}
                 <div class="campo-check-wrapper">
                     <input type="checkbox" id="campo-{{ campo.id }}" class="campo-respuesta"
-                           data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}">
+                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                        {% if campo.valor == true or campo.valor == 'true' or campo.valor == True %}checked{% endif %}>
                     <label for="campo-{{ campo.id }}">Sí</label>
                 </div>
 
@@ -217,15 +221,17 @@
                 <div class="moneda-wrapper">
                     <span class="unit-symbol">$</span>
                     <input type="number" class="field-input campo-respuesta"
-                           data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                           placeholder="0.00" step="0.01">
+                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                        value="{{ campo.valor }}"
+                        placeholder="0.00" step="0.01">
                 </div>
 
                 {% elif campo.tipo == 'porcentaje' %}
                 <div class="porcentaje-wrapper">
                     <input type="number" class="field-input campo-respuesta"
-                           data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                           placeholder="0" min="0" max="100">
+                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                        value="{{ campo.valor }}"
+                        placeholder="0" min="0" max="100">
                     <button class="record-btn" type="button" data-target-id="{{ campo.id }}" data-tipo="numero">
                         <i class="fas fa-microphone"></i>
                     </button>
@@ -237,18 +243,29 @@
 
                 {% elif campo.tipo == 'imagen' %}
                 <input type="file" class="field-input campo-respuesta"
-                       data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                       accept="image/*">
+                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                    accept="image/*">
+                {% if campo.valor %}
+                <span style="font-size:12px;color:var(--gris-texto,#6b7280);margin-top:4px;display:block;">
+                    <i class="fas fa-image"></i> Archivo actual: {{ campo.valor }}
+                </span>
+                {% endif %}
 
                 {% elif campo.tipo == 'adjunto' %}
                 <input type="file" class="field-input campo-respuesta"
-                       data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}">
+                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}">
+                {% if campo.valor %}
+                <span style="font-size:12px;color:var(--gris-texto,#6b7280);margin-top:4px;display:block;">
+                    <i class="fas fa-paperclip"></i> Archivo actual: {{ campo.valor }}
+                </span>
+                {% endif %}
 
                 {% else %}
                 <div class="input-with-icon">
                     <input type="text" class="field-input campo-respuesta"
-                           data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                           placeholder="{{ campo.nombre }}...">
+                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                        value="{{ campo.valor }}"
+                        placeholder="{{ campo.nombre }}...">
                     <button class="record-btn" type="button" data-target-id="{{ campo.id }}">
                         <i class="fas fa-microphone"></i>
                     </button>
