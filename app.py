@@ -3676,7 +3676,7 @@ def transcribe_audio():
                     model="whisper-1",
                     file=f,
                     language="es",  # español
-                    prompt="Bitácora industrial IAC. Términos comunes: proyecto, formulario, cliente, contratista, registro, evidencia, observación, actividad."
+                    prompt="Bitácora industrial IAC. Registros de campo con proyectos, formularios, clientes, contratistas, evidencias, observaciones y actividades. Se dictan correos electrónicos en formato nombre.apellido@empresa.com, ana_lopez@gmail.com, contacto@iac.com.co, carlos-mesa@outlook.com. Nombres colombianos comunes: Juan Pérez, María García, Andrés López, Camilo Ramírez, Santiago Giraldo. Cuando se escuche arroba se escribe @, punto se escribe ., guion bajo se escribe _, guion medio se escribe -. Dominios frecuentes: .com, .co, .com.co, .org."
                 )
             texto = transcription.text
             print(f"✅ [WHISPER] Texto reconocido ({len(texto)} caracteres): {texto[:100]}...")
