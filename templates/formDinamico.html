@@ -368,11 +368,9 @@
                                         mostrarToast('⚠️ No se reconoció la fecha, escríbela manualmente');
                                     }
                                 } else {
-                                    let textoFinal = data.text;
-                                    textoFinal = limpiarCorreo(textoFinal);
                                     input.value = input.value
-                                        ? input.value + ' ' + textoFinal
-                                        : textoFinal;
+                                        ? input.value + ' ' + data.text
+                                        : data.text;
                                 }
                             } else {
                                 mostrarToast('⚠️ No se detectó audio');
@@ -398,44 +396,6 @@
             }
         });
     });
-
-    function limpiarCorreo(texto) {
-        if (!texto) return texto;
-        
-        // Detectar si el texto parece contener un correo dictado
-        const palabrasClave = ['arroba', 'aroba', 'punto com', 'gmail', 'outlook', 'hotmail', 'yahoo'];
-        const tieneCorreo = palabrasClave.some(p => texto.toLowerCase().includes(p));
-        
-        if (!tieneCorreo) return texto;
-        
-        let resultado = texto.toLowerCase().trim();
-        
-        // Reemplazar palabras por símbolos
-        resultado = resultado.replace(/\s*arroba\s*/g, '@');
-        resultado = resultado.replace(/\s*aroba\s*/g, '@');
-        resultado = resultado.replace(/\s*guion\s*bajo\s*/g, '_');
-        resultado = resultado.replace(/\s*guión\s*bajo\s*/g, '_');
-        resultado = resultado.replace(/\s*guion\s*medio\s*/g, '-');
-        resultado = resultado.replace(/\s*guión\s*medio\s*/g, '-');
-        resultado = resultado.replace(/\s*guion\s*/g, '-');
-        resultado = resultado.replace(/\s*guión\s*/g, '-');
-        
-        // Manejar dominios comunes
-        resultado = resultado.replace(/\s*punto\s*com\s*punto\s*co\b/g, '.com.co');
-        resultado = resultado.replace(/\s*punto\s*com\b/g, '.com');
-        resultado = resultado.replace(/\s*punto\s*co\b/g, '.co');
-        resultado = resultado.replace(/\s*punto\s*org\b/g, '.org');
-        resultado = resultado.replace(/\s*punto\s*net\b/g, '.net');
-        resultado = resultado.replace(/\s*punto\s*edu\b/g, '.edu');
-        
-        // Punto genérico (entre partes del correo)
-        resultado = resultado.replace(/\s*punto\s*/g, '.');
-        
-        // Eliminar espacios sobrantes
-        resultado = resultado.replace(/\s+/g, '').trim();
-        
-        return resultado;
-    }
 
     // ── Guardar respuesta ──
     async function guardarRespuesta() {
