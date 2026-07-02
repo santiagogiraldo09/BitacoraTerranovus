@@ -205,6 +205,17 @@ input::placeholder { color: #c4c9d4; }
 .btn-guardar:hover  { background: var(--naranja-dark); }
 .btn-guardar:active { transform: scale(0.98); }
 
+.btn-guardar:disabled {
+    background: var(--gris-borde);
+    color: var(--gris-texto);
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-guardar:disabled:hover {
+    background: var(--gris-borde);
+}
+
 .btn-cancelar {
     width: 100%; padding: 12px;
     background: var(--blanco); color: var(--gris-texto);
