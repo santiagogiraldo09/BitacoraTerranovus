@@ -389,9 +389,13 @@
 
     // ── Guardar proyecto ──
     async function saveProject() {
+        const btnGuardar = document.querySelector('.btn-guardar');
+        
+        // Prevenir doble clic: si el botón ya está deshabilitado, salir
+        if (btnGuardar.disabled) return;
+
         const tipoSelect = document.getElementById('tipo-proyecto');
 
-        // Validar que exista el dropdown
         if (!tipoSelect) {
             mostrarToast("Debes crear un tipo de proyecto antes de poder registrar proyectos.", "error");
             return;
@@ -421,14 +425,12 @@
                 valor = input.value.trim ? input.value.trim() : input.value;
             }
 
-            // Detectar campo sistema "Nombre del proyecto"
             if (campo.es_sistema && campo.nombre === 'Nombre del proyecto') {
                 nombreProyecto = valor;
             }
 
             datosTipo[campoId] = valor;
 
-            // Validar requeridos
             const esRequerido = campo.es_sistema || false;
             const tipoData    = tiposProyecto.find(t => t.id === parseInt(tipoId));
             if (tipoData) {
@@ -446,12 +448,18 @@
 
         if (!nombreProyecto) {
             mostrarToast("El nombre del proyecto es obligatorio.", "error");
+            return;
         }
 
         if (faltantes.length > 0) {
             mostrarToast("Completa los campos obligatorios: " + faltantes.join(', '), "error");
             return;
         }
+
+        // ── DESHABILITAR BOTÓN INMEDIATAMENTE ──
+        btnGuardar.disabled = true;
+        const textoOriginal = btnGuardar.innerHTML;
+        btnGuardar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
 
         // Fechas
         const startDate = document.getElementById('start-date')?.value;
@@ -474,15 +482,20 @@
                 body: JSON.stringify(data)
             });
             const result = await response.json();
+            
             if (response.ok) {
+                // ── MOSTRAR TOAST INMEDIATAMENTE Y REDIRIGIR RÁPIDO ──
                 mostrarToast("✅ Proyecto registrado exitosamente", "success");
                 setTimeout(() => {
                     window.location.href = '/registros';
-                }, 1500);
+                }, 600);  // reducido de 1500 a 600ms
             } else {
                 throw new Error(result.error || "Error al procesar la solicitud");
             }
         } catch (error) {
+            // Si falla, re-habilitar el botón para que puedan reintentar
+            btnGuardar.disabled = false;
+            btnGuardar.innerHTML = textoOriginal;
             mostrarToast("❌ " + error.message, "error");
             console.error("Error:", error);
         }

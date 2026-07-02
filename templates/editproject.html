@@ -300,6 +300,11 @@
 
     // ── Actualizar proyecto ──
     async function updateProject() {
+        const btnGuardar = document.querySelector('.btn-guardar');
+        
+        // Prevenir doble clic
+        if (btnGuardar.disabled) return;
+
         const camposDyn = document.querySelectorAll('.field-input-dyn');
         const datosTipo = {};
         let nombreProyecto = '';
@@ -329,14 +334,19 @@
         });
 
         if (!nombreProyecto) {
-            alert("El nombre del proyecto es obligatorio.");
+            mostrarToast("El nombre del proyecto es obligatorio.", "error");
             return;
         }
 
         if (faltantes.length > 0) {
-            alert("Completa los campos obligatorios: " + faltantes.join(', '));
+            mostrarToast("Completa los campos obligatorios: " + faltantes.join(', '), "error");
             return;
         }
+
+        // ── DESHABILITAR BOTÓN INMEDIATAMENTE ──
+        btnGuardar.disabled = true;
+        const textoOriginal = btnGuardar.innerHTML;
+        btnGuardar.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
 
         const data = {
             'project-name':  nombreProyecto,
@@ -354,14 +364,21 @@
                 body: JSON.stringify(data)
             });
             const result = await response.json();
+            
             if (response.ok) {
-                alert("Proyecto actualizado correctamente");
-                window.location.href = '/registros';
+                // ── MOSTRAR TOAST INMEDIATAMENTE Y REDIRIGIR RÁPIDO ──
+                mostrarToast("✅ Proyecto actualizado correctamente", "success");
+                setTimeout(() => {
+                    window.location.href = '/registros';
+                }, 600);
             } else {
                 throw new Error(result.error || "Error al actualizar");
             }
         } catch (error) {
-            alert("Error: " + error.message);
+            // Re-habilitar el botón si hay error
+            btnGuardar.disabled = false;
+            btnGuardar.innerHTML = textoOriginal;
+            mostrarToast("❌ " + error.message, "error");
         }
     }
 
