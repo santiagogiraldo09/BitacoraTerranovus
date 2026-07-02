@@ -65,7 +65,7 @@ button { font-family: inherit; cursor: pointer; }
     padding: 80px 16px 140px;
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 28px;
 }
 
 /* Secciones */
@@ -75,7 +75,7 @@ button { font-family: inherit; cursor: pointer; }
     padding: 20px;
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 18px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.06);
     width: 100%;
 }
