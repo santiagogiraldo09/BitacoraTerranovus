@@ -68,6 +68,12 @@ button { font-family: inherit; cursor: pointer; }
     gap: 28px;
 }
 
+#project-form {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+}
+
 /* Secciones */
 .section {
     background: var(--blanco);
