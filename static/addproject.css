@@ -71,7 +71,7 @@ button { font-family: inherit; cursor: pointer; }
 #project-form {
     display: flex;
     flex-direction: column;
-    gap: 28px;
+    gap: 20px;
 }
 
 /* Secciones */
