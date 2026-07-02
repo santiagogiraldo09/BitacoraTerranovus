@@ -65,7 +65,7 @@ button { font-family: inherit; cursor: pointer; }
     padding: 80px 16px 140px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 20px;
 }
 
 /* Secciones */
