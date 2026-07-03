@@ -87,6 +87,107 @@
             text-align: center;
         }
 
+        /* ── Footer fijo con voz + acciones ── */
+        .bottom-actions {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: white;
+            border-top: 1px solid #e5e7eb;
+            padding: 12px 16px 14px;
+            z-index: 250;
+        }
+
+        .bottom-actions-inner {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            max-width: 720px;
+            margin: 0 auto;
+        }
+
+        .bottom-actions-buttons {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        /* Botón de voz */
+        .btn-voz {
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: var(--naranja, #FFAF33);
+            border: none;
+            color: white;
+            font-size: 22px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 2px 10px rgba(255,175,51,0.3);
+            transition: all 0.2s;
+        }
+
+        .btn-voz:hover {
+            transform: scale(1.05);
+        }
+
+        .btn-voz-recording {
+            background: #ef4444;
+            box-shadow: 0 2px 10px rgba(239,68,68,0.3);
+            animation: pulse 1.5s infinite;
+        }
+
+        .btn-voz-processing {
+            background: #e5e7eb;
+            color: #9ca3af;
+            box-shadow: none;
+            cursor: default;
+        }
+
+        .voice-hint {
+            text-align: center;
+            font-size: 11px;
+            color: #9ca3af;
+            padding: 4px 0 0;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+
+        /* ── Mobile ── */
+        @media screen and (max-width: 768px) {
+            .bottom-actions {
+                padding: 10px 12px 16px;
+            }
+
+            .bottom-actions-inner {
+                gap: 10px;
+            }
+
+            .btn-voz {
+                width: 48px;
+                height: 48px;
+                font-size: 20px;
+            }
+
+            .btn-guardar {
+                font-size: 14px;
+                padding: 11px;
+            }
+
+            .btn-cancelar {
+                font-size: 13px;
+                padding: 8px;
+            }
+        }
+
         .toast.show {
             opacity: 1;
             transform: translateX(-50%) translateY(0);
@@ -249,67 +350,66 @@
 
         </div>
 
-        <!-- Botón central de voz + Transcripción -->
-        <div id="voice-section" style="padding: 0 16px;">
-            <!-- Botón central -->
-            <div id="voice-idle" style="display:flex; flex-direction:column; align-items:center; gap:8px; margin:20px 0;">
-                <button type="button" id="btn-voz-central" onclick="iniciarGrabacion()" 
-                        style="width:64px; height:64px; border-radius:50%; background:var(--naranja,#FFAF33); border:none; color:white; font-size:28px; box-shadow:0 4px 16px rgba(255,175,51,0.35); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;">
-                    <i class="fas fa-microphone"></i>
-                </button>
-                <span style="font-size:12px; color:#9ca3af;">Dicta todo de corrido</span>
-            </div>
-
-            <!-- Estado: grabando -->
-            <div id="voice-recording" style="display:none; flex-direction:column; align-items:center; gap:8px; margin:20px 0;">
-                <button type="button" onclick="detenerGrabacion()"
-                        style="width:64px; height:64px; border-radius:50%; background:#ef4444; border:none; color:white; font-size:28px; box-shadow:0 4px 16px rgba(239,68,68,0.35); cursor:pointer; display:flex; align-items:center; justify-content:center; animation:pulse 1.5s infinite;">
-                    <i class="fas fa-stop"></i>
-                </button>
-                <span style="font-size:12px; color:#ef4444; font-weight:600;">Grabando... toca para detener</span>
-            </div>
-
-            <!-- Estado: procesando -->
-            <div id="voice-processing" style="display:none; flex-direction:column; align-items:center; gap:8px; margin:20px 0;">
-                <div style="width:64px; height:64px; border-radius:50%; background:#f3f4f6; border:none; color:#9ca3af; font-size:28px; display:flex; align-items:center; justify-content:center;">
-                    <i class="fas fa-spinner fa-spin"></i>
+        <!-- Preview de transcripción (flotante sobre el footer) -->
+        <div id="voice-preview" style="display:none; position:fixed; bottom:140px; left:16px; right:16px; z-index:300; max-width:720px; margin:0 auto;">
+            <div style="background:white; border:1px solid rgba(255,175,51,0.3); border-radius:12px; padding:14px 16px; box-shadow:0 4px 20px rgba(0,0,0,0.12);">
+                <div style="font-size:11px; font-weight:600; color:var(--naranja,#FFAF33); margin-bottom:6px; display:flex; align-items:center; gap:4px;">
+                    <i class="fas fa-magic"></i> Transcripción procesada
                 </div>
-                <span id="voice-processing-text" style="font-size:12px; color:#9ca3af;">Transcribiendo audio...</span>
-            </div>
-
-            <!-- Preview de transcripción -->
-            <div id="voice-preview" style="display:none; margin:16px 0;">
-                <div style="background:rgba(255,175,51,0.08); border:1px solid rgba(255,175,51,0.3); border-radius:10px; padding:12px 14px;">
-                    <div style="font-size:11px; font-weight:600; color:var(--naranja,#FFAF33); margin-bottom:6px; display:flex; align-items:center; gap:4px;">
-                        <i class="fas fa-magic"></i> Transcripción procesada
-                    </div>
-                    <div id="voice-transcription-text" style="font-size:13px; color:#4b5563; line-height:1.5;"></div>
-                </div>
-
-                <!-- Badges de campos llenados -->
+                <div id="voice-transcription-text" style="font-size:13px; color:#4b5563; line-height:1.5; max-height:80px; overflow-y:auto;"></div>
                 <div id="voice-badges" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;"></div>
-
-                <!-- Botón para volver a grabar -->
-                <div style="text-align:center; margin-top:12px;">
-                    <button type="button" onclick="resetearVoz()" 
-                            style="background:none; border:1px solid #e5e7eb; border-radius:8px; padding:8px 16px; font-size:12px; color:#6b7280; cursor:pointer;">
-                        <i class="fas fa-redo"></i> Grabar de nuevo
-                    </button>
-                </div>
             </div>
         </div>
 
-        <!-- Botones fijos abajo -->
+        <!-- Footer fijo con voz + acciones -->
         <div class="bottom-actions">
-            <button type="button" id="btn-guardar" onclick="guardarRespuesta()" class="btn-guardar">
-                <i class="fas fa-save"></i> 
-                <span id="btn-guardar-text">
-                    {% if registro_id %}Guardar cambios{% else %}Guardar registro{% endif %}
-                </span>
-            </button>
-            <button type="button" onclick="window.history.back()" class="btn-cancelar">
-                Cancelar
-            </button>
+            <div class="bottom-actions-inner">
+                <!-- Estado: idle -->
+                <div id="voice-idle">
+                    <button type="button" id="btn-voz-central" onclick="iniciarGrabacion()" class="btn-voz">
+                        <i class="fas fa-microphone"></i>
+                    </button>
+                </div>
+
+                <!-- Estado: grabando -->
+                <div id="voice-recording" style="display:none;">
+                    <button type="button" onclick="detenerGrabacion()" class="btn-voz btn-voz-recording">
+                        <i class="fas fa-stop"></i>
+                    </button>
+                </div>
+
+                <!-- Estado: procesando -->
+                <div id="voice-processing" style="display:none;">
+                    <div class="btn-voz btn-voz-processing">
+                        <i class="fas fa-spinner fa-spin"></i>
+                    </div>
+                </div>
+
+                <div class="bottom-actions-buttons">
+                    <button type="button" id="btn-guardar" onclick="guardarRespuesta()" class="btn-guardar">
+                        <i class="fas fa-save"></i>
+                        <span id="btn-guardar-text">
+                            {% if registro_id %}Guardar cambios{% else %}Guardar registro{% endif %}
+                        </span>
+                    </button>
+                    <button type="button" onclick="window.history.back()" class="btn-cancelar">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+
+            <!-- Texto debajo del botón de voz -->
+            <div id="voice-hint" class="voice-hint">Dicta todo de corrido</div>
+            <div id="voice-hint-recording" class="voice-hint" style="display:none; color:#ef4444;">Grabando... toca para detener</div>
+            <div id="voice-hint-processing" class="voice-hint" style="display:none;" id="voice-processing-text">Procesando audio...</div>
+
+            <!-- Botón grabar de nuevo (aparece después de transcribir) -->
+            <div id="voice-retry" style="display:none; text-align:center; padding:4px 0;">
+                <button type="button" onclick="resetearVoz()"
+                        style="background:none; border:none; font-size:12px; color:#6b7280; cursor:pointer; text-decoration:underline;">
+                    <i class="fas fa-redo"></i> Grabar de nuevo
+                </button>
+            </div>
         </div>
 
     </div>
@@ -333,10 +433,16 @@
     let audioChunks   = [];
 
     function mostrarEstado(estado) {
-        document.getElementById('voice-idle').style.display       = estado === 'idle'       ? 'flex' : 'none';
-        document.getElementById('voice-recording').style.display  = estado === 'recording'  ? 'flex' : 'none';
-        document.getElementById('voice-processing').style.display = estado === 'processing' ? 'flex' : 'none';
+        document.getElementById('voice-idle').style.display       = estado === 'idle'       ? '' : 'none';
+        document.getElementById('voice-recording').style.display  = estado === 'recording'  ? '' : 'none';
+        document.getElementById('voice-processing').style.display = estado === 'processing' ? '' : 'none';
         document.getElementById('voice-preview').style.display    = estado === 'preview'    ? 'block' : 'none';
+        document.getElementById('voice-retry').style.display      = estado === 'preview'    ? 'block' : 'none';
+
+        // Hints
+        document.getElementById('voice-hint').style.display             = estado === 'idle'       ? '' : 'none';
+        document.getElementById('voice-hint-recording').style.display   = estado === 'recording'  ? '' : 'none';
+        document.getElementById('voice-hint-processing').style.display  = estado === 'processing' ? '' : 'none';
     }
 
     // ── Paso 1: Grabar audio ──
