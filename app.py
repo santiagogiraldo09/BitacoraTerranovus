@@ -3750,9 +3750,9 @@ REGLAS:
 8. Extrae la información de forma inteligente: el usuario puede no decir el nombre exacto del campo pero sí dar la información que corresponde.
 9. Limpia el texto: capitaliza nombres propios, corrige puntuación básica."""
 
-fecha_hoy = date.today().strftime('%Y-%m-%d')
+        fecha_hoy = date.today().strftime('%Y-%m-%d')
 
-prompt_usuario = f"""Fecha actual: {fecha_hoy}
+        prompt_usuario = f"""Fecha actual: {fecha_hoy}
 
 Formulario con estos campos:
 {campos_texto}
