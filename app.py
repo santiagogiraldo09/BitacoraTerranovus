@@ -3727,7 +3727,7 @@ def distribuir_campos():
         # Construir la descripción de campos para el prompt
         campos_desc = []
         for c in campos:
-            desc = f'- campo_{c["id"]}: "{c["nombre"]}" (tipo: {c["tipo"]})'
+            desc = f'- {c["id"]}: "{c["nombre"]}" (tipo: {c["tipo"]})'
             if c.get('opciones'):
                 desc += f' (opciones: {", ".join(c["opciones"])})'
             if c.get('requerido'):
@@ -3740,7 +3740,7 @@ def distribuir_campos():
 
 REGLAS:
 1. Devuelve SOLO un JSON válido, sin explicaciones ni texto adicional.
-2. Las claves del JSON deben ser los IDs de los campos (como string).
+2. Las claves del JSON deben ser SOLO los IDs numéricos de los campos como string (ejemplo: "1", "3", "15"). NUNCA agregar prefijos como "campo_".
 3. Si el usuario no mencionó información para un campo, deja el valor como string vacío "".
 4. Para campos tipo numero, moneda o porcentaje, devuelve solo el número (sin símbolos).
 5. Para campos tipo seleccion o seleccion_unica, elige la opción más cercana a lo que dijo el usuario. Si ninguna coincide, deja "".
