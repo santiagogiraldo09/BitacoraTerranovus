@@ -48,6 +48,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from openai import OpenAI
 import tempfile
+from datetime import date
 
 
 connection_pool = None
@@ -3749,7 +3750,11 @@ REGLAS:
 8. Extrae la información de forma inteligente: el usuario puede no decir el nombre exacto del campo pero sí dar la información que corresponde.
 9. Limpia el texto: capitaliza nombres propios, corrige puntuación básica."""
 
-        prompt_usuario = f"""Formulario con estos campos:
+fecha_hoy = date.today().strftime('%Y-%m-%d')
+
+prompt_usuario = f"""Fecha actual: {fecha_hoy}
+
+Formulario con estos campos:
 {campos_texto}
 
 Transcripción del usuario:
