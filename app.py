@@ -3710,6 +3710,81 @@ def transcribe_audio():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+
+@app.route('/api/distribuir-campos', methods=['POST'])
+def distribuir_campos():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    try:
+        data          = request.get_json()
+        transcripcion = data.get('transcripcion', '')
+        campos        = data.get('campos', [])
+
+        if not transcripcion or not campos:
+            return jsonify({'error': 'Faltan datos'}), 400
+
+        # Construir la descripción de campos para el prompt
+        campos_desc = []
+        for c in campos:
+            desc = f'- campo_{c["id"]}: "{c["nombre"]}" (tipo: {c["tipo"]})'
+            if c.get('opciones'):
+                desc += f' (opciones: {", ".join(c["opciones"])})'
+            if c.get('requerido'):
+                desc += ' [obligatorio]'
+            campos_desc.append(desc)
+
+        campos_texto = '\n'.join(campos_desc)
+
+        prompt_sistema = """Eres un asistente que extrae información de una transcripción de voz y la distribuye en campos de un formulario.
+
+REGLAS:
+1. Devuelve SOLO un JSON válido, sin explicaciones ni texto adicional.
+2. Las claves del JSON deben ser los IDs de los campos (como string).
+3. Si el usuario no mencionó información para un campo, deja el valor como string vacío "".
+4. Para campos tipo numero, moneda o porcentaje, devuelve solo el número (sin símbolos).
+5. Para campos tipo seleccion o seleccion_unica, elige la opción más cercana a lo que dijo el usuario. Si ninguna coincide, deja "".
+6. Para campos tipo booleano, devuelve true o false.
+7. Para campos tipo fecha, devuelve en formato YYYY-MM-DD.
+8. Extrae la información de forma inteligente: el usuario puede no decir el nombre exacto del campo pero sí dar la información que corresponde.
+9. Limpia el texto: capitaliza nombres propios, corrige puntuación básica."""
+
+        prompt_usuario = f"""Formulario con estos campos:
+{campos_texto}
+
+Transcripción del usuario:
+"{transcripcion}"
+
+Devuelve SOLO el JSON con los valores extraídos."""
+
+        response = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": prompt_sistema},
+                {"role": "user", "content": prompt_usuario}
+            ],
+            temperature=0.1,
+            max_tokens=1000
+        )
+
+        respuesta_texto = response.choices[0].message.content.strip()
+
+        # Limpiar posible markdown del JSON
+        respuesta_texto = respuesta_texto.replace('```json', '').replace('```', '').strip()
+
+        resultado = json.loads(respuesta_texto)
+        print(f"[DISTRIBUIR] Campos llenados: {len([v for v in resultado.values() if v])}/{len(campos)}")
+
+        return jsonify({'success': True, 'campos': resultado})
+
+    except json.JSONDecodeError as e:
+        print(f"[DISTRIBUIR] Error parseando JSON: {e}")
+        print(f"[DISTRIBUIR] Respuesta raw: {respuesta_texto}")
+        return jsonify({'error': 'Error al interpretar la respuesta de la IA'}), 500
+    except Exception as e:
+        print(f"[DISTRIBUIR] Error: {e}")
+        return jsonify({'error': str(e)}), 500
+
 #Exportar registros seleccionados a Excel
 @app.route('/exportar-registros-excel', methods=['POST'])
 def exportar_registros_excel():

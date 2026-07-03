@@ -91,6 +91,10 @@
             opacity: 1;
             transform: translateX(-50%) translateY(0);
         }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
     </style>
     <script>
         (function() {
@@ -147,62 +151,36 @@
                 </label>
 
                 {% if campo.tipo == 'texto_corto' %}
-                <div class="input-with-icon">
-                    <input type="text" class="field-input campo-respuesta"
-                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                        value="{{ campo.valor }}"
-                        placeholder="{{ campo.nombre }}...">
-                    <button class="record-btn" type="button" data-target-id="{{ campo.id }}">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                    <button class="stop-btn" type="button" data-target-id="{{ campo.id }}" style="display:none;">
-                        <i class="fas fa-stop"></i>
-                    </button>
-                </div>
+                <input type="text" class="field-input campo-respuesta"
+                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
+                    value="{{ campo.valor }}"
+                    placeholder="{{ campo.nombre }}...">
 
                 {% elif campo.tipo == 'texto_largo' %}
-                <div class="input-with-icon" style="align-items:flex-start;">
-                    <textarea class="field-input campo-respuesta" rows="3"
-                            data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                            placeholder="{{ campo.nombre }}..." style="resize:vertical;min-height:80px;">{{ campo.valor }}</textarea>
-                    <button class="record-btn" type="button" data-target-id="{{ campo.id }}">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                    <button class="stop-btn" type="button" data-target-id="{{ campo.id }}" style="display:none;">
-                        <i class="fas fa-stop"></i>
-                    </button>
-                </div>
+                <textarea class="field-input campo-respuesta" rows="3"
+                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                        data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
+                        placeholder="{{ campo.nombre }}..." style="resize:vertical;min-height:80px;">{{ campo.valor }}</textarea>
 
                 {% elif campo.tipo == 'numero' %}
-                <div class="input-with-icon">
-                    <input type="number" class="field-input campo-respuesta"
-                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                        value="{{ campo.valor }}"
-                        placeholder="0" step="any">
-                    <button class="record-btn" type="button" data-target-id="{{ campo.id }}" data-tipo="numero">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                    <button class="stop-btn" type="button" data-target-id="{{ campo.id }}" style="display:none;">
-                        <i class="fas fa-stop"></i>
-                    </button>
-                </div>
+                <input type="number" class="field-input campo-respuesta"
+                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
+                    value="{{ campo.valor }}"
+                    placeholder="0" step="any">
 
                 {% elif campo.tipo == 'fecha' %}
-                <div class="input-with-icon">
-                    <input type="date" class="field-input campo-respuesta"
-                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                        value="{{ campo.valor }}">
-                    <button class="record-btn" type="button" data-target-id="{{ campo.id }}" data-tipo="fecha">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                    <button class="stop-btn" type="button" data-target-id="{{ campo.id }}" style="display:none;">
-                        <i class="fas fa-stop"></i>
-                    </button>
-                </div>
+                <input type="date" class="field-input campo-respuesta"
+                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
+                    value="{{ campo.valor }}">
 
                 {% elif campo.tipo == 'seleccion' or campo.tipo == 'seleccion_unica' %}
                 <select class="field-select campo-respuesta"
-                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}">
+                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                        data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
+                        data-opciones="{{ campo.opciones | tojson }}">
                     <option value="">Selecciona...</option>
                     {% for op in campo.opciones %}
                     <option value="{{ op }}" {% if op == campo.valor %}selected{% endif %}>{{ op }}</option>
@@ -213,6 +191,7 @@
                 <div class="campo-check-wrapper">
                     <input type="checkbox" id="campo-{{ campo.id }}" class="campo-respuesta"
                         data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                        data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
                         {% if campo.valor == true or campo.valor == 'true' or campo.valor == True %}checked{% endif %}>
                     <label for="campo-{{ campo.id }}">Sí</label>
                 </div>
@@ -222,6 +201,7 @@
                     <span class="unit-symbol">$</span>
                     <input type="number" class="field-input campo-respuesta"
                         data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                        data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
                         value="{{ campo.valor }}"
                         placeholder="0.00" step="0.01">
                 </div>
@@ -230,20 +210,16 @@
                 <div class="porcentaje-wrapper">
                     <input type="number" class="field-input campo-respuesta"
                         data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                        data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
                         value="{{ campo.valor }}"
                         placeholder="0" min="0" max="100">
-                    <button class="record-btn" type="button" data-target-id="{{ campo.id }}" data-tipo="numero">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                    <button class="stop-btn" type="button" data-target-id="{{ campo.id }}" style="display:none;">
-                        <i class="fas fa-stop"></i>
-                    </button>
                     <span class="unit-symbol">%</span>
                 </div>
 
                 {% elif campo.tipo == 'imagen' %}
                 <input type="file" class="field-input campo-respuesta"
                     data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
                     accept="image/*">
                 {% if campo.valor %}
                 <span style="font-size:12px;color:var(--gris-texto,#6b7280);margin-top:4px;display:block;">
@@ -253,7 +229,8 @@
 
                 {% elif campo.tipo == 'adjunto' %}
                 <input type="file" class="field-input campo-respuesta"
-                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}">
+                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}">
                 {% if campo.valor %}
                 <span style="font-size:12px;color:var(--gris-texto,#6b7280);margin-top:4px;display:block;">
                     <i class="fas fa-paperclip"></i> Archivo actual: {{ campo.valor }}
@@ -261,22 +238,65 @@
                 {% endif %}
 
                 {% else %}
-                <div class="input-with-icon">
-                    <input type="text" class="field-input campo-respuesta"
-                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                        value="{{ campo.valor }}"
-                        placeholder="{{ campo.nombre }}...">
-                    <button class="record-btn" type="button" data-target-id="{{ campo.id }}">
-                        <i class="fas fa-microphone"></i>
-                    </button>
-                    <button class="stop-btn" type="button" data-target-id="{{ campo.id }}" style="display:none;">
-                        <i class="fas fa-stop"></i>
-                    </button>
-                </div>
+                <input type="text" class="field-input campo-respuesta"
+                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
+                    value="{{ campo.valor }}"
+                    placeholder="{{ campo.nombre }}...">
                 {% endif %}
             </div>
             {% endfor %}
 
+        </div>
+
+        <!-- Botón central de voz + Transcripción -->
+        <div id="voice-section" style="padding: 0 16px;">
+            <!-- Botón central -->
+            <div id="voice-idle" style="display:flex; flex-direction:column; align-items:center; gap:8px; margin:20px 0;">
+                <button type="button" id="btn-voz-central" onclick="iniciarGrabacion()" 
+                        style="width:64px; height:64px; border-radius:50%; background:var(--naranja,#FFAF33); border:none; color:white; font-size:28px; box-shadow:0 4px 16px rgba(255,175,51,0.35); cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.2s;">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <span style="font-size:12px; color:#9ca3af;">Dicta todo de corrido</span>
+            </div>
+
+            <!-- Estado: grabando -->
+            <div id="voice-recording" style="display:none; flex-direction:column; align-items:center; gap:8px; margin:20px 0;">
+                <button type="button" onclick="detenerGrabacion()"
+                        style="width:64px; height:64px; border-radius:50%; background:#ef4444; border:none; color:white; font-size:28px; box-shadow:0 4px 16px rgba(239,68,68,0.35); cursor:pointer; display:flex; align-items:center; justify-content:center; animation:pulse 1.5s infinite;">
+                    <i class="fas fa-stop"></i>
+                </button>
+                <span style="font-size:12px; color:#ef4444; font-weight:600;">Grabando... toca para detener</span>
+            </div>
+
+            <!-- Estado: procesando -->
+            <div id="voice-processing" style="display:none; flex-direction:column; align-items:center; gap:8px; margin:20px 0;">
+                <div style="width:64px; height:64px; border-radius:50%; background:#f3f4f6; border:none; color:#9ca3af; font-size:28px; display:flex; align-items:center; justify-content:center;">
+                    <i class="fas fa-spinner fa-spin"></i>
+                </div>
+                <span id="voice-processing-text" style="font-size:12px; color:#9ca3af;">Transcribiendo audio...</span>
+            </div>
+
+            <!-- Preview de transcripción -->
+            <div id="voice-preview" style="display:none; margin:16px 0;">
+                <div style="background:rgba(255,175,51,0.08); border:1px solid rgba(255,175,51,0.3); border-radius:10px; padding:12px 14px;">
+                    <div style="font-size:11px; font-weight:600; color:var(--naranja,#FFAF33); margin-bottom:6px; display:flex; align-items:center; gap:4px;">
+                        <i class="fas fa-magic"></i> Transcripción procesada
+                    </div>
+                    <div id="voice-transcription-text" style="font-size:13px; color:#4b5563; line-height:1.5;"></div>
+                </div>
+
+                <!-- Badges de campos llenados -->
+                <div id="voice-badges" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;"></div>
+
+                <!-- Botón para volver a grabar -->
+                <div style="text-align:center; margin-top:12px;">
+                    <button type="button" onclick="resetearVoz()" 
+                            style="background:none; border:1px solid #e5e7eb; border-radius:8px; padding:8px 16px; font-size:12px; color:#6b7280; cursor:pointer;">
+                        <i class="fas fa-redo"></i> Grabar de nuevo
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- Botones fijos abajo -->
@@ -302,102 +322,203 @@
     // ── Toast ──
     function mostrarToast(msg) {
         const t = document.getElementById('toast');
+        if (!t) return;
         t.textContent = msg;
-        t.classList.add('show');
+        t.className = 'toast show';
         setTimeout(() => t.classList.remove('show'), 2500);
     }
 
-    // ── Voz: Azure Speech SDK vía /transcribe-audio ──
+    // ── Voz central: variables ──
     let mediaRecorder = null;
     let audioChunks   = [];
 
-    document.querySelectorAll('.record-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const campoId = btn.dataset.targetId;
-            const input   = document.querySelector(`.campo-respuesta[data-campo-id="${campoId}"]`);
-            const stopBtn = document.querySelector(`.stop-btn[data-target-id="${campoId}"]`);
+    function mostrarEstado(estado) {
+        document.getElementById('voice-idle').style.display       = estado === 'idle'       ? 'flex' : 'none';
+        document.getElementById('voice-recording').style.display  = estado === 'recording'  ? 'flex' : 'none';
+        document.getElementById('voice-processing').style.display = estado === 'processing' ? 'flex' : 'none';
+        document.getElementById('voice-preview').style.display    = estado === 'preview'    ? 'block' : 'none';
+    }
+
+    // ── Paso 1: Grabar audio ──
+    function iniciarGrabacion() {
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                audioChunks   = [];
+                mediaRecorder = new MediaRecorder(stream);
+                mostrarEstado('recording');
+
+                mediaRecorder.ondataavailable = e => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    stream.getTracks().forEach(t => t.stop());
+                    procesarAudio();
+                };
+
+                mediaRecorder.start();
+            })
+            .catch(() => mostrarToast('❌ No se pudo acceder al micrófono'));
+    }
+
+    function detenerGrabacion() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+        }
+    }
+
+    // ── Paso 2: Transcribir con gpt-4o-transcribe ──
+    async function procesarAudio() {
+        mostrarEstado('processing');
+        document.getElementById('voice-processing-text').textContent = 'Transcribiendo audio...';
+
+        const blob     = new Blob(audioChunks, { type: 'audio/webm' });
+        const formData = new FormData();
+        formData.append('audio', blob, 'audio.webm');
+
+        try {
+            const res  = await fetch('/transcribe-audio', { method: 'POST', body: formData });
+            const data = await res.json();
+
+            if (!data.text) {
+                mostrarToast('⚠️ No se detectó audio');
+                mostrarEstado('idle');
+                return;
+            }
+
+            const transcripcion = data.text;
+
+            // Mostrar transcripción y proceder a distribuir
+            document.getElementById('voice-transcription-text').textContent = transcripcion;
+            document.getElementById('voice-processing-text').textContent = 'Distribuyendo en campos...';
+
+            await distribuirEnCampos(transcripcion);
+
+        } catch {
+            mostrarToast('❌ Error al transcribir');
+            mostrarEstado('idle');
+        }
+    }
+
+    // ── Paso 3: Distribuir con gpt-4o-mini ──
+    async function distribuirEnCampos(transcripcion) {
+        // Recoger la definición de los campos del formulario
+        const camposInfo = [];
+        document.querySelectorAll('.campo-respuesta').forEach(input => {
+            const tipo = input.dataset.tipo;
+            // No enviar campos de archivo a la IA
+            if (tipo === 'imagen' || tipo === 'adjunto') return;
+
+            const info = {
+                id:        input.dataset.campoId,
+                nombre:    input.dataset.nombre,
+                tipo:      tipo,
+                requerido: input.dataset.requerido === 'True' || input.dataset.requerido === 'true'
+            };
+
+            // Incluir opciones para campos de selección
+            if (input.dataset.opciones) {
+                try { info.opciones = JSON.parse(input.dataset.opciones); } catch {}
+            }
+
+            camposInfo.push(info);
+        });
+
+        try {
+            const res = await fetch('/api/distribuir-campos', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({
+                    transcripcion: transcripcion,
+                    campos:        camposInfo
+                })
+            });
+            const data = await res.json();
+
+            if (!data.success || !data.campos) {
+                mostrarToast('⚠️ No se pudo distribuir la información');
+                mostrarEstado('idle');
+                return;
+            }
+
+            // Llenar los campos del formulario
+            llenarCampos(data.campos);
+
+            // Mostrar preview con badges
+            mostrarBadges(data.campos, camposInfo);
+            mostrarEstado('preview');
+
+        } catch {
+            mostrarToast('❌ Error al procesar');
+            mostrarEstado('idle');
+        }
+    }
+
+    // ── Llenar campos del formulario con los valores del JSON ──
+    function llenarCampos(valores) {
+        Object.entries(valores).forEach(([campoId, valor]) => {
+            const input = document.querySelector(`.campo-respuesta[data-campo-id="${campoId}"]`);
             if (!input) return;
 
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(stream => {
-                    audioChunks   = [];
-                    mediaRecorder = new MediaRecorder(stream);
-                    btn.style.display     = 'none';
-                    stopBtn.style.display = '';
-
-                    mediaRecorder.ondataavailable = e => {
-                        if (e.data.size > 0) audioChunks.push(e.data);
-                    };
-
-                    mediaRecorder.onstop = async () => {
-                        stopBtn.style.display = 'none';
-                        btn.style.display     = '';
-                        stream.getTracks().forEach(t => t.stop());
-
-                        const blob     = new Blob(audioChunks, { type: 'audio/webm' });
-                        const formData = new FormData();
-                        formData.append('audio', blob, 'audio.webm');
-
-                        try {
-                            btn.disabled = true;
-                            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-                            const res  = await fetch('/transcribe-audio', { method: 'POST', body: formData });
-                            const data = await res.json();
-                            if (data.text) {
-                                const tipo = btn.dataset.tipo;
-                                if (tipo === 'numero') {
-                                    const texto = data.text.replace(',', '.');
-                                    // Contar cuántos dígitos hay en total
-                                    const digitos = texto.replace(/[^\d]/g, '');
-                                    
-                                    if (!digitos) {
-                                        mostrarToast('⚠️ No se reconoció un número, escríbelo manualmente');
-                                    } else if (digitos.length >= 7) {
-                                        // 7+ dígitos → seguramente es identificador (cédula, celular, referencia)
-                                        input.value = digitos;
-                                    } else {
-                                        // Menos de 7 dígitos → puede ser decimal legítimo
-                                        const decimal = texto.match(/\d+\.\d+/);
-                                        input.value = decimal ? decimal[0] : digitos;
-                                    }
-                                } else if (tipo === 'fecha') {
-                                    const parsed = new Date(data.text);
-                                    if (!isNaN(parsed)) {
-                                        input.value = parsed.toISOString().split('T')[0];
-                                    } else {
-                                        mostrarToast('⚠️ No se reconoció la fecha, escríbela manualmente');
-                                    }
-                                } else {
-                                    input.value = input.value
-                                        ? input.value + ' ' + data.text
-                                        : data.text;
-                                }
-                            } else {
-                                mostrarToast('⚠️ No se detectó audio');
-                            }
-                        } catch {
-                            mostrarToast('❌ Error al transcribir');
-                        } finally {
-                            btn.disabled  = false;
-                            btn.innerHTML = '<i class="fas fa-microphone"></i>';
-                        }
-                    };
-
-                    mediaRecorder.start();
-                })
-                .catch(() => mostrarToast('❌ No se pudo acceder al micrófono'));
-        });
-    });
-
-    document.querySelectorAll('.stop-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
+            if (input.type === 'checkbox') {
+                input.checked = valor === true || valor === 'true';
+            } else if (input.tagName === 'SELECT') {
+                // Buscar la opción más cercana
+                const opciones = Array.from(input.options);
+                const match = opciones.find(o => o.value.toLowerCase() === String(valor).toLowerCase());
+                if (match) {
+                    input.value = match.value;
+                } else {
+                    input.value = valor;
+                }
+            } else if (input.tagName === 'TEXTAREA') {
+                input.value = valor;
+            } else {
+                input.value = valor;
             }
         });
-    });
+    }
 
-    // ── Guardar respuesta ──
+    // ── Mostrar badges de estado de cada campo ──
+    function mostrarBadges(valores, camposInfo) {
+        const container = document.getElementById('voice-badges');
+        container.innerHTML = '';
+
+        camposInfo.forEach(campo => {
+            const valor   = valores[campo.id] || '';
+            const llenado = valor !== '' && valor !== false && valor !== null;
+
+            const badge = document.createElement('div');
+            badge.style.cssText = `display:flex; align-items:center; gap:4px; padding:4px 10px; border-radius:100px; font-size:11px; font-weight:600;`;
+
+            if (llenado) {
+                badge.style.background = 'rgba(22,163,74,0.1)';
+                badge.style.color      = '#16a34a';
+                badge.innerHTML        = `<i class="fas fa-check" style="font-size:10px;"></i> ${campo.nombre}`;
+            } else {
+                badge.style.background = 'rgba(217,119,6,0.1)';
+                badge.style.color      = '#d97706';
+                badge.innerHTML        = `<i class="fas fa-minus" style="font-size:10px;"></i> ${campo.nombre}`;
+            }
+
+            container.appendChild(badge);
+        });
+    }
+
+    // ── Resetear para grabar de nuevo ──
+    function resetearVoz() {
+        mostrarEstado('idle');
+        // Limpiar campos que se llenaron
+        document.querySelectorAll('.campo-respuesta').forEach(input => {
+            if (input.type === 'checkbox') {
+                input.checked = false;
+            } else if (input.type !== 'file') {
+                input.value = '';
+            }
+        });
+    }
+
+    // ── Guardar respuesta (igual que antes) ──
     async function guardarRespuesta() {
         const projectId    = document.getElementById('project-id').value;
         const formularioId = document.getElementById('formulario-id').value;
@@ -405,7 +526,6 @@
         const puedeEditar  = document.getElementById('puede-editar').value === 'true';
         const esEdicion    = registroId !== '';
 
-        // Validar permisos si es edición
         if (esEdicion && !puedeEditar) {
             mostrarToast('⚠️ No tienes permiso para editar este registro');
             return;
@@ -417,8 +537,8 @@
 
         campos.forEach(input => {
             const campoId   = input.dataset.campoId;
-            const requerido = input.hasAttribute('required') || 
-                            input.dataset.requerido === 'True' || 
+            const requerido = input.hasAttribute('required') ||
+                            input.dataset.requerido === 'True' ||
                             input.dataset.requerido === 'true';
             let valor;
 
@@ -438,7 +558,6 @@
             }
         });
 
-        // Validar que al menos un campo tenga valor
         const algunCampoLleno = Object.values(respuestas).some(v => {
             if (v === true) return true;
             if (v === false || v === null || v === undefined) return false;
@@ -457,18 +576,18 @@
             return;
         }
 
-        const btn      = document.getElementById('btn-guardar');
-        const btnText  = document.getElementById('btn-guardar-text');
-        const textoOriginal = btnText.textContent;
-        btn.disabled   = true;
-        btn.innerHTML  = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+        const btn = document.getElementById('btn-guardar');
+        if (btn.disabled) return;
+        btn.disabled  = true;
+        const textoOriginal = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
 
         try {
-            const url     = esEdicion 
+            const url    = esEdicion
                 ? `/api/respuestas-formulario/${registroId}`
                 : '/api/respuestas-formulario';
-            const method  = esEdicion ? 'PUT' : 'POST';
-            const body    = esEdicion
+            const method = esEdicion ? 'PUT' : 'POST';
+            const body   = esEdicion
                 ? { respuestas }
                 : {
                     formulario_id: parseInt(formularioId),
@@ -487,7 +606,7 @@
                 mostrarToast(esEdicion ? '✅ Cambios guardados' : '✅ Registro guardado correctamente');
                 setTimeout(() => {
                     window.location.href = '/registros';
-                }, 1200);
+                }, 600);
             } else {
                 mostrarToast('❌ ' + (data.error || 'Error al guardar'));
             }
@@ -495,7 +614,7 @@
             mostrarToast('❌ Error de conexión');
         } finally {
             btn.disabled  = false;
-            btn.innerHTML = `<i class="fas fa-save"></i> <span id="btn-guardar-text">${textoOriginal}</span>`;
+            btn.innerHTML = textoOriginal;
         }
     }
 </script>
