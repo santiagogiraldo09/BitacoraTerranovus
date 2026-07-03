@@ -3748,7 +3748,8 @@ REGLAS:
 6. Para campos tipo booleano, devuelve true o false.
 7. Para campos tipo fecha, devuelve en formato YYYY-MM-DD.
 8. Extrae la información de forma inteligente: el usuario puede no decir el nombre exacto del campo pero sí dar la información que corresponde.
-9. Limpia el texto: capitaliza nombres propios, corrige puntuación básica."""
+9. Limpia el texto: capitaliza nombres propios, corrige puntuación básica.
+10. Para campos tipo texto_largo u observaciones: incluye TODA la información que el usuario dijo y que no pertenece claramente a otro campo. No omitas detalles como correos, nombres, números de teléfono o cualquier dato mencionado. Es mejor incluir de más que perder información."""
 
         fecha_hoy = date.today().strftime('%Y-%m-%d')
 
