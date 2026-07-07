@@ -255,6 +255,31 @@
 
         <!-- Botón central de voz + Transcripción -->
         <div id="voice-section" style="padding: 0 16px;">
+            <!-- Preview de transcripción -->
+            <div id="voice-preview" style="display:none; margin:16px 0;">
+                <div style="background:rgba(255,175,51,0.08); border:1px solid rgba(255,175,51,0.3); border-radius:10px; padding:12px 14px;">
+                    <div style="font-size:11px; font-weight:600; color:var(--naranja,#FFAF33); margin-bottom:6px; display:flex; align-items:center; gap:4px;">
+                        <i class="fas fa-magic"></i> Transcripción procesada
+                    </div>
+                    <div id="voice-transcription-text" style="font-size:13px; color:#4b5563; line-height:1.5;"></div>
+                </div>
+
+                <!-- Badges de campos llenados -->
+                <div id="voice-badges" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;"></div>
+
+                <!-- Botón para volver a grabar -->
+                <div style="text-align:center; margin-top:12px;">
+                    <button type="button" onclick="resetearVoz()" 
+                            style="background:none; border:1px solid #e5e7eb; border-radius:8px; padding:8px 16px; font-size:12px; color:#6b7280; cursor:pointer;">
+                        <i class="fas fa-redo"></i> Grabar de nuevo
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botones fijos abajo -->
+        <div class="bottom-actions">
+
             <!-- Botón central -->
             <div id="voice-idle" style="display:flex; flex-direction:column; align-items:center; gap:8px; margin:20px 0;">
                 <button type="button" id="btn-voz-central" onclick="iniciarGrabacion()" 
@@ -281,30 +306,6 @@
                 <span id="voice-processing-text" style="font-size:12px; color:#9ca3af;">Transcribiendo audio...</span>
             </div>
 
-            <!-- Preview de transcripción -->
-            <div id="voice-preview" style="display:none; margin:16px 0;">
-                <div style="background:rgba(255,175,51,0.08); border:1px solid rgba(255,175,51,0.3); border-radius:10px; padding:12px 14px;">
-                    <div style="font-size:11px; font-weight:600; color:var(--naranja,#FFAF33); margin-bottom:6px; display:flex; align-items:center; gap:4px;">
-                        <i class="fas fa-magic"></i> Transcripción procesada
-                    </div>
-                    <div id="voice-transcription-text" style="font-size:13px; color:#4b5563; line-height:1.5;"></div>
-                </div>
-
-                <!-- Badges de campos llenados -->
-                <div id="voice-badges" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:10px;"></div>
-
-                <!-- Botón para volver a grabar -->
-                <div style="text-align:center; margin-top:12px;">
-                    <button type="button" onclick="resetearVoz()" 
-                            style="background:none; border:1px solid #e5e7eb; border-radius:8px; padding:8px 16px; font-size:12px; color:#6b7280; cursor:pointer;">
-                        <i class="fas fa-redo"></i> Grabar de nuevo
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Botones fijos abajo -->
-        <div class="bottom-actions">
             <button type="button" id="btn-guardar" onclick="guardarRespuesta()" class="btn-guardar">
                 <i class="fas fa-save"></i> 
                 <span id="btn-guardar-text">
