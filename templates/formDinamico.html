@@ -70,59 +70,6 @@
             bottom: 0
         }
 
-        .bottom-actions {
-            bottom: 0 !important;
-            padding: 6px 16px !important;
-        }
-
-        /* Micrófono más pequeño */
-        #voice-idle button,
-        #voice-recording button,
-        #voice-processing div {
-            width: 42px !important;
-            height: 42px !important;
-            font-size: 18px !important;
-        }
-
-        #voice-idle span,
-        #voice-recording span,
-        #voice-processing span {
-            font-size: 9px !important;
-        }
-
-        .bottom-actions .btn-guardar {
-            padding: 11px 24px !important;
-            font-size: 15px !important;
-        }
-
-        /* Desktop */
-        @media screen and (min-width: 769px) {
-            .bottom-actions {
-                flex-direction: row !important;
-                align-items: center !important;
-                justify-content: center !important;
-                gap: 16px !important;
-                padding: 6px 32px !important;
-                position: relative;
-            }
-
-            .bottom-actions .btn-guardar {
-                width: auto !important;
-                min-width: 220px !important;
-                position: absolute;
-                right: 32px;
-            }
-        }
-
-        /* Móvil */
-        @media screen and (max-width: 768px) {
-            .bottom-actions {
-                flex-direction: column !important;
-                align-items: center !important;
-                gap: 4px !important;
-            }
-        }
-
         .toast {
             position: fixed;
             top: 80px;
