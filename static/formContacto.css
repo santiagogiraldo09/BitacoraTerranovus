@@ -204,7 +204,7 @@ textarea.field-input { resize: vertical; min-height: 90px; }
 .bottom-actions {
     position: fixed;
     bottom: 60px; left: 0; right: 0;
-    padding: 12px 16px;
+    padding: 8px 12px;
     background: var(--blanco);
     border-top: 1px solid var(--gris-borde);
     display: flex; flex-direction: column; gap: 8px;
@@ -212,7 +212,7 @@ textarea.field-input { resize: vertical; min-height: 90px; }
 }
 
 .btn-guardar {
-    width: 100%; padding: 10px 14px;
+    width: 100%; padding: 8px;
     background: var(--naranja); color: var(--blanco);
     font-family: 'Sora', sans-serif; font-size: 15px; font-weight: 700;
     border-radius: 10px; transition: background 0.2s;
