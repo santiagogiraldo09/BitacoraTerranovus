@@ -287,18 +287,39 @@ textarea.field-input { resize: vertical; min-height: 90px; }
 
 /* Desktop */
 @media screen and (min-width: 769px) {
-    .content-scroll { padding: 86px 32px 160px; }
+    .content-scroll {
+        padding: 86px 32px 160px;
+    }
 
     .bottom-actions {
         flex-direction: row;
-        justify-content: flex-end;
+        justify-content: center;   /* Antes: flex-end */
+        align-items: center;
         padding: 16px 32px;
         bottom: 0;
         gap: 12px;
+
+        position: relative;
     }
 
-    .btn-guardar  { width: auto; min-width: 200px; }
-    .btn-cancelar { width: auto; min-width: 120px; }
+    #voice-idle,
+    #voice-recording,
+    #voice-processing {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
+    .btn-guardar {
+        width: auto;
+        min-width: 200px;
+        margin-left: auto;
+    }
+
+    .btn-cancelar {
+        width: auto;
+        min-width: 120px;
+    }
 
     .galeria-grid {
         grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
