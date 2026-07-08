@@ -56,7 +56,7 @@ button { font-family: inherit; cursor: pointer; border: none; }
 }
 
 .header-logo {
-    width: 32px; height: 32px; object-fit: contain; border-radius: 6px;
+    width: 48px; height: 48px; object-fit: contain; border-radius: 8px;
 }
 
 .header-title {
