@@ -545,6 +545,58 @@ def crear_registro_lote():
         return jsonify({'error': str(e)}), 500
 
  
+@app.route('/api/interpretar-respuesta', methods=['POST'])
+def interpretar_respuesta():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    try:
+        data          = request.get_json()
+        pregunta      = data.get('pregunta', '')
+        respuesta     = data.get('respuesta', '')
+        campo_id      = data.get('campo_id', '')
+        campo_nombre  = data.get('campo_nombre', '')
+        campo_tipo    = data.get('campo_tipo', 'texto_corto')
+
+        fecha_hoy = date.today().strftime('%Y-%m-%d')
+
+        prompt = f"""El sistema le preguntó al usuario: "{pregunta}"
+El usuario respondió: "{respuesta}"
+
+El campo a llenar es: "{campo_nombre}" (tipo: {campo_tipo})
+Fecha actual: {fecha_hoy}
+
+Extrae el valor que corresponde al campo. Devuelve SOLO un JSON:
+{{"valor": "el valor extraído"}}
+
+Reglas:
+- Si el tipo es fecha, devuelve en formato YYYY-MM-DD.
+- Si el tipo es numero/moneda/porcentaje, devuelve solo el número.
+- Si el tipo es booleano, devuelve true o false.
+- Si no puedes extraer un valor claro, devuelve {{"valor": ""}}
+- No inventes datos. Solo extrae lo que el usuario dijo."""
+
+        response = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,
+            max_tokens=200
+        )
+
+        respuesta_texto = response.choices[0].message.content.strip()
+        respuesta_texto = respuesta_texto.replace('```json', '').replace('```', '').strip()
+        resultado = json.loads(respuesta_texto)
+
+        print(f"[INTERPRETAR] Campo: {campo_nombre} → Valor: {resultado.get('valor', '')}")
+
+        return jsonify({'success': True, 'valor': resultado.get('valor', '')})
+
+    except Exception as e:
+        print(f"[INTERPRETAR] Error: {e}")
+        return jsonify({'error': str(e), 'success': False}), 500
+
 # ── Ruta GET: mostrar formulario ────────────────────────────────
 @app.route('/registroEmpresa', methods=['GET'])
 def registro_page():
@@ -3749,7 +3801,24 @@ REGLAS:
 7. Para campos tipo fecha, devuelve en formato YYYY-MM-DD.
 8. Extrae la información de forma inteligente: el usuario puede no decir el nombre exacto del campo pero sí dar la información que corresponde.
 9. Limpia el texto: capitaliza nombres propios, corrige puntuación básica.
-10. Para campos tipo texto_largo u observaciones: resume y estructura la información relevante que el usuario dijo, pero NUNCA omitas datos específicos como correos electrónicos, nombres de personas, números de teléfono, cantidades o direcciones. Redacta de forma profesional y concisa, no copies la transcripción textual."""
+10. Para campos tipo texto_largo u observaciones: resume y estructura la información relevante que el usuario dijo, pero NUNCA omitas datos específicos como correos electrónicos, nombres de personas, números de teléfono, cantidades o direcciones. Redacta de forma profesional y concisa, no copies la transcripción textual.
+
+FORMATO DE RESPUESTA:
+{
+  "campos": { "id": "valor", ... },
+  "faltantes": [
+    {
+      "campo_id": "id",
+      "nombre": "nombre del campo",
+      "pregunta": "pregunta natural y corta para pedir este dato"
+    }
+  ]
+}
+
+- En "campos" pon todos los valores extraídos.
+- En "faltantes" pon SOLO los campos marcados como [obligatorio] que quedaron vacíos.
+- La pregunta debe ser natural, corta y en español colombiano. Ejemplo: "¿Cuál es la fecha de inicio?" o "¿Me puedes dar el nombre del responsable?"
+- Si todos los campos obligatorios fueron llenados, "faltantes" debe ser un array vacío []."""
 
         fecha_hoy = date.today().strftime('%Y-%m-%d')
 
@@ -3779,9 +3848,23 @@ Devuelve SOLO el JSON con los valores extraídos."""
         respuesta_texto = respuesta_texto.replace('```json', '').replace('```', '').strip()
 
         resultado = json.loads(respuesta_texto)
-        print(f"[DISTRIBUIR] Campos llenados: {len([v for v in resultado.values() if v])}/{len(campos)}")
 
-        return jsonify({'success': True, 'campos': resultado})
+        # Soportar ambos formatos: nuevo (con faltantes) y viejo (solo campos)
+        if 'campos' in resultado:
+            campos_resultado = resultado['campos']
+            faltantes = resultado.get('faltantes', [])
+        else:
+            campos_resultado = resultado
+            faltantes = []
+
+        llenados = len([v for v in campos_resultado.values() if v])
+        print(f"[DISTRIBUIR] Campos llenados: {llenados}/{len(campos)}. Faltantes obligatorios: {len(faltantes)}")
+
+        return jsonify({
+            'success': True,
+            'campos': campos_resultado,
+            'faltantes': faltantes
+        })
 
     except json.JSONDecodeError as e:
         print(f"[DISTRIBUIR] Error parseando JSON: {e}")

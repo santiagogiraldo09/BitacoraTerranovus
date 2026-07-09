@@ -276,6 +276,39 @@
                     </button>
                 </div>
             </div>
+            <!-- Pregunta por campo faltante -->
+            <div id="voice-question" style="display:none; margin:16px 0; padding:0 16px;">
+                <div style="background:#FFF7ED; border:1px solid #FDBA74; border-radius:10px; padding:14px 16px;">
+                    <div style="font-size:11px; font-weight:600; color:#EA580C; margin-bottom:6px; display:flex; align-items:center; gap:4px;">
+                        <i class="fas fa-question-circle"></i> Campo faltante
+                    </div>
+                    <div id="voice-question-text" style="font-size:14px; color:#9A3412; line-height:1.5; font-weight:500;"></div>
+                </div>
+
+                <!-- Micrófono para responder + timer -->
+                <div id="question-mic-area" style="display:flex; flex-direction:column; align-items:center; gap:6px; margin-top:12px;">
+                    <div id="question-recording" style="display:none; flex-direction:column; align-items:center; gap:4px;">
+                        <div style="width:48px; height:48px; border-radius:50%; background:#ef4444; color:white; font-size:20px; display:flex; align-items:center; justify-content:center; animation:pulse 1.5s infinite;">
+                            <i class="fas fa-microphone"></i>
+                        </div>
+                        <span id="question-timer" style="font-size:12px; color:#ef4444; font-weight:600;">Escuchando... 8s</span>
+                    </div>
+                    <div id="question-processing" style="display:none; flex-direction:column; align-items:center; gap:4px;">
+                        <div style="width:48px; height:48px; border-radius:50%; background:#e5e7eb; color:#9ca3af; font-size:20px; display:flex; align-items:center; justify-content:center;">
+                            <i class="fas fa-spinner fa-spin"></i>
+                        </div>
+                        <span style="font-size:12px; color:#9ca3af;">Procesando respuesta...</span>
+                    </div>
+                </div>
+
+                <!-- Botón para omitir -->
+                <div style="text-align:center; margin-top:8px;">
+                    <button type="button" onclick="omitirPregunta()"
+                            style="background:none; border:none; font-size:12px; color:#9ca3af; cursor:pointer; text-decoration:underline;">
+                        Omitir este campo
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- Botones fijos abajo -->
@@ -333,6 +366,13 @@
     // ── Voz central: variables ──
     let mediaRecorder = null;
     let audioChunks   = [];
+    // ── Preguntas por faltantes ──
+    let faltantesPendientes = [];
+    let faltanteActual      = null;
+    let questionRecorder    = null;
+    let questionChunks      = [];
+    let questionTimer       = null;
+    let countdownInterval   = null;
 
     function mostrarEstado(estado) {
         document.getElementById('voice-idle').style.display       = estado === 'idle'       ? 'flex' : 'none';
@@ -450,9 +490,207 @@
             mostrarBadges(data.campos, camposInfo);
             mostrarEstado('preview');
 
+            // Verificar si hay campos faltantes obligatorios
+            faltantesPendientes = data.faltantes || [];
+            if (faltantesPendientes.length > 0) {
+                // Esperar 1 segundo para que el usuario vea el preview, luego preguntar
+                setTimeout(() => preguntarSiguienteFaltante(), 1000);
+            }
+
         } catch {
             mostrarToast('❌ Error al procesar');
             mostrarEstado('idle');
+        }
+    }
+
+    // ── Flujo de preguntas por faltantes ──
+    function preguntarSiguienteFaltante() {
+        if (faltantesPendientes.length === 0) {
+            // No hay más faltantes, ocultar pregunta
+            document.getElementById('voice-question').style.display = 'none';
+            return;
+        }
+
+        faltanteActual = faltantesPendientes.shift();
+
+        // Mostrar pregunta visualmente
+        document.getElementById('voice-question').style.display = 'block';
+        document.getElementById('voice-question-text').textContent = faltanteActual.pregunta;
+        document.getElementById('question-recording').style.display = 'none';
+        document.getElementById('question-processing').style.display = 'none';
+
+        // Enunciar pregunta con Text-to-Speech
+        hablarPregunta(faltanteActual.pregunta, () => {
+            // Después de hablar, abrir micrófono automáticamente
+            iniciarGrabacionRespuesta();
+        });
+    }
+
+    function hablarPregunta(texto, callback) {
+        if (!window.speechSynthesis) {
+            // Si no hay TTS disponible, solo esperar 1 segundo y continuar
+            setTimeout(callback, 1000);
+            return;
+        }
+
+        // Cancelar cualquier habla anterior
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(texto);
+        utterance.lang = 'es-CO';
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+
+        utterance.onend = () => {
+            // Pequeña pausa después de hablar antes de escuchar
+            setTimeout(callback, 500);
+        };
+
+        utterance.onerror = () => {
+            setTimeout(callback, 500);
+        };
+
+        window.speechSynthesis.speak(utterance);
+    }
+
+    function iniciarGrabacionRespuesta() {
+        document.getElementById('question-recording').style.display = 'flex';
+
+        let segundosRestantes = 8;
+        const timerEl = document.getElementById('question-timer');
+        timerEl.textContent = `Escuchando... ${segundosRestantes}s`;
+
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                questionChunks  = [];
+                questionRecorder = new MediaRecorder(stream);
+
+                questionRecorder.ondataavailable = e => {
+                    if (e.data.size > 0) questionChunks.push(e.data);
+                };
+
+                questionRecorder.onstop = () => {
+                    stream.getTracks().forEach(t => t.stop());
+                    clearInterval(countdownInterval);
+                    clearTimeout(questionTimer);
+                    procesarRespuestaFaltante();
+                };
+
+                questionRecorder.start();
+
+                // Countdown visual
+                countdownInterval = setInterval(() => {
+                    segundosRestantes--;
+                    timerEl.textContent = `Escuchando... ${segundosRestantes}s`;
+                    if (segundosRestantes <= 0) {
+                        clearInterval(countdownInterval);
+                    }
+                }, 1000);
+
+                // Auto-detener después de 8 segundos
+                questionTimer = setTimeout(() => {
+                    if (questionRecorder && questionRecorder.state === 'recording') {
+                        questionRecorder.stop();
+                    }
+                }, 8000);
+            })
+            .catch(() => {
+                mostrarToast('⚠️ No se pudo acceder al micrófono');
+                omitirPregunta();
+            });
+    }
+
+    async function procesarRespuestaFaltante() {
+        document.getElementById('question-recording').style.display = 'none';
+        document.getElementById('question-processing').style.display = 'flex';
+
+        const blob     = new Blob(questionChunks, { type: 'audio/webm' });
+        const formData = new FormData();
+        formData.append('audio', blob, 'audio.webm');
+
+        try {
+            // Transcribir respuesta
+            const res  = await fetch('/transcribe-audio', { method: 'POST', body: formData });
+            const data = await res.json();
+
+            if (data.text && data.text.trim()) {
+                // Interpretar la respuesta con gpt-4o-mini
+                const resInterpret = await fetch('/api/interpretar-respuesta', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({
+                        pregunta:    faltanteActual.pregunta,
+                        respuesta:   data.text,
+                        campo_id:    faltanteActual.campo_id,
+                        campo_nombre: faltanteActual.nombre,
+                        campo_tipo:  document.querySelector(`.campo-respuesta[data-campo-id="${faltanteActual.campo_id}"]`)?.dataset.tipo || 'texto_corto'
+                    })
+                });
+                const dataInterpret = await resInterpret.json();
+
+                if (dataInterpret.success && dataInterpret.valor) {
+                    // Llenar el campo
+                    const input = document.querySelector(`.campo-respuesta[data-campo-id="${faltanteActual.campo_id}"]`);
+                    if (input) {
+                        if (input.type === 'checkbox') {
+                            input.checked = dataInterpret.valor === true || dataInterpret.valor === 'true';
+                        } else {
+                            input.value = dataInterpret.valor;
+                        }
+                    }
+
+                    // Actualizar badge a verde
+                    actualizarBadge(faltanteActual.campo_id, faltanteActual.nombre, true);
+                    mostrarToast('✅ ' + faltanteActual.nombre + ' completado');
+                } else {
+                    mostrarToast('⚠️ No se entendió la respuesta');
+                }
+            } else {
+                // No se detectó audio
+                mostrarToast('⚠️ No se detectó respuesta para ' + faltanteActual.nombre);
+            }
+        } catch {
+            mostrarToast('❌ Error al procesar la respuesta');
+        }
+
+        document.getElementById('question-processing').style.display = 'none';
+
+        // Continuar con el siguiente faltante
+        setTimeout(() => preguntarSiguienteFaltante(), 800);
+    }
+
+    function omitirPregunta() {
+        // Detener grabación si está activa
+        if (questionRecorder && questionRecorder.state === 'recording') {
+            questionRecorder.stop();
+            return; // El onstop manejará el flujo
+        }
+
+        clearInterval(countdownInterval);
+        clearTimeout(questionTimer);
+
+        // Cancelar TTS si está hablando
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+        }
+
+        document.getElementById('question-recording').style.display  = 'none';
+        document.getElementById('question-processing').style.display = 'none';
+
+        // Pasar al siguiente faltante
+        setTimeout(() => preguntarSiguienteFaltante(), 300);
+    }
+
+    function actualizarBadge(campoId, nombre, llenado) {
+        const badges = document.getElementById('voice-badges');
+        const existente = badges.querySelector(`[data-badge-id="${campoId}"]`);
+
+        if (existente) {
+            if (llenado) {
+                existente.style.background = 'rgba(22,163,74,0.1)';
+                existente.style.color      = '#16a34a';
+                existente.innerHTML        = `<i class="fas fa-check" style="font-size:10px;"></i> ${nombre}`;
+            }
         }
     }
 
@@ -491,6 +729,7 @@
             const llenado = valor !== '' && valor !== false && valor !== null;
 
             const badge = document.createElement('div');
+            badge.dataset.badgeId = campo.id;
             badge.style.cssText = `display:flex; align-items:center; gap:4px; padding:4px 10px; border-radius:100px; font-size:11px; font-weight:600;`;
 
             if (llenado) {
