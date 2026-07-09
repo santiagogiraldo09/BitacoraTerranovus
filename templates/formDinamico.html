@@ -562,14 +562,59 @@
 
         navigator.mediaDevices.getUserMedia({ audio: true })
             .then(stream => {
-                questionChunks  = [];
+                questionChunks   = [];
                 questionRecorder = new MediaRecorder(stream);
+
+                // ── Detección de silencio ──
+                const audioContext = new AudioContext();
+                const source       = audioContext.createMediaStreamSource(stream);
+                const analyser     = audioContext.createAnalyser();
+                analyser.fftSize   = 512;
+                source.connect(analyser);
+
+                const dataArray     = new Uint8Array(analyser.frequencyBinCount);
+                let usuarioHablo    = false;
+                let silencioInicio  = null;
+                const UMBRAL_VOZ    = 30;    // nivel mínimo para considerar que habla
+                const SILENCIO_MS   = 2000;  // 2 segundos de silencio para detener
+                let detectando      = true;
+
+                function detectarSilencio() {
+                    if (!detectando) return;
+
+                    analyser.getByteFrequencyData(dataArray);
+                    const volumen = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+
+                    if (volumen > UMBRAL_VOZ) {
+                        // El usuario está hablando
+                        usuarioHablo   = true;
+                        silencioInicio = null;
+                        timerEl.textContent = 'Escuchando...';
+                    } else if (usuarioHablo) {
+                        // El usuario habló pero ahora hay silencio
+                        if (!silencioInicio) {
+                            silencioInicio = Date.now();
+                        } else if (Date.now() - silencioInicio >= SILENCIO_MS) {
+                            // 2 segundos de silencio → detener
+                            detectando = false;
+                            audioContext.close();
+                            if (questionRecorder && questionRecorder.state === 'recording') {
+                                questionRecorder.stop();
+                            }
+                            return;
+                        }
+                    }
+
+                    requestAnimationFrame(detectarSilencio);
+                }
 
                 questionRecorder.ondataavailable = e => {
                     if (e.data.size > 0) questionChunks.push(e.data);
                 };
 
                 questionRecorder.onstop = () => {
+                    detectando = false;
+                    audioContext.close().catch(() => {});
                     stream.getTracks().forEach(t => t.stop());
                     clearInterval(countdownInterval);
                     clearTimeout(questionTimer);
@@ -577,19 +622,24 @@
                 };
 
                 questionRecorder.start();
+                detectarSilencio();
 
-                // Countdown visual
+                // Countdown visual (máximo 8 segundos si nunca habla)
                 countdownInterval = setInterval(() => {
                     segundosRestantes--;
-                    timerEl.textContent = `Escuchando... ${segundosRestantes}s`;
+                    if (!usuarioHablo) {
+                        timerEl.textContent = `Escuchando... ${segundosRestantes}s`;
+                    }
                     if (segundosRestantes <= 0) {
                         clearInterval(countdownInterval);
                     }
                 }, 1000);
 
-                // Auto-detener después de 8 segundos
+                // Timeout máximo: 8 segundos sin hablar
                 questionTimer = setTimeout(() => {
                     if (questionRecorder && questionRecorder.state === 'recording') {
+                        detectando = false;
+                        audioContext.close().catch(() => {});
                         questionRecorder.stop();
                     }
                 }, 8000);
