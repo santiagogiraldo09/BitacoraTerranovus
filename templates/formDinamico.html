@@ -304,7 +304,7 @@
 
                 <!-- Botón para omitir -->
                 <div style="text-align:center; margin-top:8px;">
-                    <button type="button" onclick="omitirPregunta()"
+                    <button type="button" onclick="omitirActual()"
                             style="background:none; border:none; font-size:12px; color:#9ca3af; cursor:pointer; text-decoration:underline;">
                         Omitir este campo
                     </button>
@@ -377,6 +377,8 @@
     let questionChunks      = [];
     let questionTimer       = null;
     let countdownInterval   = null;
+    let ambiguedadesPendientes = [];
+    let ambiguedadActual       = null;
 
     function mostrarEstado(estado) {
         document.getElementById('voice-idle').style.display       = estado === 'idle'       ? 'flex' : 'none';
@@ -494,10 +496,14 @@
             mostrarBadges(data.campos, camposInfo);
             mostrarEstado('preview');
 
-            // Verificar si hay campos faltantes obligatorios
+            // Guardar faltantes para después
             faltantesPendientes = data.faltantes || [];
-            if (faltantesPendientes.length > 0) {
-                // Esperar 1 segundo para que el usuario vea el preview, luego preguntar
+
+            // Verificar primero ambigüedades, luego faltantes
+            ambiguedadesPendientes = data.ambiguedades || [];
+            if (ambiguedadesPendientes.length > 0) {
+                setTimeout(() => preguntarSiguienteAmbiguedad(), 1000);
+            } else if (faltantesPendientes.length > 0) {
                 setTimeout(() => preguntarSiguienteFaltante(), 1000);
             }
 
@@ -505,6 +511,213 @@
             mostrarToast('❌ Error al procesar');
             mostrarEstado('idle');
         }
+    }
+
+    function omitirActual() {
+        if (ambiguedadActual) {
+            omitirAmbiguedad();
+        } else {
+            omitirPregunta();
+        }
+    }
+
+    // ── Flujo de ambigüedades ──
+
+    function preguntarSiguienteAmbiguedad() {
+        if (ambiguedadesPendientes.length === 0) {
+            // Ya no hay ambigüedades, pasar a faltantes
+            document.getElementById('voice-question').style.display = 'none';
+            if (faltantesPendientes.length > 0) {
+                setTimeout(() => preguntarSiguienteFaltante(), 500);
+            }
+            return;
+        }
+
+        ambiguedadActual = ambiguedadesPendientes.shift();
+
+        // Mostrar pregunta visualmente
+        document.getElementById('voice-question').style.display = 'block';
+        document.getElementById('voice-question-text').textContent = ambiguedadActual.pregunta;
+        document.getElementById('question-recording').style.display = 'none';
+        document.getElementById('question-processing').style.display = 'none';
+
+        // Cambiar el título a "Ambigüedad" en vez de "Campo faltante"
+        const titulo = document.querySelector('#voice-question .fa-question-circle')?.parentElement;
+        if (titulo) titulo.innerHTML = '<i class="fas fa-question-circle"></i> Aclaración necesaria';
+
+        // Enunciar pregunta con Text-to-Speech
+        hablarPregunta(ambiguedadActual.pregunta, () => {
+            iniciarGrabacionAmbiguedad();
+        });
+    }
+
+    function iniciarGrabacionAmbiguedad() {
+        document.getElementById('question-recording').style.display = 'flex';
+
+        let segundosRestantes = 8;
+        const timerEl = document.getElementById('question-timer');
+        timerEl.textContent = `Escuchando... ${segundosRestantes}s`;
+
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                questionChunks   = [];
+                questionRecorder = new MediaRecorder(stream);
+
+                // Detección de silencio
+                const audioContext = new AudioContext();
+                const source       = audioContext.createMediaStreamSource(stream);
+                const analyser     = audioContext.createAnalyser();
+                analyser.fftSize   = 512;
+                source.connect(analyser);
+
+                const dataArray     = new Uint8Array(analyser.frequencyBinCount);
+                let usuarioHablo    = false;
+                let silencioInicio  = null;
+                const UMBRAL_VOZ    = 30;
+                const SILENCIO_MS   = 2000;
+                let detectando      = true;
+
+                function detectarSilencio() {
+                    if (!detectando) return;
+                    analyser.getByteFrequencyData(dataArray);
+                    const volumen = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+
+                    if (volumen > UMBRAL_VOZ) {
+                        usuarioHablo   = true;
+                        silencioInicio = null;
+                        timerEl.textContent = 'Escuchando...';
+                    } else if (usuarioHablo) {
+                        if (!silencioInicio) {
+                            silencioInicio = Date.now();
+                        } else if (Date.now() - silencioInicio >= SILENCIO_MS) {
+                            detectando = false;
+                            audioContext.close();
+                            if (questionRecorder && questionRecorder.state === 'recording') {
+                                questionRecorder.stop();
+                            }
+                            return;
+                        }
+                    }
+                    requestAnimationFrame(detectarSilencio);
+                }
+
+                questionRecorder.ondataavailable = e => {
+                    if (e.data.size > 0) questionChunks.push(e.data);
+                };
+
+                questionRecorder.onstop = () => {
+                    detectando = false;
+                    audioContext.close().catch(() => {});
+                    stream.getTracks().forEach(t => t.stop());
+                    clearInterval(countdownInterval);
+                    clearTimeout(questionTimer);
+                    procesarRespuestaAmbiguedad();
+                };
+
+                questionRecorder.start();
+                detectarSilencio();
+
+                countdownInterval = setInterval(() => {
+                    segundosRestantes--;
+                    if (!usuarioHablo) {
+                        timerEl.textContent = `Escuchando... ${segundosRestantes}s`;
+                    }
+                    if (segundosRestantes <= 0) clearInterval(countdownInterval);
+                }, 1000);
+
+                questionTimer = setTimeout(() => {
+                    if (questionRecorder && questionRecorder.state === 'recording') {
+                        detectando = false;
+                        audioContext.close().catch(() => {});
+                        questionRecorder.stop();
+                    }
+                }, 8000);
+            })
+            .catch(() => {
+                mostrarToast('⚠️ No se pudo acceder al micrófono');
+                omitirAmbiguedad();
+            });
+    }
+
+    async function procesarRespuestaAmbiguedad() {
+        document.getElementById('question-recording').style.display = 'none';
+        document.getElementById('question-processing').style.display = 'flex';
+
+        const blob     = new Blob(questionChunks, { type: 'audio/webm' });
+        const formData = new FormData();
+        formData.append('audio', blob, 'audio.webm');
+
+        try {
+            // Transcribir respuesta
+            const res  = await fetch('/transcribe-audio', { method: 'POST', body: formData });
+            const data = await res.json();
+
+            if (data.text && data.text.trim()) {
+                // Enviar a resolver ambigüedad
+                const resResolver = await fetch('/api/resolver-ambiguedad', {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({
+                        pregunta:        ambiguedadActual.pregunta,
+                        respuesta:       data.text,
+                        valor:           ambiguedadActual.valor,
+                        campos_posibles: ambiguedadActual.campos_posibles
+                    })
+                });
+                const dataResolver = await resResolver.json();
+
+                if (dataResolver.success && dataResolver.campo_id) {
+                    // Llenar el campo elegido
+                    const input = document.querySelector(`.campo-respuesta[data-campo-id="${dataResolver.campo_id}"]`);
+                    if (input) {
+                        if (input.type === 'checkbox') {
+                            input.checked = dataResolver.valor === true || dataResolver.valor === 'true';
+                        } else {
+                            input.value = dataResolver.valor;
+                        }
+                    }
+
+                    // Buscar nombre del campo para el toast y badge
+                    const campoElegido = ambiguedadActual.campos_posibles.find(c => c.id === dataResolver.campo_id);
+                    const nombreCampo  = campoElegido ? campoElegido.nombre : 'Campo';
+                    actualizarBadge(dataResolver.campo_id, nombreCampo, true);
+                    mostrarToast('✅ ' + nombreCampo + ' completado');
+
+                    // Quitar de faltantes si estaba ahí
+                    faltantesPendientes = faltantesPendientes.filter(f => f.campo_id !== dataResolver.campo_id);
+                } else {
+                    mostrarToast('⚠️ No se entendió la respuesta');
+                }
+            } else {
+                mostrarToast('⚠️ No se detectó respuesta');
+            }
+        } catch {
+            mostrarToast('❌ Error al procesar la respuesta');
+        }
+
+        document.getElementById('question-processing').style.display = 'none';
+
+        // Continuar con la siguiente ambigüedad
+        setTimeout(() => preguntarSiguienteAmbiguedad(), 800);
+    }
+
+    function omitirAmbiguedad() {
+        if (questionRecorder && questionRecorder.state === 'recording') {
+            questionRecorder.stop();
+            return;
+        }
+
+        clearInterval(countdownInterval);
+        clearTimeout(questionTimer);
+
+        if (window.speechSynthesis) {
+            window.speechSynthesis.cancel();
+        }
+
+        document.getElementById('question-recording').style.display  = 'none';
+        document.getElementById('question-processing').style.display = 'none';
+
+        setTimeout(() => preguntarSiguienteAmbiguedad(), 300);
     }
 
     // ── Flujo de preguntas por faltantes ──

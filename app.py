@@ -2724,6 +2724,58 @@ def guardar_contacto():
         print(f"Error guardando contacto: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/resolver-ambiguedad', methods=['POST'])
+def resolver_ambiguedad():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    try:
+        data             = request.get_json()
+        pregunta         = data.get('pregunta', '')
+        respuesta        = data.get('respuesta', '')
+        valor            = data.get('valor', '')
+        campos_posibles  = data.get('campos_posibles', [])
+
+        campos_desc = ', '.join([f'"{c["nombre"]}" (ID: {c["id"]})' for c in campos_posibles])
+
+        prompt = f"""El sistema le preguntó al usuario: "{pregunta}"
+El usuario respondió: "{respuesta}"
+
+El valor en cuestión es: "{valor}"
+Los campos posibles son: {campos_desc}
+
+Determina a cuál campo pertenece el valor según la respuesta del usuario.
+Devuelve SOLO un JSON:
+{{"campo_id": "el ID del campo elegido", "valor": "{valor}"}}
+
+Si no puedes determinar el campo, devuelve:
+{{"campo_id": "", "valor": ""}}"""
+
+        response = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,
+            max_tokens=200
+        )
+
+        respuesta_texto = response.choices[0].message.content.strip()
+        respuesta_texto = respuesta_texto.replace('```json', '').replace('```', '').strip()
+        resultado = json.loads(respuesta_texto)
+
+        print(f"[AMBIGUEDAD] Valor '{valor}' → Campo: {resultado.get('campo_id', 'ninguno')}")
+
+        return jsonify({
+            'success': True,
+            'campo_id': resultado.get('campo_id', ''),
+            'valor': resultado.get('valor', valor)
+        })
+
+    except Exception as e:
+        print(f"[AMBIGUEDAD] Error: {e}")
+        return jsonify({'error': str(e), 'success': False}), 500
+
 
 @app.route('/detalleContacto/<int:id_contacto>')
 def detalleContacto(id_contacto):
@@ -3803,9 +3855,24 @@ REGLAS:
 9. Limpia el texto: capitaliza nombres propios, corrige puntuación básica.
 10. Para campos tipo texto_largo u observaciones: resume y estructura la información relevante que el usuario dijo, pero NUNCA omitas datos específicos como correos electrónicos, nombres de personas, números de teléfono, cantidades o direcciones. Redacta de forma profesional y concisa, no copies la transcripción textual.
 
+DETECCIÓN DE AMBIGÜEDADES:
+- Si un valor mencionado por el usuario podría pertenecer a más de un campo, NO lo pongas en ninguno de esos campos. Déjalos vacíos y repórtalo como ambigüedad.
+- Solo reporta ambigüedades cuando genuinamente hay confusión (campos similares como "Correo del cliente" y "Correo del supervisor", o "Fecha de inicio" y "Fecha de entrega" si el usuario solo dijo "la fecha es...").
+- NO reportes ambigüedad si por contexto es claro a qué campo pertenece el valor.
+
 FORMATO DE RESPUESTA:
 {
   "campos": { "id": "valor", ... },
+  "ambiguedades": [
+    {
+      "valor": "el valor ambiguo",
+      "campos_posibles": [
+        {"id": "id_campo_1", "nombre": "nombre del campo 1"},
+        {"id": "id_campo_2", "nombre": "nombre del campo 2"}
+      ],
+      "pregunta": "pregunta corta y natural para resolver la duda"
+    }
+  ],
   "faltantes": [
     {
       "campo_id": "id",
@@ -3815,10 +3882,12 @@ FORMATO DE RESPUESTA:
   ]
 }
 
-- En "campos" pon todos los valores extraídos.
-- En "faltantes" pon SOLO los campos marcados como [obligatorio] que quedaron vacíos.
-- La pregunta debe ser natural, corta y en español colombiano. Ejemplo: "¿Cuál es la fecha de inicio?" o "¿Me puedes dar el nombre del responsable?"
-- Si todos los campos obligatorios fueron llenados, "faltantes" debe ser un array vacío []."""
+- En "campos" pon todos los valores que se pudieron asignar sin duda.
+- En "ambiguedades" pon los valores que podrían ir en más de un campo. La pregunta debe mencionar el valor y los campos posibles de forma natural. Ejemplo: "Mencionaste juan@empresa.com, ¿corresponde al correo del cliente o al correo del supervisor?"
+- En "faltantes" pon SOLO los campos marcados como [obligatorio] que quedaron vacíos Y que NO están en ambiguedades.
+- Si no hay ambigüedades, el array debe ser [].
+- Si no hay faltantes, el array debe ser [].
+- Las preguntas deben ser naturales, cortas y en español colombiano."""
 
         fecha_hoy = date.today().strftime('%Y-%m-%d')
 
@@ -3852,10 +3921,22 @@ Devuelve SOLO el JSON con los valores extraídos."""
         # Soportar ambos formatos: nuevo (con faltantes) y viejo (solo campos)
         if 'campos' in resultado:
             campos_resultado = resultado['campos']
+            ambiguedades = resultado.get('ambiguedades', [])
             faltantes = resultado.get('faltantes', [])
         else:
             campos_resultado = resultado
+            ambiguedades = []
             faltantes = []
+
+        llenados = len([v for v in campos_resultado.values() if v])
+        print(f"[DISTRIBUIR] Campos llenados: {llenados}/{len(campos)}. Ambigüedades: {len(ambiguedades)}. Faltantes: {len(faltantes)}")
+
+        return jsonify({
+            'success': True,
+            'campos': campos_resultado,
+            'ambiguedades': ambiguedades,
+            'faltantes': faltantes
+        })
 
         llenados = len([v for v in campos_resultado.values() if v])
         print(f"[DISTRIBUIR] Campos llenados: {llenados}/{len(campos)}. Faltantes obligatorios: {len(faltantes)}")
