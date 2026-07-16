@@ -2791,7 +2791,7 @@ def text_to_speech():
 
         response = openai_client.audio.speech.create(
             model="gpt-4o-mini-tts",
-            voice="ash",
+            voice="onyx",
             input=texto,
             instructions="Habla rápido en español latinoamericano neutro. Acento colombiano profesional. Sin pausas innecesarias. Ritmo ágil como si tuvieras prisa pero pronunciando claro."
         )
