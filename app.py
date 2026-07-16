@@ -49,6 +49,7 @@ from datetime import datetime, timedelta, timezone
 from openai import OpenAI
 import tempfile
 from datetime import date
+from flask import Response
 
 
 connection_pool = None
@@ -2776,6 +2777,31 @@ Si no puedes determinar el campo, devuelve:
         print(f"[AMBIGUEDAD] Error: {e}")
         return jsonify({'error': str(e), 'success': False}), 500
 
+@app.route('/api/text-to-speech', methods=['POST'])
+def text_to_speech():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    try:
+        data  = request.get_json()
+        texto = data.get('texto', '')
+
+        if not texto:
+            return jsonify({'error': 'No hay texto'}), 400
+
+        response = openai_client.audio.speech.create(
+            model="tts-1",
+            voice="echo",
+            input=texto
+        )
+
+        # Devolver el audio como MP3
+        audio_bytes = response.content
+        return Response(audio_bytes, mimetype='audio/mpeg')
+
+    except Exception as e:
+        print(f"[TTS] Error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/detalleContacto/<int:id_contacto>')
 def detalleContacto(id_contacto):

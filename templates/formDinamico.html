@@ -743,31 +743,40 @@
         });
     }
 
-    function hablarPregunta(texto, callback) {
-        if (!window.speechSynthesis) {
-            // Si no hay TTS disponible, solo esperar 1 segundo y continuar
-            setTimeout(callback, 1000);
-            return;
+    async function hablarPregunta(texto, callback) {
+        try {
+            const res = await fetch('/api/text-to-speech', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ texto: texto })
+            });
+
+            if (!res.ok) {
+                // Si falla TTS, continuar sin voz
+                setTimeout(callback, 500);
+                return;
+            }
+
+            const audioBlob = await res.blob();
+            const audioUrl  = URL.createObjectURL(audioBlob);
+            const audio     = new Audio(audioUrl);
+
+            audio.onended = () => {
+                URL.revokeObjectURL(audioUrl);
+                setTimeout(callback, 500);
+            };
+
+            audio.onerror = () => {
+                URL.revokeObjectURL(audioUrl);
+                setTimeout(callback, 500);
+            };
+
+            audio.play();
+
+        } catch {
+            // Si falla, continuar sin voz
+            setTimeout(callback, 500);
         }
-
-        // Cancelar cualquier habla anterior
-        window.speechSynthesis.cancel();
-
-        const utterance = new SpeechSynthesisUtterance(texto);
-        utterance.lang = 'es-CO';
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
-
-        utterance.onend = () => {
-            // Pequeña pausa después de hablar antes de escuchar
-            setTimeout(callback, 500);
-        };
-
-        utterance.onerror = () => {
-            setTimeout(callback, 500);
-        };
-
-        window.speechSynthesis.speak(utterance);
     }
 
     function iniciarGrabacionRespuesta() {
