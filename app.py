@@ -2793,7 +2793,7 @@ def text_to_speech():
             model="gpt-4o-mini-tts",
             voice="ash",
             input=texto,
-            instructions="Habla en español latinoamericano con acento neutro, como un profesional colombiano. Claro y natural. No uses acento español de España ni acento mexicano marcado. Pronunciación limpia pero que sea rápida."
+            instructions="Habla rápido en español latinoamericano neutro. Acento colombiano profesional. Sin pausas innecesarias. Ritmo ágil como si tuvieras prisa pero pronunciando claro."
         )
 
         # Devolver el audio como MP3
