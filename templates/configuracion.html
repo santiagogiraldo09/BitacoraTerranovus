@@ -968,6 +968,9 @@
                     document.getElementById('builder-nombre').value      = form.nombre;
                     document.getElementById('builder-descripcion').value = form.descripcion;
                     builderCamposForm = form.campos.map(item => {
+                        if (item && item.tipo === 'grupo') {
+                            return { __grupo: true, nombre: item.nombre || 'Grupo' };
+                        }
                         const id       = typeof item === 'object' ? item.id : item;
                         const requerido = typeof item === 'object' ? (item.requerido || false) : false;
                         const campo    = builderCamposGlobales.find(c => c.id === id);
