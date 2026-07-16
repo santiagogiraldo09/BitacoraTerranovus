@@ -397,9 +397,14 @@
 
                     <!-- Panel derecho: canvas del formulario -->
                     <div class="builder-panel" id="panel-formulario">
-                        <h4 class="builder-panel-title">
-                            <i class="fas fa-eye"></i> Vista previa
-                        </h4>
+                        <div class="builder-panel-head">
+                            <h4 class="builder-panel-title">
+                                <i class="fas fa-eye"></i> Vista previa
+                            </h4>
+                            <button class="btn-nuevo-campo" onclick="agregarGrupo()" title="Agregar grupo">
+                                <i class="fas fa-layer-group"></i> Nuevo grupo
+                            </button>
+                        </div>
                         <div id="canvas-formulario">
                             <div class="canvas-empty" id="canvas-empty">
                                 <i class="fas fa-hand-point-left"></i>
@@ -1048,7 +1053,7 @@
     function agregarCampoAlForm(campoId) {
         const campo = builderCamposGlobales.find(c => c.id === campoId);
         if (!campo) return;
-        if (builderCamposForm.find(c => c.id === campoId)) {
+        if (builderCamposForm.find(c => !c.__grupo && c.id === campoId)) {
             mostrarToast('⚠️ Este campo ya está en el formulario');
             return;
         }
@@ -1059,11 +1064,22 @@
         mostrarToast('✅ Campo agregado');
     }
 
+    function agregarGrupo() {
+        builderCamposForm.push({ __grupo: true, nombre: 'Nuevo grupo' });
+        renderCanvas();
+        if (window.innerWidth <= 768) cambiarTab('formulario');
+        mostrarToast('✅ Grupo agregado');
+    }
+
+    function renombrarGrupo(idx, valor) {
+        builderCamposForm[idx].nombre = valor;
+    }
+
     function renderCanvas() {
         const canvas   = document.getElementById('canvas-formulario');
         const empty    = document.getElementById('canvas-empty');
         const contador = document.getElementById('contador-campos-form');
-        contador.textContent = builderCamposForm.length;
+        contador.textContent = builderCamposForm.filter(c => !c.__grupo).length;
 
         if (builderCamposForm.length === 0) {
             canvas.innerHTML = '';
@@ -1077,11 +1093,59 @@
             if (c !== empty) c.remove();
         });
 
+        let enGrupo = false;
+
         builderCamposForm.forEach((campo, idx) => {
             const div = document.createElement('div');
-            div.className     = 'canvas-campo';
             div.draggable     = true;
             div.dataset.index = idx;
+
+            const registrarDrag = () => {
+                div.addEventListener('dragstart', () => { dragSrcIndex = idx; });
+                div.addEventListener('dragover',  (e) => {
+                    e.preventDefault();
+                    div.classList.add('drag-over-campo');
+                });
+                div.addEventListener('dragleave', () => div.classList.remove('drag-over-campo'));
+                div.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    div.classList.remove('drag-over-campo');
+                    if (dragSrcIndex === null || dragSrcIndex === idx) return;
+                    const moved = builderCamposForm.splice(dragSrcIndex, 1)[0];
+                    builderCamposForm.splice(idx, 0, moved);
+                    dragSrcIndex = null;
+                    renderCanvas();
+                });
+            };
+
+            if (campo.__grupo) {
+                enGrupo = true;
+                div.className = 'canvas-grupo';
+                div.innerHTML = `
+                    <i class="fas fa-grip-vertical canvas-campo-handle"></i>
+                    <input class="canvas-grupo-nombre"
+                        value="${campo.nombre}"
+                        placeholder="Nombre del grupo"
+                        oninput="renombrarGrupo(${idx}, this.value)">
+                    <div class="canvas-campo-actions">
+                        <button class="icon-btn" onclick="moverCampo(${idx}, -1)" title="Subir"
+                                ${idx === 0 ? 'disabled' : ''}>
+                            <i class="fas fa-chevron-up"></i>
+                        </button>
+                        <button class="icon-btn" onclick="moverCampo(${idx}, 1)" title="Bajar"
+                                ${idx === builderCamposForm.length - 1 ? 'disabled' : ''}>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                        <button class="icon-btn danger" onclick="quitarCampoForm(${idx})" title="Quitar grupo">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>`;
+                registrarDrag();
+                canvas.appendChild(div);
+                return;
+            }
+
+            div.className = 'canvas-campo' + (enGrupo ? ' dentro-grupo' : '');
 
             const preview   = previsualizarCampo(campo);
             const requerido = campo.requerido || false;
@@ -1111,22 +1175,7 @@
                     </button>
                 </div>`;
 
-            div.addEventListener('dragstart', () => { dragSrcIndex = idx; });
-            div.addEventListener('dragover',  (e) => {
-                e.preventDefault();
-                div.classList.add('drag-over-campo');
-            });
-            div.addEventListener('dragleave', () => div.classList.remove('drag-over-campo'));
-            div.addEventListener('drop', (e) => {
-                e.preventDefault();
-                div.classList.remove('drag-over-campo');
-                if (dragSrcIndex === null || dragSrcIndex === idx) return;
-                const moved = builderCamposForm.splice(dragSrcIndex, 1)[0];
-                builderCamposForm.splice(idx, 0, moved);
-                dragSrcIndex = null;
-                renderCanvas();
-            });
-
+            registrarDrag();
             canvas.appendChild(div);
         });
 
@@ -1208,7 +1257,7 @@
             mostrarToast('❌ El nombre del formulario es obligatorio', true);
             return;
         }
-        if (builderCamposForm.length === 0) {
+        if (builderCamposForm.filter(c => !c.__grupo).length === 0) {
             mostrarToast('❌ Agrega al menos un campo', true);
             return;
         }
@@ -1216,7 +1265,9 @@
         const payload = {
             nombre,
             descripcion,
-            campos: builderCamposForm.map(c => ({ id: c.id, requerido: c.requerido || false }))
+            campos: builderCamposForm.map(c => c.__grupo
+                ? { tipo: 'grupo', nombre: (c.nombre || '').trim() || 'Grupo' }
+                : { id: c.id, requerido: c.requerido || false })
         };
 
         try {

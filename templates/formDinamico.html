@@ -10,6 +10,17 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
     <style>
+
+        .grupo-header {
+            display: flex; align-items: center; gap: 8px;
+            margin: 22px 0 10px; padding-bottom: 6px;
+            border-bottom: 2px solid var(--naranja, #FFAF33);
+            font-size: 13px; font-weight: 700;
+            color: #374151; text-transform: uppercase; letter-spacing: .4px;
+        }
+        .grupo-header i { color: var(--naranja, #FFAF33); }
+        .grupo-header + .field-group { margin-top: 0; }
+
         .field-select {
             width: 100%;
             padding: 11px 14px;
@@ -150,6 +161,12 @@
             {% endif %}
 
             {% for campo in campos %}
+            {% if campo.tipo == 'grupo' %}
+            <div class="grupo-header">
+                <i class="fas fa-layer-group"></i>
+                <span>{{ campo.nombre }}</span>
+            </div>
+            {% else %}
             <div class="field-group form-group">
                 <label class="field-label">
                     {{ campo.nombre }}{% if campo.requerido %} *{% endif %}
@@ -250,6 +267,7 @@
                     placeholder="{{ campo.nombre }}...">
                 {% endif %}
             </div>
+            {% endif %}
             {% endfor %}
 
         </div>

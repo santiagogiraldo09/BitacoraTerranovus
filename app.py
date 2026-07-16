@@ -2196,11 +2196,16 @@ def formulario_dinamico():
                     )
 
             # Obtener campos globales
+            def es_grupo(item):
+                return isinstance(item, dict) and item.get('tipo') == 'grupo'
+
             campo_ids = [
                 (item['id'] if isinstance(item, dict) else item)
                 for item in formulario['campos_config']
+                if not es_grupo(item)
             ]
 
+            campos_db = {}
             if campo_ids:
                 cursor.execute("""
                     SELECT id, nombre, tipo, opciones, configuracion
@@ -2213,18 +2218,21 @@ def formulario_dinamico():
                     'opciones': r[3] or [], 'configuracion': r[4] or {}
                 } for r in cursor.fetchall()}
 
-                for item in formulario['campos_config']:
-                    cid       = item['id'] if isinstance(item, dict) else item
-                    requerido = item.get('requerido', False) if isinstance(item, dict) else False
-                    if cid in campos_db:
-                        campo = campos_db[cid].copy()
-                        campo['requerido'] = requerido
-                        # Pre-cargar valor si es edición
-                        if registro:
-                            campo['valor'] = registro['respuestas'].get(str(cid)) or registro['respuestas'].get(cid) or ''
-                        else:
-                            campo['valor'] = ''
-                        campos.append(campo)
+            for item in formulario['campos_config']:
+                if es_grupo(item):
+                    campos.append({'tipo': 'grupo', 'nombre': item.get('nombre', 'Grupo')})
+                    continue
+                cid       = item['id'] if isinstance(item, dict) else item
+                requerido = item.get('requerido', False) if isinstance(item, dict) else False
+                if cid in campos_db:
+                    campo = campos_db[cid].copy()
+                    campo['requerido'] = requerido
+                    # Pre-cargar valor si es edición
+                    if registro:
+                        campo['valor'] = registro['respuestas'].get(str(cid)) or registro['respuestas'].get(cid) or ''
+                    else:
+                        campo['valor'] = ''
+                    campos.append(campo)
 
             # Colores y logo
             cursor.execute("""

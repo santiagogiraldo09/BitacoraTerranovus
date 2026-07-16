@@ -1447,3 +1447,18 @@ button { font-family: inherit; cursor: pointer; }
 .icon-btn.active-required {
     color: var(--naranja);
 }
+
+.canvas-grupo {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--color-primario-light, #f3f4f6);
+    border-left: 3px solid var(--color-primario, #FBAF33);
+    border-radius: 0; padding: 8px 10px; margin: 14px 0 6px;
+}
+.canvas-grupo-nombre {
+    flex: 1; border: none; background: transparent;
+    font-weight: 600; font-size: 13px; color: #374151; outline: none;
+}
+.canvas-campo.dentro-grupo { margin-left: 16px; }
+.builder-panel-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
