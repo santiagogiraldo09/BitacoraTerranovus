@@ -2790,9 +2790,10 @@ def text_to_speech():
             return jsonify({'error': 'No hay texto'}), 400
 
         response = openai_client.audio.speech.create(
-            model="tts-1",
-            voice="echo",
-            input=texto
+            model="gpt-4o-mini-tts",
+            voice="ash",
+            input=texto,
+            instructions="Habla en español latinoamericano con acento neutro, como un profesional colombiano. Tono calmado, claro y natural. No uses acento español de España ni acento mexicano marcado. Pronunciación limpia y pausada."
         )
 
         # Devolver el audio como MP3
