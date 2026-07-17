@@ -1837,7 +1837,17 @@ def api_registros_proyecto(project_id):
                 respuestas = r[3] or {}
                 preview    = ''
                 if isinstance(respuestas, dict):
-                    valores = [str(v) for v in respuestas.values() if v and isinstance(v, (str, int, float))]
+                    valores = [
+                        str(v) for k, v in respuestas.items()
+                        if k != '__repeticiones' and v and isinstance(v, (str, int, float))
+                    ]
+                    for lista in (respuestas.get('__repeticiones') or {}).values():
+                        for rep in (lista or []):
+                            if isinstance(rep, dict):
+                                valores += [
+                                    str(v) for v in rep.values()
+                                    if v and isinstance(v, (str, int, float))
+                                ]
                     preview = ' · '.join(valores[:3])[:150]
 
                 registros.append({
@@ -2148,6 +2158,7 @@ def formulario_dinamico():
 
     formulario     = None
     campos         = []
+    secciones      = []
     logo_actual    = None
     color_primario = '#FFAF33'
     registro       = None
@@ -2220,7 +2231,12 @@ def formulario_dinamico():
 
             for item in formulario['campos_config']:
                 if es_grupo(item):
-                    campos.append({'tipo': 'grupo', 'nombre': item.get('nombre', 'Grupo')})
+                    campos.append({
+                        'tipo':      'grupo',
+                        'gid':       item.get('gid') or '',
+                        'nombre':    item.get('nombre', 'Grupo'),
+                        'repetible': item.get('repetible', False)
+                    })
                     continue
                 cid       = item['id'] if isinstance(item, dict) else item
                 requerido = item.get('requerido', False) if isinstance(item, dict) else False
@@ -2233,6 +2249,38 @@ def formulario_dinamico():
                     else:
                         campo['valor'] = ''
                     campos.append(campo)
+
+            # ── Agrupar en secciones (para el render con grupos) ──
+            reps_guardadas = {}
+            if registro:
+                reps_guardadas = (registro['respuestas'] or {}).get('__repeticiones') or {}
+
+            actual = None
+            for c in campos:
+                if c.get('tipo') == 'grupo':
+                    actual = {
+                        'tipo':      'grupo',
+                        'gid':       c['gid'],
+                        'nombre':    c['nombre'],
+                        'repetible': c['repetible'],
+                        'campos':    []
+                    }
+                    secciones.append(actual)
+                else:
+                    if actual is None:
+                        actual = {'tipo': 'sueltos', 'gid': '', 'nombre': '',
+                                  'repetible': False, 'campos': []}
+                        secciones.append(actual)
+                    actual['campos'].append(c)
+
+            for sec in secciones:
+                if sec['tipo'] != 'grupo':
+                    sec['repeticiones'] = []
+                    continue
+                guardadas = reps_guardadas.get(sec['gid']) or []
+                sec['repeticiones'] = guardadas if guardadas else [{}]
+                for c in sec['campos']:
+                    c['valor'] = ''
 
             # Colores y logo
             cursor.execute("""
@@ -2252,6 +2300,7 @@ def formulario_dinamico():
                            project_id=project_id,
                            formulario=formulario,
                            campos=campos,
+                           secciones=secciones,
                            registro_id=registro_id,
                            puede_editar=puede_editar,
                            logo_actual=logo_actual,

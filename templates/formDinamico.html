@@ -11,6 +11,27 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
     <style>
 
+        .grupo-rep { margin-bottom: 18px; }
+        .rep-bloque {
+            border: 1px solid #e5e7eb; border-left: 3px solid var(--naranja, #FFAF33);
+            border-radius: 8px; padding: 10px 12px; margin-bottom: 10px;
+            background: #fcfcfd;
+        }
+        .rep-header { margin-top: 0; border-bottom: none; padding-bottom: 0; }
+        .rep-header .rep-titulo { flex: 1; }
+        .btn-rep-quitar {
+            background: none; border: none; color: #9ca3af; cursor: pointer;
+            padding: 4px 6px; font-size: 13px; border-radius: 4px;
+        }
+        .btn-rep-quitar:hover { color: #ef4444; background: #fef2f2; }
+        .btn-rep-agregar {
+            width: 100%; padding: 10px; cursor: pointer;
+            background: none; border: 1px dashed var(--naranja, #FFAF33);
+            border-radius: 8px; color: var(--naranja, #FFAF33);
+            font-family: inherit; font-size: 13px; font-weight: 600;
+        }
+        .btn-rep-agregar:hover { background: rgba(255,175,51,0.08); }
+
         .grupo-header {
             display: flex; align-items: center; gap: 8px;
             margin: 22px 0 10px; padding-bottom: 6px;
@@ -119,6 +140,109 @@
         })();
     </script>
 </head>
+{% macro campo_input(campo, valor, uid, gid, rep) %}
+            {% set extra %}{% if gid %} data-gid="{{ gid }}" data-rep="{{ rep }}"{% endif %}{% endset %}
+            <div class="field-group form-group">
+                <label class="field-label">
+                    {{ campo.nombre }}{% if campo.requerido %} *{% endif %}
+                </label>
+
+                {% if campo.tipo == 'texto_corto' %}
+                <input type="text" class="field-input campo-respuesta"
+                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"{{ extra }}
+                    value="{{ valor }}"
+                    placeholder="{{ campo.nombre }}...">
+
+                {% elif campo.tipo == 'texto_largo' %}
+                <textarea class="field-input campo-respuesta" rows="3"
+                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                        data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"{{ extra }}
+                        placeholder="{{ campo.nombre }}..." style="resize:vertical;min-height:80px;">{{ valor }}</textarea>
+
+                {% elif campo.tipo == 'numero' %}
+                <input type="number" class="field-input campo-respuesta"
+                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"{{ extra }}
+                    value="{{ valor }}"
+                    placeholder="0" step="any">
+
+                {% elif campo.tipo == 'fecha' %}
+                <input type="date" class="field-input campo-respuesta"
+                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"{{ extra }}
+                    value="{{ valor }}">
+
+                {% elif campo.tipo == 'seleccion' or campo.tipo == 'seleccion_unica' %}
+                <select class="field-select campo-respuesta"
+                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                        data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"{{ extra }}
+                        data-opciones="{{ campo.opciones | tojson }}">
+                    <option value="">Selecciona...</option>
+                    {% for op in campo.opciones %}
+                    <option value="{{ op }}" {% if op == valor %}selected{% endif %}>{{ op }}</option>
+                    {% endfor %}
+                </select>
+
+                {% elif campo.tipo == 'booleano' %}
+                <div class="campo-check-wrapper">
+                    <input type="checkbox" id="campo-{{ uid }}" class="campo-respuesta"
+                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                        data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"{{ extra }}
+                        {% if valor == true or valor == 'true' or valor == True %}checked{% endif %}>
+                    <label for="campo-{{ uid }}">Sí</label>
+                </div>
+
+                {% elif campo.tipo == 'moneda' %}
+                <div class="moneda-wrapper">
+                    <span class="unit-symbol">$</span>
+                    <input type="number" class="field-input campo-respuesta"
+                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                        data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"{{ extra }}
+                        value="{{ valor }}"
+                        placeholder="0.00" step="0.01">
+                </div>
+
+                {% elif campo.tipo == 'porcentaje' %}
+                <div class="porcentaje-wrapper">
+                    <input type="number" class="field-input campo-respuesta"
+                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                        data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"{{ extra }}
+                        value="{{ valor }}"
+                        placeholder="0" min="0" max="100">
+                    <span class="unit-symbol">%</span>
+                </div>
+
+                {% elif campo.tipo == 'imagen' %}
+                <input type="file" class="field-input campo-respuesta"
+                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"{{ extra }}
+                    accept="image/*">
+                {% if valor %}
+                <span style="font-size:12px;color:var(--gris-texto,#6b7280);margin-top:4px;display:block;">
+                    <i class="fas fa-image"></i> Archivo actual: {{ valor }}
+                </span>
+                {% endif %}
+
+                {% elif campo.tipo == 'adjunto' %}
+                <input type="file" class="field-input campo-respuesta"
+                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"{{ extra }}>
+                {% if valor %}
+                <span style="font-size:12px;color:var(--gris-texto,#6b7280);margin-top:4px;display:block;">
+                    <i class="fas fa-paperclip"></i> Archivo actual: {{ valor }}
+                </span>
+                {% endif %}
+
+                {% else %}
+                <input type="text" class="field-input campo-respuesta"
+                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"{{ extra }}
+                    value="{{ valor }}"
+                    placeholder="{{ campo.nombre }}...">
+                {% endif %}
+            </div>
+{% endmacro %}
 <body>
 <div class="page-wrapper">
 
@@ -160,113 +284,34 @@
             <p class="section-hint">{{ formulario.descripcion }}</p>
             {% endif %}
 
-            {% for campo in campos %}
-            {% if campo.tipo == 'grupo' %}
-            <div class="grupo-header">
-                <i class="fas fa-layer-group"></i>
-                <span>{{ campo.nombre }}</span>
+            {% for sec in secciones %}
+            {% if sec.tipo == 'grupo' %}
+            <div class="grupo-rep" data-gid="{{ sec.gid }}" data-nombre="{{ sec.nombre }}">
+                {% for rep in sec.repeticiones %}
+                {% set ridx = loop.index0 %}
+                <div class="rep-bloque" data-gid="{{ sec.gid }}" data-rep="{{ ridx }}">
+                    <div class="grupo-header rep-header">
+                        <i class="fas fa-layer-group"></i>
+                        <span class="rep-titulo">{% if sec.repeticiones|length > 1 %}{{ ridx + 1 }}. {% endif %}{{ sec.nombre }}</span>
+                        <button type="button" class="btn-rep-quitar" onclick="eliminarRepeticion(this)"
+                                title="Quitar este bloque"
+                                {% if sec.repeticiones|length <= 1 %}style="display:none"{% endif %}>
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    {% for campo in sec.campos %}
+                    {{ campo_input(campo, rep.get(campo.id|string, ''), sec.gid ~ '-' ~ ridx ~ '-' ~ campo.id, sec.gid, ridx) }}
+                    {% endfor %}
+                </div>
+                {% endfor %}
+                <button type="button" class="btn-rep-agregar" onclick="agregarRepeticion('{{ sec.gid }}')">
+                    <i class="fas fa-plus"></i> Agregar otra {{ sec.nombre|lower }}
+                </button>
             </div>
             {% else %}
-            <div class="field-group form-group">
-                <label class="field-label">
-                    {{ campo.nombre }}{% if campo.requerido %} *{% endif %}
-                </label>
-
-                {% if campo.tipo == 'texto_corto' %}
-                <input type="text" class="field-input campo-respuesta"
-                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
-                    value="{{ campo.valor }}"
-                    placeholder="{{ campo.nombre }}...">
-
-                {% elif campo.tipo == 'texto_largo' %}
-                <textarea class="field-input campo-respuesta" rows="3"
-                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                        data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
-                        placeholder="{{ campo.nombre }}..." style="resize:vertical;min-height:80px;">{{ campo.valor }}</textarea>
-
-                {% elif campo.tipo == 'numero' %}
-                <input type="number" class="field-input campo-respuesta"
-                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
-                    value="{{ campo.valor }}"
-                    placeholder="0" step="any">
-
-                {% elif campo.tipo == 'fecha' %}
-                <input type="date" class="field-input campo-respuesta"
-                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
-                    value="{{ campo.valor }}">
-
-                {% elif campo.tipo == 'seleccion' or campo.tipo == 'seleccion_unica' %}
-                <select class="field-select campo-respuesta"
-                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                        data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
-                        data-opciones="{{ campo.opciones | tojson }}">
-                    <option value="">Selecciona...</option>
-                    {% for op in campo.opciones %}
-                    <option value="{{ op }}" {% if op == campo.valor %}selected{% endif %}>{{ op }}</option>
-                    {% endfor %}
-                </select>
-
-                {% elif campo.tipo == 'booleano' %}
-                <div class="campo-check-wrapper">
-                    <input type="checkbox" id="campo-{{ campo.id }}" class="campo-respuesta"
-                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                        data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
-                        {% if campo.valor == true or campo.valor == 'true' or campo.valor == True %}checked{% endif %}>
-                    <label for="campo-{{ campo.id }}">Sí</label>
-                </div>
-
-                {% elif campo.tipo == 'moneda' %}
-                <div class="moneda-wrapper">
-                    <span class="unit-symbol">$</span>
-                    <input type="number" class="field-input campo-respuesta"
-                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                        data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
-                        value="{{ campo.valor }}"
-                        placeholder="0.00" step="0.01">
-                </div>
-
-                {% elif campo.tipo == 'porcentaje' %}
-                <div class="porcentaje-wrapper">
-                    <input type="number" class="field-input campo-respuesta"
-                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                        data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
-                        value="{{ campo.valor }}"
-                        placeholder="0" min="0" max="100">
-                    <span class="unit-symbol">%</span>
-                </div>
-
-                {% elif campo.tipo == 'imagen' %}
-                <input type="file" class="field-input campo-respuesta"
-                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
-                    accept="image/*">
-                {% if campo.valor %}
-                <span style="font-size:12px;color:var(--gris-texto,#6b7280);margin-top:4px;display:block;">
-                    <i class="fas fa-image"></i> Archivo actual: {{ campo.valor }}
-                </span>
-                {% endif %}
-
-                {% elif campo.tipo == 'adjunto' %}
-                <input type="file" class="field-input campo-respuesta"
-                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}">
-                {% if campo.valor %}
-                <span style="font-size:12px;color:var(--gris-texto,#6b7280);margin-top:4px;display:block;">
-                    <i class="fas fa-paperclip"></i> Archivo actual: {{ campo.valor }}
-                </span>
-                {% endif %}
-
-                {% else %}
-                <input type="text" class="field-input campo-respuesta"
-                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
-                    value="{{ campo.valor }}"
-                    placeholder="{{ campo.nombre }}...">
-                {% endif %}
-            </div>
+            {% for campo in sec.campos %}
+            {{ campo_input(campo, campo.valor, campo.id, '', '') }}
+            {% endfor %}
             {% endif %}
             {% endfor %}
 
@@ -1053,6 +1098,91 @@
         });
     }
 
+    // ── Grupos repetibles ──────────────────────────────────────
+    function valorDe(input) {
+        if (input.type === 'checkbox') return input.checked;
+        if (input.type === 'file')     return input.files.length > 0 ? input.files[0].name : '';
+        return input.value.trim ? input.value.trim() : input.value;
+    }
+
+    function tieneValor(v) {
+        if (v === true) return true;
+        if (v === false || v === null || v === undefined) return false;
+        if (typeof v === 'string') return v.trim() !== '';
+        if (typeof v === 'number') return true;
+        return false;
+    }
+
+    function esRequerido(input) {
+        return input.hasAttribute('required') ||
+            input.dataset.requerido === 'True' ||
+            input.dataset.requerido === 'true';
+    }
+
+    function etiquetaDe(input) {
+        return input.closest('.field-group')?.querySelector('.field-label')
+                    ?.textContent.replace(' *', '').trim() || 'Campo requerido';
+    }
+
+    function renumerarGrupo(gid) {
+        const cont = document.querySelector(`.grupo-rep[data-gid="${gid}"]`);
+        if (!cont) return;
+        const nombre  = cont.dataset.nombre;
+        const bloques = cont.querySelectorAll('.rep-bloque');
+        const varios  = bloques.length > 1;
+        bloques.forEach((bloque, i) => {
+            bloque.dataset.rep = i;
+            const titulo = bloque.querySelector('.rep-titulo');
+            if (titulo) titulo.textContent = varios ? `${i + 1}. ${nombre}` : nombre;
+            const quitar = bloque.querySelector('.btn-rep-quitar');
+            if (quitar) quitar.style.display = varios ? '' : 'none';
+            bloque.querySelectorAll('.campo-respuesta').forEach(input => {
+                input.dataset.rep = i;
+            });
+        });
+    }
+
+    function agregarRepeticion(gid) {
+        const cont    = document.querySelector(`.grupo-rep[data-gid="${gid}"]`);
+        const bloques = cont.querySelectorAll('.rep-bloque');
+        const nuevo   = bloques[bloques.length - 1].cloneNode(true);
+        const idx     = bloques.length;
+
+        nuevo.querySelectorAll('.campo-respuesta').forEach(input => {
+            if (input.type === 'checkbox') {
+                input.checked = false;
+                const lbl = nuevo.querySelector(`label[for="${input.id}"]`);
+                input.id  = `campo-${gid}-${idx}-${input.dataset.campoId}`;
+                if (lbl) lbl.setAttribute('for', input.id);
+            } else {
+                input.value = '';
+            }
+            input.classList.remove('campo-lleno');
+        });
+
+        cont.insertBefore(nuevo, cont.querySelector('.btn-rep-agregar'));
+        renumerarGrupo(gid);
+        nuevo.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        nuevo.querySelector('.campo-respuesta')?.focus();
+    }
+
+    function eliminarRepeticion(btn) {
+        const bloque = btn.closest('.rep-bloque');
+        const cont   = bloque.closest('.grupo-rep');
+        const gid    = cont.dataset.gid;
+
+        if (cont.querySelectorAll('.rep-bloque').length <= 1) {
+            bloque.querySelectorAll('.campo-respuesta').forEach(input => {
+                if (input.type === 'checkbox') input.checked = false;
+                else input.value = '';
+            });
+            mostrarToast('Se limpió el bloque — debe quedar al menos uno');
+            return;
+        }
+        bloque.remove();
+        renumerarGrupo(gid);
+    }
+
     // ── Guardar respuesta (igual que antes) ──
     async function guardarRespuesta() {
         const projectId    = document.getElementById('project-id').value;
@@ -1066,40 +1196,46 @@
             return;
         }
 
-        const campos       = document.querySelectorAll('.campo-respuesta');
         const respuestas   = {};
+        const repeticiones = {};
         const faltantes    = [];
 
-        campos.forEach(input => {
-            const campoId   = input.dataset.campoId;
-            const requerido = input.hasAttribute('required') ||
-                            input.dataset.requerido === 'True' ||
-                            input.dataset.requerido === 'true';
-            let valor;
-
-            if (input.type === 'checkbox') {
-                valor = input.checked;
-            } else if (input.type === 'file') {
-                valor = input.files.length > 0 ? input.files[0].name : '';
-            } else {
-                valor = input.value.trim ? input.value.trim() : input.value;
-            }
-
-            respuestas[campoId] = valor;
-
-            if (!esEdicion && requerido && !valor && valor !== false) {
-                const label = input.closest('.field-group')?.querySelector('.field-label')?.textContent.replace(' *', '').trim();
-                faltantes.push(label || 'Campo requerido');
+        // 1. Campos que no están en un grupo → van en la raíz
+        document.querySelectorAll('.campo-respuesta:not([data-gid])').forEach(input => {
+            const valor = valorDe(input);
+            respuestas[input.dataset.campoId] = valor;
+            if (!esEdicion && esRequerido(input) && !tieneValor(valor)) {
+                faltantes.push(etiquetaDe(input));
             }
         });
 
-        const algunCampoLleno = Object.values(respuestas).some(v => {
-            if (v === true) return true;
-            if (v === false || v === null || v === undefined) return false;
-            if (typeof v === 'string') return v.trim() !== '';
-            if (typeof v === 'number') return true;
-            return false;
+        // 2. Grupos → bloque por bloque, los vacíos se descartan
+        document.querySelectorAll('.grupo-rep').forEach(cont => {
+            const lista = [];
+            cont.querySelectorAll('.rep-bloque').forEach(bloque => {
+                const inputs = bloque.querySelectorAll('.campo-respuesta');
+                const rep    = {};
+                inputs.forEach(input => { rep[input.dataset.campoId] = valorDe(input); });
+
+                if (!Object.values(rep).some(tieneValor)) return;   // bloque vacío: se ignora
+
+                if (!esEdicion) {
+                    inputs.forEach(input => {
+                        if (esRequerido(input) && !tieneValor(valorDe(input))) {
+                            faltantes.push(etiquetaDe(input));
+                        }
+                    });
+                }
+                lista.push(rep);
+            });
+            if (lista.length) repeticiones[cont.dataset.gid] = lista;
         });
+
+        if (Object.keys(repeticiones).length) respuestas.__repeticiones = repeticiones;
+
+        const algunCampoLleno =
+            Object.entries(respuestas).some(([k, v]) => k !== '__repeticiones' && tieneValor(v)) ||
+            Object.keys(repeticiones).length > 0;
 
         if (!algunCampoLleno) {
             mostrarToast('⚠️ Debes llenar al menos un campo');

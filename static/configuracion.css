@@ -1462,3 +1462,34 @@ button { font-family: inherit; cursor: pointer; }
 .builder-panel-head {
     display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
+
+.canvas-grupo {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--color-primario-light, #f3f4f6);
+    border-left: 3px solid var(--color-primario, #FBAF33);
+    border-radius: 0; padding: 8px 10px; margin: 14px 0 6px;
+}
+.canvas-grupo-nombre {
+    flex: 1; background: transparent;
+    font-weight: 600; font-size: 13px; color: #374151;
+    border: none; border-bottom: 1px dashed #9ca3af;
+    padding: 2px 0; outline: none; transition: border-color .15s;
+}
+.canvas-grupo-nombre::placeholder { font-weight: 400; font-style: italic; color: #9ca3af; }
+.canvas-grupo-nombre:hover { border-bottom-color: var(--color-primario, #FBAF33); }
+.canvas-grupo-nombre:focus { border-bottom: 1px solid var(--color-primario, #FBAF33); }
+.canvas-grupo .fa-pen { font-size: 10px; color: #9ca3af; }
+.canvas-grupo.sin-nombre {
+    border-left-color: #ef4444; border-left-style: dashed; background: #fef2f2;
+}
+.canvas-grupo.sin-nombre .canvas-grupo-nombre { border-bottom-color: #ef4444; }
+.canvas-grupo.sin-nombre .fa-pen { color: #ef4444; }
+.canvas-campo.dentro-grupo { margin-left: 16px; }
+.builder-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.icon-btn.active-rep { color: var(--color-primario, #FBAF33); }
+.canvas-grupo-badge {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .3px; color: var(--color-primario, #FBAF33);
+    border: 1px solid var(--color-primario, #FBAF33);
+    border-radius: 10px; padding: 1px 7px; white-space: nowrap;
+}

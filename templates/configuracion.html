@@ -969,7 +969,12 @@
                     document.getElementById('builder-descripcion').value = form.descripcion;
                     builderCamposForm = form.campos.map(item => {
                         if (item && item.tipo === 'grupo') {
-                            return { __grupo: true, nombre: item.nombre || 'Grupo' };
+                            return {
+                                __grupo:   true,
+                                gid:       item.gid || nuevoGid(),
+                                nombre:    item.nombre || 'Grupo',
+                                repetible: item.repetible || false
+                            };
                         }
                         const id       = typeof item === 'object' ? item.id : item;
                         const requerido = typeof item === 'object' ? (item.requerido || false) : false;
@@ -1068,14 +1073,51 @@
     }
 
     function agregarGrupo() {
-        builderCamposForm.push({ __grupo: true, nombre: 'Nuevo grupo' });
+        builderCamposForm.push({ __grupo: true, gid: nuevoGid(), nombre: '', repetible: false });
         renderCanvas();
         if (window.innerWidth <= 768) cambiarTab('formulario');
-        mostrarToast('✅ Grupo agregado');
+        enfocarUltimoGrupo();
+        mostrarToast('✅ Grupo agregado — escribe su nombre');
     }
 
     function renombrarGrupo(idx, valor) {
         builderCamposForm[idx].nombre = valor;
+        const div = document.querySelector(`.canvas-grupo[data-index="${idx}"]`);
+        if (div) div.classList.toggle('sin-nombre', !valor.trim());
+    }
+
+    function escHtml(v) {
+        return String(v ?? '').replace(/[&<>"']/g, m => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[m]));
+    }
+
+    function nuevoGid() {
+        return 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    }
+
+    function duplicarGrupo(idx) {
+        const original = builderCamposForm[idx];
+        builderCamposForm.splice(idx + 1, 0, {
+            __grupo: true,
+            gid: nuevoGid(),
+            nombre: (original.nombre || 'Grupo') + ' (copia)',
+            repetible: original.repetible || false
+        });
+        renderCanvas();
+        enfocarUltimoGrupo(idx + 1);
+        mostrarToast('✅ Grupo duplicado');
+    }
+
+    function enfocarUltimoGrupo(idx) {
+        const grupos = document.querySelectorAll('.canvas-grupo-nombre');
+        const input  = (idx === undefined)
+            ? grupos[grupos.length - 1]
+            : document.querySelector(`.canvas-grupo[data-index="${idx}"] .canvas-grupo-nombre`);
+        if (!input) return;
+        input.focus();
+        input.select();
+        input.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
 
     function renderCanvas() {
@@ -1123,14 +1165,19 @@
 
             if (campo.__grupo) {
                 enGrupo = true;
-                div.className = 'canvas-grupo';
+                div.className = 'canvas-grupo' + ((campo.nombre || '').trim() ? '' : ' sin-nombre');
                 div.innerHTML = `
                     <i class="fas fa-grip-vertical canvas-campo-handle"></i>
+                    <i class="fas fa-pen"></i>
                     <input class="canvas-grupo-nombre"
-                        value="${campo.nombre}"
-                        placeholder="Nombre del grupo"
+                        value="${escHtml(campo.nombre)}"
+                        placeholder="Escribe el nombre del grupo…"
+                        title="Clic para renombrar este grupo"
                         oninput="renombrarGrupo(${idx}, this.value)">
                     <div class="canvas-campo-actions">
+                        <button class="icon-btn" onclick="duplicarGrupo(${idx})" title="Duplicar grupo">
+                            <i class="fas fa-copy"></i>
+                        </button>
                         <button class="icon-btn" onclick="moverCampo(${idx}, -1)" title="Subir"
                                 ${idx === 0 ? 'disabled' : ''}>
                             <i class="fas fa-chevron-up"></i>
@@ -1265,11 +1312,23 @@
             return;
         }
 
+        const idxSinNombre = builderCamposForm.findIndex(c => c.__grupo && !(c.nombre || '').trim());
+        if (idxSinNombre !== -1) {
+            mostrarToast('❌ Ponle un nombre a todos los grupos', true);
+            enfocarUltimoGrupo(idxSinNombre);
+            return;
+        }
+
         const payload = {
             nombre,
             descripcion,
             campos: builderCamposForm.map(c => c.__grupo
-                ? { tipo: 'grupo', nombre: (c.nombre || '').trim() || 'Grupo' }
+                ? {
+                    tipo:      'grupo',
+                    gid:       c.gid || nuevoGid(),
+                    nombre:    (c.nombre || '').trim() || 'Grupo',
+                    repetible: c.repetible || false
+                }
                 : { id: c.id, requerido: c.requerido || false })
         };
 
