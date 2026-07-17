@@ -3905,80 +3905,105 @@ def distribuir_campos():
     if 'user_id' not in session:
         return jsonify({'error': 'No autorizado'}), 401
 
+    respuesta_texto = ''
     try:
         data          = request.get_json()
         transcripcion = data.get('transcripcion', '')
-        campos        = data.get('campos', [])
+        sueltos       = data.get('sueltos', [])
+        grupos        = data.get('grupos', [])
 
-        if not transcripcion or not campos:
+        # Compatibilidad: si llega el formato viejo, se trata como campos sueltos
+        if not sueltos and not grupos and data.get('campos'):
+            sueltos = data.get('campos', [])
+
+        if not transcripcion or (not sueltos and not grupos):
             return jsonify({'error': 'Faltan datos'}), 400
 
-        # Construir la descripción de campos para el prompt
-        campos_desc = []
-        for c in campos:
+        def describir(c):
             desc = f'- {c["id"]}: "{c["nombre"]}" (tipo: {c["tipo"]})'
             if c.get('opciones'):
                 desc += f' (opciones: {", ".join(c["opciones"])})'
             if c.get('requerido'):
                 desc += ' [obligatorio]'
-            campos_desc.append(desc)
+            return desc
 
-        campos_texto = '\n'.join(campos_desc)
+        sueltos_texto = '\n'.join(describir(c) for c in sueltos) or '(ninguno)'
 
-        prompt_sistema = """Eres un asistente que extrae información de una transcripción de voz y la distribuye en campos de un formulario.
+        grupos_desc = []
+        for g in grupos:
+            lineas = [f'GRUPO gid="{g["gid"]}" nombre="{g["nombre"]}"']
+            lineas += ['  ' + describir(c) for c in g.get('campos', [])]
+            lineas.append('  Bloques que ya existen en pantalla:')
+            for b in g.get('bloques_actuales', []):
+                vals = b.get('valores') or {}
+                resumen = ', '.join(f'{k}="{v}"' for k, v in vals.items()) if vals else '(vacío)'
+                lineas.append(f'    bloque {b["bloque"]}: {resumen}')
+            grupos_desc.append('\n'.join(lineas))
+        grupos_texto = '\n\n'.join(grupos_desc) or '(ninguno)'
 
-REGLAS:
-1. Devuelve SOLO un JSON válido, sin explicaciones ni texto adicional.
-2. Las claves del JSON deben ser SOLO los IDs numéricos de los campos como string (ejemplo: "1", "3", "15"). NUNCA agregar prefijos como "campo_".
-3. Si el usuario no mencionó información para un campo, deja el valor como string vacío "".
-4. Para campos tipo numero, moneda o porcentaje, devuelve solo el número (sin símbolos).
-5. Para campos tipo seleccion o seleccion_unica, elige la opción más cercana a lo que dijo el usuario. Si ninguna coincide, deja "".
-6. Para campos tipo booleano, devuelve true o false.
-7. Para campos tipo fecha, devuelve en formato YYYY-MM-DD.
-8. Extrae la información de forma inteligente: el usuario puede no decir el nombre exacto del campo pero sí dar la información que corresponde.
+        prompt_sistema = """Eres un asistente que extrae información de una transcripción de voz de un reporte de obra y la distribuye en los campos de un formulario.
+
+El formulario tiene dos partes:
+- CAMPOS SUELTOS: un solo valor cada uno.
+- GRUPOS: conjuntos de campos que se repiten en BLOQUES. El usuario pudo haber hablado de varios (por ejemplo, varias actividades del día). Cada bloque es una ocurrencia distinta.
+
+REGLAS GENERALES:
+1. Devuelve SOLO un JSON válido, sin explicaciones ni markdown.
+2. Las claves de los campos son SOLO el ID numérico como string ("1", "3", "15"). Nunca prefijos como "campo_".
+3. NO incluyas los campos de los que el usuario no habló. Si no escuchaste nada para un campo, OMÍTELO del JSON. Nunca devuelvas "" para rellenar.
+4. Para tipo numero, moneda o porcentaje: solo el número, sin símbolos.
+5. Para tipo seleccion o seleccion_unica: elige la opción más cercana. Si ninguna coincide, omite el campo.
+6. Para tipo booleano: true o false.
+7. Para tipo fecha: formato YYYY-MM-DD.
+8. Extrae de forma inteligente: el usuario puede no decir el nombre exacto del campo pero sí dar el dato.
 9. Limpia el texto: capitaliza nombres propios, corrige puntuación básica.
-10. Para campos tipo texto_largo u observaciones: resume y estructura la información relevante que el usuario dijo, pero NUNCA omitas datos específicos como correos electrónicos, nombres de personas, números de teléfono, cantidades o direcciones. Redacta de forma profesional y concisa, no copies la transcripción textual.
+10. Para texto_largo u observaciones: resume y redacta de forma profesional y concisa, pero NUNCA omitas datos específicos como correos, nombres de personas, teléfonos, cantidades o direcciones.
 
-DETECCIÓN DE AMBIGÜEDADES:
-- Si un valor mencionado por el usuario podría pertenecer a más de un campo, NO lo pongas en ninguno de esos campos. Déjalos vacíos y repórtalo como ambigüedad.
-- Solo reporta ambigüedades cuando genuinamente hay confusión (campos similares como "Correo del cliente" y "Correo del supervisor", o "Fecha de inicio" y "Fecha de entrega" si el usuario solo dijo "la fecha es...").
-- NO reportes ambigüedad si por contexto es claro a qué campo pertenece el valor.
+REGLAS DE LOS GRUPOS (lo más importante):
+11. Un grupo representa algo de lo que el usuario pudo hablar varias veces. Devuelve un elemento por cada ocurrencia REAL que mencione.
+12. Cada elemento lleva "bloque": el número que el usuario mencionó. "En la actividad 2..." → "bloque": 2. Si habla de algo nuevo sin numerar, usa "bloque": "nuevo".
+13. Si el usuario se refiere a un bloque por su contenido en vez de por número (ej. "el del vaciado"), usa el número de ese bloque según los bloques que ya existen en pantalla.
+14. En "valores" pon SOLO los campos que el usuario mencionó para ese bloque. Los que no mencionó se omiten: lo que ya está escrito en pantalla se conserva solo.
+15. Si el usuario NO usó marcadores ni números y no está claro que sean varias ocurrencias, trátalo como UNA SOLA: un elemento con "bloque": 1. Ante la duda, NO partas.
+16. NUNCA inventes ocurrencias para rellenar. Si habló de una actividad, devuelve una.
+
+AMBIGÜEDADES:
+- Repórtalas SOLO para campos sueltos, y solo cuando un valor claramente dicho podría ir en más de un campo (ej. "Correo del cliente" vs "Correo del supervisor"). En ese caso no lo asignes a ninguno.
+- NO reportes ambigüedad si por contexto es claro.
+- NUNCA preguntes cuántas actividades son ni si algo es una o dos ocurrencias. Aplica la regla 15.
 
 FORMATO DE RESPUESTA:
 {
-  "campos": { "id": "valor", ... },
+  "campos": { "9": "valor" },
+  "grupos": {
+    "gid_del_grupo": [
+      { "bloque": 1, "valores": { "4": "Sergio Gómez" } },
+      { "bloque": "nuevo", "valores": { "3": "Armado de columnas", "4": "Cuadrilla B" } }
+    ]
+  },
   "ambiguedades": [
-    {
-      "valor": "el valor ambiguo",
-      "campos_posibles": [
-        {"id": "id_campo_1", "nombre": "nombre del campo 1"},
-        {"id": "id_campo_2", "nombre": "nombre del campo 2"}
-      ],
-      "pregunta": "pregunta corta y natural para resolver la duda"
-    }
+    { "valor": "el valor ambiguo",
+      "campos_posibles": [ {"id": "1", "nombre": "Campo 1"}, {"id": "2", "nombre": "Campo 2"} ],
+      "pregunta": "pregunta corta y natural" }
   ],
   "faltantes": [
-    {
-      "campo_id": "id",
-      "nombre": "nombre del campo",
-      "pregunta": "pregunta natural y corta para pedir este dato"
-    }
+    { "campo_id": "id", "nombre": "nombre del campo", "pregunta": "pregunta natural y corta" }
   ]
 }
 
-- En "campos" pon todos los valores que se pudieron asignar sin duda.
-- En "ambiguedades" pon los valores que podrían ir en más de un campo. La pregunta debe mencionar el valor y los campos posibles de forma natural. Ejemplo: "Mencionaste juan@empresa.com, ¿corresponde al correo del cliente o al correo del supervisor?"
-- En "faltantes" pon SOLO los campos marcados como [obligatorio] que quedaron vacíos Y que NO están en ambiguedades.
-- Si no hay ambigüedades, el array debe ser [].
-- Si no hay faltantes, el array debe ser [].
-- Las preguntas deben ser naturales, cortas y en español colombiano."""
+- "faltantes": SOLO campos sueltos [obligatorio] que quedaron sin valor y que no estén en ambiguedades. NO reportes faltantes de campos que estén dentro de un grupo.
+- Si no hay grupos, "grupos" debe ser {}. Si no hay ambigüedades o faltantes, arrays vacíos.
+- Las preguntas: naturales, cortas y en español colombiano."""
 
         fecha_hoy = date.today().strftime('%Y-%m-%d')
 
         prompt_usuario = f"""Fecha actual: {fecha_hoy}
 
-Formulario con estos campos:
-{campos_texto}
+CAMPOS SUELTOS:
+{sueltos_texto}
+
+GRUPOS:
+{grupos_texto}
 
 Transcripción del usuario:
 "{transcripcion}"
@@ -3992,43 +4017,41 @@ Devuelve SOLO el JSON con los valores extraídos."""
                 {"role": "user", "content": prompt_usuario}
             ],
             temperature=0.1,
-            max_tokens=1000
+            max_tokens=2000
         )
 
         respuesta_texto = response.choices[0].message.content.strip()
-
-        # Limpiar posible markdown del JSON
         respuesta_texto = respuesta_texto.replace('```json', '').replace('```', '').strip()
 
         resultado = json.loads(respuesta_texto)
 
-        # Soportar ambos formatos: nuevo (con faltantes) y viejo (solo campos)
-        if 'campos' in resultado:
-            campos_resultado = resultado['campos']
-            ambiguedades = resultado.get('ambiguedades', [])
-            faltantes = resultado.get('faltantes', [])
+        if 'campos' in resultado or 'grupos' in resultado:
+            campos_resultado = resultado.get('campos', {}) or {}
+            grupos_resultado = resultado.get('grupos', {}) or {}
+            ambiguedades     = resultado.get('ambiguedades', []) or []
+            faltantes        = resultado.get('faltantes', []) or []
         else:
             campos_resultado = resultado
-            ambiguedades = []
-            faltantes = []
+            grupos_resultado = {}
+            ambiguedades     = []
+            faltantes        = []
 
-        llenados = len([v for v in campos_resultado.values() if v])
-        print(f"[DISTRIBUIR] Campos llenados: {llenados}/{len(campos)}. Ambigüedades: {len(ambiguedades)}. Faltantes: {len(faltantes)}")
+        # Descartar grupos que no existen en el formulario
+        gids_validos     = {g['gid'] for g in grupos}
+        grupos_resultado = {k: v for k, v in grupos_resultado.items()
+                            if k in gids_validos and isinstance(v, list)}
+
+        bloques = sum(len(v) for v in grupos_resultado.values())
+        print(f"[DISTRIBUIR] Sueltos: {len([v for v in campos_resultado.values() if v])}/{len(sueltos)}. "
+              f"Grupos: {len(grupos_resultado)} ({bloques} bloques). "
+              f"Ambigüedades: {len(ambiguedades)}. Faltantes: {len(faltantes)}")
 
         return jsonify({
-            'success': True,
-            'campos': campos_resultado,
+            'success':      True,
+            'campos':       campos_resultado,
+            'grupos':       grupos_resultado,
             'ambiguedades': ambiguedades,
-            'faltantes': faltantes
-        })
-
-        llenados = len([v for v in campos_resultado.values() if v])
-        print(f"[DISTRIBUIR] Campos llenados: {llenados}/{len(campos)}. Faltantes obligatorios: {len(faltantes)}")
-
-        return jsonify({
-            'success': True,
-            'campos': campos_resultado,
-            'faltantes': faltantes
+            'faltantes':    faltantes
         })
 
     except json.JSONDecodeError as e:
