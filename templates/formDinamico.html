@@ -176,11 +176,17 @@
                 {% elif campo.tipo == 'seleccion' or campo.tipo == 'seleccion_unica' %}
                 <select class="field-select campo-respuesta"
                         data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                        data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"{{ extra }}
+                        data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
                         data-opciones="{{ campo.opciones | tojson }}">
                     <option value="">Selecciona...</option>
                     {% for op in campo.opciones %}
-                    <option value="{{ op }}" {% if op == valor %}selected{% endif %}>{{ op }}</option>
+                        {% if op is mapping %}
+                        <option value="{{ op.nombre }}" data-codigo="{{ op.codigo }}" {% if op.nombre == campo.valor %}selected{% endif %}>
+                            {{ op.nombre }} {% if op.codigo %}({{ op.codigo }}){% endif %}
+                        </option>
+                        {% else %}
+                        <option value="{{ op }}" {% if op == campo.valor %}selected{% endif %}>{{ op }}</option>
+                        {% endif %}
                     {% endfor %}
                 </select>
 
@@ -1257,7 +1263,7 @@
         renumerarGrupo(gid);
     }
 
-    // ── Guardar respuesta (igual que antes) ──
+    // ── Guardar respuesta ──
     async function guardarRespuesta() {
         const projectId    = document.getElementById('project-id').value;
         const formularioId = document.getElementById('formulario-id').value;
@@ -1278,6 +1284,11 @@
         document.querySelectorAll('.campo-respuesta:not([data-gid])').forEach(input => {
             const valor = valorDe(input);
             respuestas[input.dataset.campoId] = valor;
+            // Guardar código asociado si es un select con código
+            if (input.tagName === 'SELECT' && input.selectedIndex >= 0) {
+                const codigo = input.options[input.selectedIndex]?.dataset.codigo;
+                if (codigo) respuestas[input.dataset.campoId + '_codigo'] = codigo;
+            }
             if (!esEdicion && esRequerido(input) && !tieneValor(valor)) {
                 faltantes.push(etiquetaDe(input));
             }
@@ -1289,7 +1300,15 @@
             cont.querySelectorAll('.rep-bloque').forEach(bloque => {
                 const inputs = bloque.querySelectorAll('.campo-respuesta');
                 const rep    = {};
-                inputs.forEach(input => { rep[input.dataset.campoId] = valorDe(input); });
+                inputs.forEach(input => {
+                    rep[input.dataset.campoId] = valorDe(input);
+
+                    // Guardar código asociado si es un select con código
+                    if (input.tagName === 'SELECT' && input.selectedIndex >= 0) {
+                        const codigo = input.options[input.selectedIndex]?.dataset.codigo;
+                        if (codigo) rep[input.dataset.campoId + '_codigo'] = codigo;
+                    }
+                });
 
                 if (!Object.values(rep).some(tieneValor)) return;   // bloque vacío: se ignora
 

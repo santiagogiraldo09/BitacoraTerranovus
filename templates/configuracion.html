@@ -305,6 +305,14 @@
                     </div>
                 </div>
 
+                <!-- Checkbox: opciones con código (solo selección) -->
+                <div id="campo-con-codigo-group" style="display:none;">
+                    <div class="invite-field" style="display:flex; align-items:center; gap:10px; margin-top:4px;">
+                        <input type="checkbox" id="campo-con-codigo" style="width:auto;" onchange="toggleCodigoOpciones()">
+                        <label for="campo-con-codigo" style="text-transform:none; font-size:14px;">Las opciones tienen código asociado</label>
+                    </div>
+                </div>
+
                 <p class="invite-feedback" id="campo-feedback"></p>
 
                 <button class="send-invite-btn" onclick="guardarCampo()">
@@ -1795,6 +1803,27 @@
         document.getElementById('campo-opciones-group').style.display  = 'none';
         document.getElementById('opciones-lista').innerHTML             = '';
         document.getElementById('campo-feedback').textContent           = '';
+        document.getElementById('campo-con-codigo').checked = false;
+        document.getElementById('campo-con-codigo-group').style.display = 'none';
+    }
+
+    function toggleCodigoOpciones() {
+        const conCodigo = document.getElementById('campo-con-codigo').checked;
+        const opciones = document.querySelectorAll('#opciones-lista .opcion-row');
+
+        opciones.forEach(row => {
+            let codigoInput = row.querySelector('.opcion-codigo');
+            if (conCodigo && !codigoInput) {
+                codigoInput = document.createElement('input');
+                codigoInput.type = 'text';
+                codigoInput.className = 'opcion-codigo';
+                codigoInput.placeholder = 'Código';
+                codigoInput.style.cssText = 'width:100px; padding:6px 10px; border:1px solid var(--gris-borde,#e5e7eb); border-radius:6px; font-size:13px; font-family:DM Sans,sans-serif;';
+                row.insertBefore(codigoInput, row.querySelector('button'));
+            } else if (!conCodigo && codigoInput) {
+                codigoInput.remove();
+            }
+        });
     }
 
     function onTipoCampoChange() {
@@ -1803,17 +1832,29 @@
             ['texto_corto', 'texto_largo'].includes(tipo) ? '' : 'none';
         document.getElementById('campo-opciones-group').style.display =
             ['seleccion', 'seleccion_unica'].includes(tipo) ? '' : 'none';
+        document.getElementById('campo-con-codigo-group').style.display =
+            ['seleccion', 'seleccion_unica'].includes(tipo) ? '' : 'none';
+
+        // Resetear checkbox si cambia de tipo
+        if (!['seleccion', 'seleccion_unica'].includes(tipo)) {
+            document.getElementById('campo-con-codigo').checked = false;
+            toggleCodigoOpciones();
+        }
     }
 
     function agregarOpcion() {
         const lista = document.getElementById('opciones-lista');
-        const div   = document.createElement('div');
+        const conCodigo = document.getElementById('campo-con-codigo').checked;
+        const div = document.createElement('div');
         div.className = 'opcion-row';
-        div.innerHTML = `
-            <input type="text" placeholder="Opción...">
-            <button type="button" class="btn-quitar-opcion" onclick="this.parentElement.remove()">
-                <i class="fas fa-times"></i>
-            </button>`;
+        let html = '<input type="text" class="opcion-nombre" placeholder="Opción...">';
+        if (conCodigo) {
+            html += '<input type="text" class="opcion-codigo" placeholder="Código..." style="width:100px;">';
+        }
+        html += `<button type="button" class="btn-quitar-opcion" onclick="this.parentElement.remove()">
+                    <i class="fas fa-times"></i>
+                </button>`;
+        div.innerHTML = html;
         lista.appendChild(div);
     }
 
@@ -1834,9 +1875,19 @@
         if (maxChars) configuracion.max_caracteres = parseInt(maxChars);
 
         const opciones = [];
+        const conCodigo = document.getElementById('campo-con-codigo')?.checked || false;
         if (['seleccion', 'seleccion_unica'].includes(tipo)) {
-            document.querySelectorAll('#opciones-lista .opcion-row input').forEach(inp => {
-                if (inp.value.trim()) opciones.push(inp.value.trim());
+            document.querySelectorAll('#opciones-lista .opcion-row').forEach(row => {
+                const nombreInput = row.querySelector('.opcion-nombre');
+                const codigoInput = row.querySelector('.opcion-codigo');
+                const nombre = nombreInput?.value.trim();
+                if (nombre) {
+                    if (conCodigo && codigoInput) {
+                        opciones.push({ nombre: nombre, codigo: codigoInput.value.trim() });
+                    } else {
+                        opciones.push(nombre);
+                    }
+                }
             });
             if (opciones.length === 0) {
                 fb.textContent = 'Agrega al menos una opción.';
