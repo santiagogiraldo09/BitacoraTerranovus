@@ -52,12 +52,16 @@
     <!-- ════════════════════════════════════════════ -->
     <div class="tab-content active" id="tab-registros">
 
-        <!-- Chips de filtro -->
-        <div class="filter-chips" id="filter-chips">
-            <button class="chip chip-active" data-filter="todos" onclick="filtrarPorFormulario('todos')">
-                Todos
+        <!-- Chips de filtro + botón exportar -->
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:18px;">
+            <div class="filter-chips" id="filter-chips" style="margin-bottom:0; flex:1;">
+                <button class="chip chip-active" data-filter="todos" onclick="filtrarPorFormulario('todos')">
+                    Todos
+                </button>
+            </div>
+            <button class="btn-exportar" onclick="abrirModalExportar()" title="Exportar a Excel">
+                <i class="fas fa-download"></i>
             </button>
-            <!-- Los chips de formularios se cargan dinámicamente -->
         </div>
 
         <!-- Lista de registros -->
@@ -309,7 +313,93 @@
     // ── Init ──
     construirChips();
     cargarRegistros();
+
+    // ── Exportar a Excel ──
+    function abrirModalExportar() {
+        const select = document.getElementById('export-formulario');
+        select.innerHTML = '';
+
+        formulariosProy.forEach(f => {
+            const opt = document.createElement('option');
+            opt.value = f.id;
+            opt.textContent = f.nombre;
+            select.appendChild(opt);
+        });
+
+        // Si hay un filtro activo, preseleccionar ese formulario
+        if (filtroActual && filtroActual !== 'todos') {
+            select.value = filtroActual;
+        }
+
+        // Limpiar fechas
+        document.getElementById('export-desde').value = '';
+        document.getElementById('export-hasta').value = '';
+
+        document.getElementById('modal-exportar').classList.add('active');
+    }
+
+    function cerrarModalExportar() {
+        document.getElementById('modal-exportar').classList.remove('active');
+    }
+
+    function ejecutarExportacion() {
+        const formularioId = document.getElementById('export-formulario').value;
+        const desde        = document.getElementById('export-desde').value;
+        const hasta        = document.getElementById('export-hasta').value;
+
+        if (!formularioId) {
+            mostrarToast('⚠️ Selecciona un formulario');
+            return;
+        }
+
+        let url = `/api/exportar-formulario/${proyectoId}/${formularioId}?`;
+        if (desde) url += `desde=${desde}&`;
+        if (hasta) url += `hasta=${hasta}&`;
+
+        // Descargar directamente
+        window.location.href = url;
+
+        mostrarToast('✅ Descargando Excel...');
+        setTimeout(() => cerrarModalExportar(), 500);
+    }
 </script>
+
+<!-- Modal exportar -->
+<div class="modal-overlay" id="modal-exportar">
+    <div class="modal-box" style="text-align:left;">
+        <h3 class="modal-title" style="margin-bottom:16px;">
+            <i class="fas fa-file-excel" style="color:#16a34a;"></i> Exportar a Excel
+        </h3>
+
+        <div style="margin-bottom:14px;">
+            <label style="font-size:13px; font-weight:600; color:#4b5563; display:block; margin-bottom:4px;">Formulario</label>
+            <select id="export-formulario" style="width:100%; padding:10px 12px; border:1.5px solid #e5e7eb; border-radius:8px; font-size:14px; font-family:'DM Sans',sans-serif;">
+                <!-- Se llena dinámicamente -->
+            </select>
+        </div>
+
+        <div style="display:flex; gap:12px; margin-bottom:18px;">
+            <div style="flex:1;">
+                <label style="font-size:13px; font-weight:600; color:#4b5563; display:block; margin-bottom:4px;">Desde</label>
+                <input type="date" id="export-desde" style="width:100%; padding:10px 12px; border:1.5px solid #e5e7eb; border-radius:8px; font-size:14px; font-family:'DM Sans',sans-serif;">
+            </div>
+            <div style="flex:1;">
+                <label style="font-size:13px; font-weight:600; color:#4b5563; display:block; margin-bottom:4px;">Hasta</label>
+                <input type="date" id="export-hasta" style="width:100%; padding:10px 12px; border:1.5px solid #e5e7eb; border-radius:8px; font-size:14px; font-family:'DM Sans',sans-serif;">
+            </div>
+        </div>
+
+        <div style="display:flex; flex-direction:column; gap:8px;">
+            <button class="modal-btn" onclick="ejecutarExportacion()" 
+                    style="background:#16a34a; color:white; width:100%; padding:12px; border-radius:8px; font-weight:600;">
+                <i class="fas fa-download"></i> Descargar Excel
+            </button>
+            <button class="modal-btn modal-btn-cancel" onclick="cerrarModalExportar()" style="width:100%;">
+                Cancelar
+            </button>
+        </div>
+    </div>
+</div>
 
 </body>
 </html>

@@ -50,7 +50,8 @@ from openai import OpenAI
 import tempfile
 from datetime import date
 from flask import Response
-
+import openpyxl
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
 connection_pool = None
 
@@ -2833,6 +2834,201 @@ Si no puedes determinar el campo, devuelve:
     except Exception as e:
         print(f"[AMBIGUEDAD] Error: {e}")
         return jsonify({'error': str(e), 'success': False}), 500
+
+
+@app.route('/api/exportar-formulario/<int:project_id>/<int:formulario_id>')
+def exportar_formulario(project_id, formulario_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    try:
+        fecha_desde = request.args.get('desde', '')
+        fecha_hasta = request.args.get('hasta', '')
+
+        with db_connection() as (conn, cursor):
+            # Obtener nombre del proyecto
+            cursor.execute("SELECT nombre_proyecto FROM proyectos WHERE id = %s", (project_id,))
+            proyecto_row = cursor.fetchone()
+            nombre_proyecto = proyecto_row[0] if proyecto_row else 'Proyecto'
+
+            # Obtener nombre del formulario y sus campos
+            cursor.execute("""
+                SELECT f.nombre, f.campos
+                FROM formularios f
+                WHERE f.id = %s AND f.empresa_id = %s
+            """, (formulario_id, session.get('empresa_id')))
+            form_row = cursor.fetchone()
+            if not form_row:
+                return jsonify({'error': 'Formulario no encontrado'}), 404
+
+            nombre_formulario = form_row[0]
+            campos_config = form_row[1] or []
+
+            # Obtener IDs de campos
+            campo_ids = [
+                (item['id'] if isinstance(item, dict) else item)
+                for item in campos_config
+            ]
+
+            # Obtener nombres de campos
+            campos_map = {}
+            if campo_ids:
+                cursor.execute("""
+                    SELECT id, nombre FROM campos_globales WHERE id = ANY(%s)
+                """, (campo_ids,))
+                for r in cursor.fetchall():
+                    campos_map[str(r[0])] = r[1]
+
+            # Obtener registros con filtro de fechas
+            query = """
+                SELECT rf.respuestas, rf.created_at
+                FROM respuestas_formulario rf
+                WHERE rf.id_proyecto = %s AND rf.formulario_id = %s
+            """
+            params = [project_id, formulario_id]
+
+            if fecha_desde:
+                query += " AND rf.created_at::date >= %s"
+                params.append(fecha_desde)
+            if fecha_hasta:
+                query += " AND rf.created_at::date <= %s"
+                params.append(fecha_hasta)
+
+            query += " ORDER BY rf.created_at ASC"
+            cursor.execute(query, params)
+            registros = cursor.fetchall()
+
+        # ── Mapeo de campos por nombre → columna Excel ──
+        # Invertir: nombre → campo_id
+        nombre_a_id = {v: k for k, v in campos_map.items()}
+
+        # Meses en español
+        meses_es = {
+            1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'ABRIL',
+            5: 'MAYO', 6: 'JUNIO', 7: 'JULIO', 8: 'AGOSTO',
+            9: 'SEPTIEMBRE', 10: 'OCTUBRE', 11: 'NOVIEMBRE', 12: 'DICIEMBRE'
+        }
+
+        # Definir columnas del Excel
+        columnas_excel = [
+            'Mes', 'Día', 'Turno', 'Código', 'Nombre Producto',
+            'Cant. Aceptada', 'Horas Maq.', 'H.PP', 'Codigo PP',
+            'Causa PP', 'H.PNP', 'Codigo PNP', 'Causa PNP'
+        ]
+
+        # Mapeo: columna excel → campo del formulario (por nombre)
+        mapeo = {
+            'Turno':           'N° de Turno',
+            'Nombre Producto': 'Nombre Producto',
+            'Cant. Aceptada':  'Cantidad Aceptada',
+            'Horas Maq.':      'Tiempo de Máquina (Hora M)',
+            'H.PP':            'Horas Paro Programado',
+            'Causa PP':        'Causa Paro Programado',
+            'H.PNP':           'Horas Paro No programado',
+            'Causa PNP':       'Causa Paro No Programado',
+        }
+
+        # Campos cuyo código viene de otro campo
+        mapeo_codigo = {
+            'Código':    'Nombre Producto',
+            'Codigo PP': 'Causa Paro Programado',
+            'Codigo PNP':'Causa Paro No Programado',
+        }
+
+        # ── Generar Excel ──
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = 'Reporte'
+
+        # Estilos
+        header_font = Font(name='Arial', bold=True, size=11, color='FFFFFF')
+        header_fill = PatternFill(start_color='333333', end_color='333333', fill_type='solid')
+        header_align = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        cell_font = Font(name='Arial', size=10)
+        cell_align = Alignment(vertical='center')
+        thin_border = Border(
+            left=Side(style='thin', color='D9D9D9'),
+            right=Side(style='thin', color='D9D9D9'),
+            top=Side(style='thin', color='D9D9D9'),
+            bottom=Side(style='thin', color='D9D9D9')
+        )
+
+        # Título
+        ws.merge_cells('A1:M1')
+        title_cell = ws['A1']
+        title_cell.value = f'{nombre_formulario} — {nombre_proyecto}'
+        title_cell.font = Font(name='Arial', bold=True, size=13)
+        title_cell.alignment = Alignment(horizontal='center', vertical='center')
+
+        # Headers
+        for col_idx, col_name in enumerate(columnas_excel, 1):
+            cell = ws.cell(row=2, column=col_idx, value=col_name)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_align
+            cell.border = thin_border
+
+        # Datos
+        for row_idx, (respuestas, created_at) in enumerate(registros, 3):
+            resp = respuestas if isinstance(respuestas, dict) else {}
+
+            for col_idx, col_name in enumerate(columnas_excel, 1):
+                valor = ''
+
+                if col_name == 'Mes':
+                    valor = meses_es.get(created_at.month, '') if created_at else ''
+                elif col_name == 'Día':
+                    valor = created_at.day if created_at else ''
+                elif col_name in mapeo_codigo:
+                    # Buscar el código del campo asociado
+                    campo_origen = mapeo_codigo[col_name]
+                    campo_id = nombre_a_id.get(campo_origen, '')
+                    valor = resp.get(campo_id + '_codigo', '')
+                elif col_name in mapeo:
+                    campo_nombre = mapeo[col_name]
+                    campo_id = nombre_a_id.get(campo_nombre, '')
+                    valor = resp.get(campo_id, '')
+
+                cell = ws.cell(row=row_idx, column=col_idx, value=valor)
+                cell.font = cell_font
+                cell.alignment = cell_align
+                cell.border = thin_border
+
+        # Ajustar anchos de columna
+        anchos = {
+            'A': 12, 'B': 8, 'C': 8, 'D': 12, 'E': 45,
+            'F': 16, 'G': 12, 'H': 10, 'I': 12,
+            'J': 30, 'K': 10, 'L': 12, 'M': 30
+        }
+        for col, ancho in anchos.items():
+            ws.column_dimensions[col].width = ancho
+
+        # Filtro automático
+        ws.auto_filter.ref = f'A2:M{len(registros) + 2}'
+
+        # Congelar encabezados
+        ws.freeze_panes = 'A3'
+
+        # Generar archivo
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+
+        filename = f'Reporte_{nombre_formulario}_{nombre_proyecto}.xlsx'
+        filename = filename.replace(' ', '_')
+
+        return Response(
+            output.getvalue(),
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            headers={'Content-Disposition': f'attachment; filename={filename}'}
+        )
+
+    except Exception as e:
+        print(f"Error al exportar: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/text-to-speech', methods=['POST'])
 def text_to_speech():

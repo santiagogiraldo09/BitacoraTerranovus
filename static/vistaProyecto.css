@@ -606,3 +606,24 @@ button { font-family: inherit; cursor: pointer; }
         padding: 40px 160px;
     }
 }
+
+.btn-exportar {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    border: 1px solid var(--gris-borde, #e5e7eb);
+    background: var(--blanco, white);
+    color: var(--naranja, #FFAF33);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all 0.2s;
+}
+
+.btn-exportar:hover {
+    background: var(--naranja-light, rgba(255,175,51,0.12));
+    border-color: var(--naranja, #FFAF33);
+}
