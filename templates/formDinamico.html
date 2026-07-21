@@ -1227,6 +1227,37 @@
         });
     }
 
+    // ── Validación de horas por turno (máximo 8h) ──
+    function validarHorasTurno() {
+        const formularioId = document.getElementById('formulario-id').value;
+        if (formularioId !== '6') return { valido: true }; // Solo aplica al formulario 6
+
+        const campos = document.querySelectorAll('.campo-respuesta');
+        let horasMaq = 0, horasPP = 0, horasPNP = 0;
+
+        campos.forEach(input => {
+            const nombre = (input.dataset.nombre || '').toLowerCase();
+            const valor  = parseFloat(input.value) || 0;
+
+            if (nombre.includes('tiempo de máquina') || nombre.includes('tiempo de maquina')) {
+                horasMaq = valor;
+            } else if (nombre.includes('horas paro programado')) {
+                horasPP = valor;
+            } else if (nombre.includes('horas paro no')) {
+                horasPNP = valor;
+            }
+        });
+
+        const total = horasMaq + horasPP + horasPNP;
+        return {
+            valido: total <= 8,
+            total: total,
+            horasMaq: horasMaq,
+            horasPP: horasPP,
+            horasPNP: horasPNP
+        };
+    }
+
     function agregarRepeticion(gid, silecioso) {
         const cont    = document.querySelector(`.grupo-rep[data-gid="${gid}"]`);
         const bloques = cont.querySelectorAll('.rep-bloque');
@@ -1346,6 +1377,14 @@
             return;
         }
 
+        // Validar horas del turno
+        const validacionHoras = validarHorasTurno();
+        if (!validacionHoras.valido) {
+            mostrarToast(`⚠️ Las horas suman ${validacionHoras.total}h y el turno es de 8h máximo`);
+            return;
+        }
+
+
         const btn = document.getElementById('btn-guardar');
         if (btn.disabled) return;
         btn.disabled  = true;
@@ -1386,6 +1425,51 @@
             btn.disabled  = false;
             btn.innerHTML = textoOriginal;
         }
+    }
+
+    function verificarHorasEnTiempoReal() {
+        const resultado = validarHorasTurno();
+        if (!resultado.valido) return; // Solo aplica si es formulario 6
+
+        let indicador = document.getElementById('indicador-horas');
+
+        // Crear indicador si no existe
+        if (!indicador) {
+            indicador = document.createElement('div');
+            indicador.id = 'indicador-horas';
+            indicador.style.cssText = 'padding:10px 14px; border-radius:8px; font-size:13px; margin:10px 16px; display:none;';
+            // Insertarlo después de la sección del formulario
+            const seccion = document.querySelector('.section');
+            if (seccion) seccion.parentElement.insertBefore(indicador, seccion.nextSibling);
+        }
+
+        const total = resultado.total;
+        if (total === 0) {
+            indicador.style.display = 'none';
+            return;
+        }
+
+        indicador.style.display = 'block';
+        if (total > 8) {
+            indicador.style.background = '#FEE2E2';
+            indicador.style.color = '#DC2626';
+            indicador.style.border = '1px solid #FECACA';
+            indicador.innerHTML = `<i class="fas fa-exclamation-triangle"></i> <strong>${total}h de 8h</strong> — Las horas exceden el turno (Máq: ${resultado.horasMaq}h + PP: ${resultado.horasPP}h + PNP: ${resultado.horasPNP}h)`;
+        } else {
+            indicador.style.background = '#F0FDF4';
+            indicador.style.color = '#16A34A';
+            indicador.style.border = '1px solid #BBF7D0';
+            indicador.innerHTML = `<i class="fas fa-check-circle"></i> <strong>${total}h de 8h</strong> — Horas dentro del turno (Máq: ${resultado.horasMaq}h + PP: ${resultado.horasPP}h + PNP: ${resultado.horasPNP}h)`;
+        }
+    }
+
+    // Activar validación en tiempo real para formulario 6
+    if (document.getElementById('formulario-id').value === '6') {
+        document.addEventListener('input', (e) => {
+            if (e.target.classList.contains('campo-respuesta')) {
+                verificarHorasEnTiempoReal();
+            }
+        });
     }
 </script>
 </body>
