@@ -1111,13 +1111,19 @@
             if (input.type === 'checkbox') {
                 input.checked = valor === true || valor === 'true';
             } else if (input.tagName === 'SELECT') {
-                // Buscar la opción más cercana
-                const opciones = Array.from(input.options);
-                const match = opciones.find(o => o.value.toLowerCase() === String(valor).toLowerCase());
+                const opciones = Array.from(input.options).filter(o => o.value);
+                const valorLower = String(valor).toLowerCase();
+
+                // Buscar coincidencia exacta primero
+                let match = opciones.find(o => o.value.toLowerCase() === valorLower);
+
+                // Si no hay exacta, buscar coincidencia parcial
+                if (!match) {
+                    match = opciones.find(o => o.value.toLowerCase().includes(valorLower) || valorLower.includes(o.value.toLowerCase()));
+                }
+
                 if (match) {
                     input.value = match.value;
-                } else {
-                    input.value = valor;
                 }
             } else if (input.tagName === 'TEXTAREA') {
                 input.value = valor;
