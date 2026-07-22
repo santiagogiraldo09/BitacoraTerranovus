@@ -52,6 +52,8 @@ from datetime import date
 from flask import Response
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from api_movil import api_movil
+
 
 connection_pool = None
 
@@ -5010,6 +5012,8 @@ def exportar_contactos_excel():
         if conn:
             cursor.close()
             connection_pool.putconn(conn)
+
+app.register_blueprint(api_movil)
 
 if __name__ == '__main__':
     app.run(debug=True)
