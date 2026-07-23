@@ -115,6 +115,9 @@
                                     <a class="dropdown-item" onclick="window.location.href='/edit_project/{{ proyecto.id_proyecto }}'">
                                         <i class="fas fa-pen"></i> Editar proyecto
                                     </a>
+                                    <a class="dropdown-item" onclick="window.location.href='/formulario-synchro?proyecto={{ proyecto.id_proyecto }}'">
+                                        <i class="fas fa-clipboard-check"></i> Formulario Synchro Control
+                                    </a>
                                     <a class="dropdown-item danger" onclick="eliminarProyecto('{{ proyecto.id_proyecto }}', '{{ proyecto.name }}')">
                                         <i class="fas fa-trash"></i> Eliminar
                                     </a>
