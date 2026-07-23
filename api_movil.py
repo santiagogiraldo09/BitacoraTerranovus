@@ -29,6 +29,11 @@ DIAS_VALIDEZ_TOKEN = 30
 
 @api_movil.after_request
 def _cors(resp):
+    # Si Flask-CORS ya puso la cabecera, NO la duplicamos:
+    # dos Access-Control-Allow-Origin hacen que el navegador bloquee todo.
+    if resp.headers.get("Access-Control-Allow-Origin"):
+        return resp
+
     origen = request.headers.get("Origin", "")
     if origen in ORIGENES_APP:
         resp.headers["Access-Control-Allow-Origin"] = origen
@@ -142,40 +147,76 @@ def _nombre_empresa(empresa_id):
     return ""
 
 
+# Si un usuario no tiene proyectos por ninguna de las dos vías,
+# ¿mostrarle todos los de su empresa? Útil para probar.
+INCLUIR_TODOS_DE_EMPRESA_SI_VACIO = False
+
+
+def _ids_asignados(uid, empresa_id):
+    """Busca los proyectos del usuario por las DOS vías posibles."""
+    from app import supabase_client
+    ids = set()
+    detalle = {}
+
+    # a) Tabla de asignación
+    try:
+        r = (supabase_client.table("proyecto_usuarios")
+             .select("id_proyecto")
+             .eq("user_id", uid)
+             .execute())
+        v = {a["id_proyecto"] for a in (r.data or [])}
+        detalle["proyecto_usuarios"] = len(v)
+        ids |= v
+    except Exception as e:
+        detalle["proyecto_usuarios_error"] = str(e)
+
+    # b) Proyectos creados por el usuario (columna user_id en proyectos)
+    try:
+        r = (supabase_client.table("proyectos")
+             .select("id")
+             .eq("user_id", uid)
+             .execute())
+        v = {p["id"] for p in (r.data or [])}
+        detalle["proyectos_user_id"] = len(v)
+        ids |= v
+    except Exception as e:
+        detalle["proyectos_user_id_error"] = str(e)
+
+    # c) Respaldo opcional: todos los de la empresa
+    if not ids and INCLUIR_TODOS_DE_EMPRESA_SI_VACIO:
+        r = (supabase_client.table("proyectos")
+             .select("id")
+             .eq("empresa_id", empresa_id)
+             .execute())
+        ids |= {p["id"] for p in (r.data or [])}
+        detalle["respaldo_empresa"] = len(ids)
+
+    return list(ids), detalle
+
+
 def _proyectos_del_usuario(uid, empresa_id):
     from app import supabase_client
 
     uid = _num(uid)
     empresa_id = _num(empresa_id)
 
-    # 1) Proyectos asignados a ESTE usuario
-    asign = (supabase_client.table("proyecto_usuarios")
-             .select("id_proyecto")
-             .eq("user_id", uid)
-             .eq("empresa_id", empresa_id)
-             .execute())
-
-    ids = list({a["id_proyecto"] for a in (asign.data or [])})
+    ids, _ = _ids_asignados(uid, empresa_id)
     if not ids:
         return []
 
-    # 2) Datos de esos proyectos
     proy = (supabase_client.table("proyectos")
             .select("*")
             .in_("id", ids)
             .eq("empresa_id", empresa_id)
             .execute())
 
-    # 3) Formularios activos de esos proyectos
     q = (supabase_client.table("proyecto_formularios_activos")
          .select("proyecto_id, formulario_id, activated_at")
-         .in_("proyecto_id", ids)
-         .eq("empresa_id", empresa_id))
+         .in_("proyecto_id", ids))
     if FILTRAR_FORMULARIOS_POR_USUARIO:
         q = q.eq("user_id", uid)
     activos = q.execute()
 
-    # 4) Nombres de los formularios
     ids_form = list({a["formulario_id"] for a in (activos.data or [])})
     catalogo = {}
     if ids_form:
@@ -185,7 +226,6 @@ def _proyectos_del_usuario(uid, empresa_id):
                  .execute())
         catalogo = {f["id"]: f for f in (forms.data or [])}
 
-    # 5) Agrupar formularios por proyecto (el más reciente queda destacado)
     por_proyecto = {}
     for a in (activos.data or []):
         f = catalogo.get(a["formulario_id"], {})
@@ -203,7 +243,6 @@ def _proyectos_del_usuario(uid, empresa_id):
         for f in lista:
             f.pop("_orden", None)
 
-    # 6) Armar la respuesta
     salida = []
     for p in (proy.data or []):
         pid = p["id"]
@@ -289,3 +328,53 @@ def api_proyectos():
 @api_movil.route("/api/ping", methods=["GET"])
 def api_ping():
     return jsonify({"ok": True})
+
+
+# ---------------------- DIAGNÓSTICO (temporal) -----------------------
+#  Ábrelo en el navegador:
+#    https://TU-APP.onrender.com/api/diagnostico?token=EL_TOKEN
+#  Borra esta ruta cuando termines de depurar.
+# ---------------------------------------------------------------------
+
+@api_movil.route("/api/diagnostico", methods=["GET"])
+def api_diagnostico():
+    from app import supabase_client
+
+    # Modo sin token (solo mientras DEBUG_API esté activo):
+    #   /api/diagnostico?uid=1&empresa=1
+    uid_param = request.args.get("uid")
+    if uid_param and DEBUG_API:
+        uid = _num(uid_param)
+        emp = _num(request.args.get("empresa", "1"))
+    else:
+        token = request.args.get("token") or request.headers.get("Authorization", "")[7:]
+        try:
+            u = _firmador().loads(token, max_age=DIAS_VALIDEZ_TOKEN * 86400)
+        except Exception as e:
+            return jsonify({"error": "token_invalido", "detalle": str(e)}), 401
+        uid = _num(u["uid"])
+        emp = _num(u["empresa_id"])
+    info = {"user_id": uid, "empresa_id": emp}
+
+    ids, detalle = _ids_asignados(uid, emp)
+    info["busqueda"] = detalle
+    info["ids_encontrados"] = ids[:20]
+    info["total_ids"] = len(ids)
+
+    try:
+        r = (supabase_client.table("proyectos").select("id")
+             .eq("empresa_id", emp).execute())
+        info["proyectos_en_la_empresa"] = len(r.data or [])
+    except Exception as e:
+        info["proyectos_en_la_empresa_error"] = str(e)
+
+    try:
+        r = (supabase_client.table("proyectos").select("*")
+             .eq("empresa_id", emp).limit(1).execute())
+        if r.data:
+            info["columnas_de_proyectos"] = sorted(r.data[0].keys())
+    except Exception as e:
+        info["columnas_error"] = str(e)
+
+    info["proyectos_devueltos"] = len(_proyectos_del_usuario(uid, emp))
+    return jsonify(info)
