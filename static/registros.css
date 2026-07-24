@@ -265,7 +265,7 @@ button { font-family: inherit; cursor: pointer; }
 /* ─── Grilla de proyectos ────────────────────────────────────── */
 .projects-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));  /* minmax(0,..) evita el desborde */
     gap: 16px;
 }
 
@@ -280,6 +280,8 @@ button { font-family: inherit; cursor: pointer; }
     display: flex;
     flex-direction: column;
     gap: 12px;
+    min-width: 0;                 /* clave: la tarjeta puede encogerse */
+    overflow: hidden;             /* nada se sale del borde redondeado */
 }
 
 .project-card:hover {
@@ -292,6 +294,7 @@ button { font-family: inherit; cursor: pointer; }
     justify-content: space-between;
     align-items: flex-start;
     gap: 8px;
+    min-width: 0;
 }
 
 .card-title {
@@ -300,7 +303,10 @@ button { font-family: inherit; cursor: pointer; }
     font-weight: 700;
     color: var(--texto);
     line-height: 1.3;
-    flex: 1;
+    flex: 1 1 auto;
+    min-width: 0;                 /* permite encogerse dentro del flex */
+    overflow-wrap: anywhere;      /* parte nombres largos sin desbordar */
+    word-break: break-word;
 }
 
 /* Badges de estado */
@@ -1043,6 +1049,7 @@ button { font-family: inherit; cursor: pointer; }
     border: 1.5px solid transparent;
     cursor: pointer;
     transition: all 0.2s;
+    min-width: 0;                 /* deja que el nombre interior se corte */
 }
 
 .formulario-card:hover {
@@ -1074,6 +1081,9 @@ button { font-family: inherit; cursor: pointer; }
 .formulario-card-subtexto {
     font-size: 12px;
     color: var(--gris-texto, #6b7280);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .formulario-destacado .formulario-card-subtexto {
@@ -1091,3 +1101,6 @@ button { font-family: inherit; cursor: pointer; }
 .formulario-destacado .formulario-card-arrow {
     color: var(--naranja, #FFAF33);
 }
+
+/* ── Fix responsive: cortar cualquier desbordamiento horizontal ──── */
+html, body { max-width: 100%; overflow-x: hidden; }
