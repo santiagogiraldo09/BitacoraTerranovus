@@ -330,11 +330,11 @@
                             <div style="display:flex; gap:16px;">
                                 <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
                                     <input type="radio" name="mostrar-como" value="izquierda" checked style="accent-color:var(--naranja,#FFAF33);"> 
-                                    <span id="radio-label-izq">Izquierda</span>
+                                    <span id="radio-label-izq">Columna izquierda</span>
                                 </label>
                                 <label style="display:flex; align-items:center; gap:6px; font-size:13px; cursor:pointer;">
                                     <input type="radio" name="mostrar-como" value="derecha" style="accent-color:var(--naranja,#FFAF33);">
-                                    <span id="radio-label-der">Derecha</span>
+                                    <span id="radio-label-der">Columna derecha</span>
                                 </label>
                             </div>
                         </div>
@@ -1840,8 +1840,8 @@
         document.getElementById('valor-asociado-config').style.display = 'none';
         document.getElementById('etiqueta-izquierda').value = '';
         document.getElementById('etiqueta-derecha').value = '';
-        document.getElementById('radio-label-izq').textContent = 'Columna izquierda';
-        document.getElementById('radio-label-der').textContent = 'Columna derecha';
+        document.getElementById('radio-label-izq').textContent = 'Izquierda';
+        document.getElementById('radio-label-der').textContent = 'Derecha';
     }
 
     function toggleValorAsociado() {
