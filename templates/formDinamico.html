@@ -174,21 +174,49 @@
                     value="{{ valor }}">
 
                 {% elif campo.tipo == 'seleccion' or campo.tipo == 'seleccion_unica' %}
+                {% set conf = campo.configuracion or {} %}
+                {% set con_valor = conf.get('con_valor_asociado', false) %}
+                {% set mostrar = conf.get('mostrar_como', 'izquierda') %}
+                {% set etiq_izq = conf.get('etiqueta_izquierda', 'Opción') %}
+                {% set etiq_der = conf.get('etiqueta_derecha', 'Valor') %}
                 <select class="field-select campo-respuesta"
                         data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
                         data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
-                        data-opciones="{{ campo.opciones | tojson }}">
+                        data-opciones="{{ campo.opciones | tojson }}"
+                        data-con-valor="{{ con_valor }}"
+                        data-mostrar="{{ mostrar }}"
+                        {% if con_valor %}onchange="actualizarValorAsociado(this)"{% endif %}>
                     <option value="">Selecciona...</option>
                     {% for op in campo.opciones %}
                         {% if op is mapping %}
-                        <option value="{{ op.nombre }}" data-codigo="{{ op.codigo }}" {% if op.nombre == campo.valor %}selected{% endif %}>
-                            {{ op.nombre }} {% if op.codigo %}({{ op.codigo }}){% endif %}
-                        </option>
+                            {% if mostrar == 'izquierda' %}
+                            <option value="{{ op.izquierda }}" 
+                                    data-asociado="{{ op.derecha }}"
+                                    {% if op.izquierda == campo.valor %}selected{% endif %}>
+                                {{ op.izquierda }}
+                            </option>
+                            {% else %}
+                            <option value="{{ op.derecha }}" 
+                                    data-asociado="{{ op.izquierda }}"
+                                    {% if op.derecha == campo.valor %}selected{% endif %}>
+                                {{ op.derecha }}
+                            </option>
+                            {% endif %}
                         {% else %}
                         <option value="{{ op }}" {% if op == campo.valor %}selected{% endif %}>{{ op }}</option>
                         {% endif %}
                     {% endfor %}
                 </select>
+
+                {% if con_valor %}
+                <div class="valor-asociado-display" id="asociado-{{ campo.id }}" 
+                    style="margin-top:6px; padding:10px 14px; background:#f3f4f6; border-radius:8px; font-size:13px; color:#4b5563; border:1px solid #e5e7eb;">
+                    <span style="font-size:11px; font-weight:600; color:#9ca3af; display:block; margin-bottom:2px;">
+                        {% if mostrar == 'izquierda' %}{{ etiq_der }}{% else %}{{ etiq_izq }}{% endif %}
+                    </span>
+                    <span id="asociado-valor-{{ campo.id }}">—</span>
+                </div>
+                {% endif %}
 
                 {% elif campo.tipo == 'booleano' %}
                 <div class="campo-check-wrapper">
@@ -1097,12 +1125,31 @@
         }
     }
 
+    function actualizarValorAsociado(select) {
+        const campoId = select.dataset.campoId;
+        const display = document.getElementById('asociado-valor-' + campoId);
+        if (!display) return;
+
+        const selected = select.options[select.selectedIndex];
+        if (selected && selected.dataset.asociado) {
+            display.textContent = selected.dataset.asociado;
+        } else {
+            display.textContent = '—';
+        }
+    }
+
+    // Inicializar valores asociados al cargar la página
+    document.addEventListener('DOMContentLoaded', () => {
+        document.querySelectorAll('select[data-con-valor="True"]').forEach(select => {
+            actualizarValorAsociado(select);
+        });
+    });
+
     function llenarCampos(valores) {
         llenarCamposEn(document, valores);
     }
 
-    // ── Llenar campos del formulario con los valores del JSON ──
-    function llenarCamposEn(scope,valores) {
+    function llenarCamposEn(scope, valores) {
         Object.entries(valores).forEach(([campoId, valor]) => {
             if (valor === '' || valor === null || valor === undefined) return;
             const input = scope.querySelector(`.campo-respuesta[data-campo-id="${campoId}"]`);
@@ -1111,19 +1158,42 @@
             if (input.type === 'checkbox') {
                 input.checked = valor === true || valor === 'true';
             } else if (input.tagName === 'SELECT') {
-                const opciones = Array.from(input.options).filter(o => o.value);
+                const opciones  = Array.from(input.options).filter(o => o.value);
                 const valorLower = String(valor).toLowerCase();
+                const conValor   = input.dataset.conValor === 'True';
 
-                // Buscar coincidencia exacta primero
-                let match = opciones.find(o => o.value.toLowerCase() === valorLower);
+                let match = null;
 
-                // Si no hay exacta, buscar coincidencia parcial
-                if (!match) {
-                    match = opciones.find(o => o.value.toLowerCase().includes(valorLower) || valorLower.includes(o.value.toLowerCase()));
+                if (conValor) {
+                    // 1. Valor principal exacto
+                    match = opciones.find(o => o.value.toLowerCase() === valorLower);
+
+                    // 2. Valor asociado exacto
+                    if (!match) {
+                        match = opciones.find(o => (o.dataset.asociado || '').toLowerCase() === valorLower);
+                    }
+
+                    // 3. Valor principal parcial
+                    if (!match) {
+                        match = opciones.find(o =>
+                            o.value.toLowerCase().includes(valorLower) ||
+                            valorLower.includes(o.value.toLowerCase())
+                        );
+                    }
+                } else {
+                    // Sin valor asociado: búsqueda normal
+                    match = opciones.find(o => o.value.toLowerCase() === valorLower);
+                    if (!match) {
+                        match = opciones.find(o =>
+                            o.value.toLowerCase().includes(valorLower) ||
+                            valorLower.includes(o.value.toLowerCase())
+                        );
+                    }
                 }
 
                 if (match) {
                     input.value = match.value;
+                    if (conValor) actualizarValorAsociado(input);
                 }
             } else if (input.tagName === 'TEXTAREA') {
                 input.value = valor;
@@ -1342,8 +1412,8 @@
 
                     // Guardar código asociado si es un select con código
                     if (input.tagName === 'SELECT' && input.selectedIndex >= 0) {
-                        const codigo = input.options[input.selectedIndex]?.dataset.codigo;
-                        if (codigo) rep[input.dataset.campoId + '_codigo'] = codigo;
+                        const asociado = input.options[input.selectedIndex]?.dataset.asociado;
+                        if (asociado) respuestas[campoId + '_asociado'] = asociado;
                     }
                 });
 

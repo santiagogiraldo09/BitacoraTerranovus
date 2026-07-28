@@ -4120,7 +4120,18 @@ def distribuir_campos():
         def describir(c):
             desc = f'- {c["id"]}: "{c["nombre"]}" (tipo: {c["tipo"]})'
             if c.get('opciones'):
-                desc += f' (opciones: {", ".join(c["opciones"])})'
+                opciones_desc = []
+                conf = c.get('configuracion', {})
+                etiq_izq = conf.get('etiqueta_izquierda', 'Opción')
+                etiq_der = conf.get('etiqueta_derecha', 'Valor')
+                for op in c['opciones']:
+                    if isinstance(op, dict) and 'izquierda' in op:
+                        opciones_desc.append(f'{etiq_izq}: {op["izquierda"]} → {etiq_der}: {op["derecha"]}')
+                    elif isinstance(op, dict) and 'nombre' in op:
+                        opciones_desc.append(f'{op["nombre"]} [código: {op.get("codigo", "")}]')
+                    else:
+                        opciones_desc.append(str(op))
+                desc += f' (opciones: {"; ".join(opciones_desc)})'
             if c.get('requerido'):
                 desc += ' [obligatorio]'
             return desc
@@ -4156,14 +4167,15 @@ REGLAS GENERALES:
 8. Extrae de forma inteligente: el usuario puede no decir el nombre exacto del campo pero sí dar el dato.
 9. Limpia el texto: capitaliza nombres propios, corrige puntuación básica.
 10. Para texto_largo u observaciones: resume y redacta de forma profesional y concisa, pero NUNCA omitas datos específicos como correos, nombres de personas, teléfonos, cantidades o direcciones.
+11. Para campos de selección con valor asociado, el usuario puede mencionar cualquiera de los dos valores (izquierda o derecha). Si el campo muestra códigos en el desplegable y el usuario dice un código, devuelve el CÓDIGO. Si dice el nombre, busca qué código le corresponde y devuelve el CÓDIGO. Siempre devuelve el valor que corresponde a lo que se muestra en el desplegable.
 
 REGLAS DE LOS GRUPOS (lo más importante):
-11. Un grupo representa algo de lo que el usuario pudo hablar varias veces. Devuelve un elemento por cada ocurrencia REAL que mencione.
-12. Cada elemento lleva "bloque": el número que el usuario mencionó. "En la actividad 2..." → "bloque": 2. Si habla de algo nuevo sin numerar, usa "bloque": "nuevo".
-13. Si el usuario se refiere a un bloque por su contenido en vez de por número (ej. "el del vaciado"), usa el número de ese bloque según los bloques que ya existen en pantalla.
-14. En "valores" pon SOLO los campos que el usuario mencionó para ese bloque. Los que no mencionó se omiten: lo que ya está escrito en pantalla se conserva solo.
-15. Si el usuario NO usó marcadores ni números y no está claro que sean varias ocurrencias, trátalo como UNA SOLA: un elemento con "bloque": 1. Ante la duda, NO partas.
-16. NUNCA inventes ocurrencias para rellenar. Si habló de una actividad, devuelve una.
+12. Un grupo representa algo de lo que el usuario pudo hablar varias veces. Devuelve un elemento por cada ocurrencia REAL que mencione.
+13. Cada elemento lleva "bloque": el número que el usuario mencionó. "En la actividad 2..." → "bloque": 2. Si habla de algo nuevo sin numerar, usa "bloque": "nuevo".
+14. Si el usuario se refiere a un bloque por su contenido en vez de por número (ej. "el del vaciado"), usa el número de ese bloque según los bloques que ya existen en pantalla.
+15. En "valores" pon SOLO los campos que el usuario mencionó para ese bloque. Los que no mencionó se omiten: lo que ya está escrito en pantalla se conserva solo.
+16. Si el usuario NO usó marcadores ni números y no está claro que sean varias ocurrencias, trátalo como UNA SOLA: un elemento con "bloque": 1. Ante la duda, NO partas.
+17. NUNCA inventes ocurrencias para rellenar. Si habló de una actividad, devuelve una.
 
 AMBIGÜEDADES:
 - Repórtalas SOLO para campos sueltos, y solo cuando un valor claramente dicho podría ir en más de un campo (ej. "Correo del cliente" vs "Correo del supervisor"). En ese caso no lo asignes a ninguno.
