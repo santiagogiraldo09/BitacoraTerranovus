@@ -492,6 +492,50 @@ def api_movil_formulario(formulario_id):
         return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
 
 
+@api_movil.route("/api/movil/respuestas-formulario", methods=["POST"])
+@requiere_token
+def api_movil_guardar_respuesta():
+    """Crea un registro (respuesta de formulario) desde la app."""
+    from app import supabase_client
+    u = request.usuario
+    uid = _num(u["uid"])
+    empresa_id = _num(u["empresa_id"])
+    data = request.get_json(silent=True) or {}
+
+    formulario_id = data.get("formulario_id")
+    project_id = data.get("project_id")
+    respuestas = data.get("respuestas")
+
+    if not formulario_id or not project_id or respuestas is None:
+        return jsonify({"error": "datos_incompletos"}), 400
+
+    try:
+        fila = {
+            "formulario_id": _num(formulario_id),
+            "id_proyecto": _num(project_id),
+            "respuestas": respuestas,
+            "user_id": uid,
+            "empresa_id": empresa_id,
+        }
+        # id_local: si la app lo manda, sirve para evitar duplicados al
+        # reintentar la subida desde el outbox (idempotencia).
+        id_local = data.get("id_local")
+        if id_local:
+            existe = (supabase_client.table("respuestas_formulario")
+                      .select("id").eq("id_local", id_local).limit(1).execute())
+            if existe.data:
+                return jsonify({"success": True, "id": existe.data[0]["id"], "duplicado": True})
+            fila["id_local"] = id_local
+
+        r = supabase_client.table("respuestas_formulario").insert(fila).execute()
+        nuevo_id = (r.data or [{}])[0].get("id")
+        return jsonify({"success": True, "id": nuevo_id})
+
+    except Exception as e:
+        current_app.logger.exception("api_movil_guardar_respuesta")
+        return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
+
+
 @api_movil.route("/api/ping", methods=["GET"])
 def api_ping():
     return jsonify({"ok": True})
