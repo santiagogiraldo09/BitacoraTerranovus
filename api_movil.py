@@ -325,6 +325,116 @@ def api_proyectos():
     return jsonify({"proyectos": proyectos})
 
 
+@api_movil.route("/api/proyecto/<int:project_id>/registros", methods=["GET"])
+@requiere_token
+def api_proyecto_registros(project_id):
+    """Historial de un proyecto desde respuestas_formulario."""
+    from app import supabase_client
+    u = request.usuario
+    formulario_id = request.args.get("formulario_id", type=int)
+
+    try:
+        q = (supabase_client.table("respuestas_formulario")
+             .select("id, formulario_id, id_proyecto, respuestas, created_at, user_id")
+             .eq("id_proyecto", project_id)
+             .order("created_at", desc=True)
+             .limit(100))
+        if formulario_id:
+            q = q.eq("formulario_id", formulario_id)
+        filas = q.execute().data or []
+
+        # Nombres de formularios
+        ids_form = list({f["formulario_id"] for f in filas})
+        nombres = {}
+        if ids_form:
+            fr = (supabase_client.table("formularios")
+                  .select("id, nombre").in_("id", ids_form).execute())
+            nombres = {f["id"]: f.get("nombre", "Formulario") for f in (fr.data or [])}
+
+        # Nombres de autores
+        ids_user = list({f["user_id"] for f in filas if f.get("user_id")})
+        autores = {}
+        if ids_user:
+            ur = (supabase_client.table("usuario")
+                  .select("user_id, name, apellido").in_("user_id", ids_user).execute())
+            for x in (ur.data or []):
+                autores[x["user_id"]] = (f"{x.get('name','')} {x.get('apellido','')}").strip() or "Usuario"
+
+        registros = []
+        for r in filas:
+            registros.append({
+                "id": r["id"],
+                "formulario_id": r["formulario_id"],
+                "formulario_nombre": nombres.get(r["formulario_id"], "Formulario"),
+                "preview": _preview_respuestas(r.get("respuestas")),
+                "created_at": r.get("created_at"),
+                "autor": autores.get(r.get("user_id"), "Usuario"),
+            })
+        return jsonify({"registros": registros})
+
+    except Exception as e:
+        current_app.logger.exception("api_proyecto_registros")
+        return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
+
+
+def _preview_respuestas(respuestas):
+    """Arma un texto corto con los primeros valores del registro."""
+    if not isinstance(respuestas, dict):
+        return ""
+    valores = []
+    for k, v in respuestas.items():
+        if k != "__repeticiones" and v and isinstance(v, (str, int, float)):
+            valores.append(str(v))
+    for lista in (respuestas.get("__repeticiones") or {}).values():
+        for rep in (lista or []):
+            if isinstance(rep, dict):
+                valores += [str(v) for v in rep.values()
+                            if v and isinstance(v, (str, int, float))]
+    return " · ".join(valores[:3])[:150]
+
+
+@api_movil.route("/api/proyecto/<int:project_id>/formulario/<int:formulario_id>/toggle",
+                 methods=["POST"])
+@requiere_token
+def api_toggle_formulario(project_id, formulario_id):
+    """Activa/desactiva un formulario para el usuario del token."""
+    from app import supabase_client
+    u = request.usuario
+    uid = _num(u["uid"])
+    empresa_id = _num(u["empresa_id"])
+    activar = (request.get_json(silent=True) or {}).get("activar", True)
+
+    try:
+        if activar:
+            # upsert equivalente al ON CONFLICT DO NOTHING
+            existe = (supabase_client.table("proyecto_formularios_activos")
+                      .select("id")
+                      .eq("proyecto_id", project_id)
+                      .eq("formulario_id", formulario_id)
+                      .eq("user_id", uid)
+                      .limit(1).execute())
+            if not (existe.data or []):
+                (supabase_client.table("proyecto_formularios_activos")
+                 .insert({
+                     "proyecto_id": project_id,
+                     "formulario_id": formulario_id,
+                     "user_id": uid,
+                     "empresa_id": empresa_id,
+                 }).execute())
+        else:
+            (supabase_client.table("proyecto_formularios_activos")
+             .delete()
+             .eq("proyecto_id", project_id)
+             .eq("formulario_id", formulario_id)
+             .eq("user_id", uid).execute())
+
+        return jsonify({"success": True, "activo": activar})
+
+    except Exception as e:
+        current_app.logger.exception("api_toggle_formulario")
+        return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
+
+
 @api_movil.route("/api/ping", methods=["GET"])
 def api_ping():
     return jsonify({"ok": True})
