@@ -411,6 +411,87 @@ def api_toggle_formulario(project_id, formulario_id):
         return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
 
 
+@api_movil.route("/api/movil/formulario/<int:formulario_id>", methods=["GET"])
+@requiere_token
+def api_movil_formulario(formulario_id):
+    """Definición COMPLETA de un formulario, lista para renderizar offline.
+    Replica el cruce que hace /formulario-dinamico: formularios.campos son
+    solo referencias; la definición real está en campos_globales."""
+    from app import supabase_client
+    u = request.usuario
+    empresa_id = _num(u["empresa_id"])
+
+    try:
+        fr = (supabase_client.table("formularios")
+              .select("id, nombre, descripcion, campos")
+              .eq("id", formulario_id)
+              .eq("empresa_id", empresa_id)
+              .limit(1).execute())
+        if not (fr.data or []):
+            return jsonify({"error": "no_encontrado"}), 404
+        form = fr.data[0]
+        campos_config = form.get("campos") or []
+
+        def es_grupo(item):
+            return isinstance(item, dict) and item.get("tipo") == "grupo"
+
+        # IDs de campos (los que no son grupo)
+        campo_ids = [(item["id"] if isinstance(item, dict) else item)
+                     for item in campos_config if not es_grupo(item)]
+
+        catalogo = {}
+        if campo_ids:
+            cr = (supabase_client.table("campos_globales")
+                  .select("id, nombre, tipo, opciones, configuracion")
+                  .in_("id", campo_ids)
+                  .eq("empresa_id", empresa_id).execute())
+            catalogo = {c["id"]: {
+                "id": c["id"], "nombre": c.get("nombre", ""),
+                "tipo": c.get("tipo", "texto_corto"),
+                "opciones": c.get("opciones") or [],
+                "configuracion": c.get("configuracion") or {},
+            } for c in (cr.data or [])}
+
+        # Reconstruir el orden en secciones (sueltos y grupos), como la web
+        secciones = []
+        actual = None
+        for item in campos_config:
+            if es_grupo(item):
+                actual = {
+                    "tipo": "grupo",
+                    "gid": item.get("gid") or "",
+                    "nombre": item.get("nombre", "Grupo"),
+                    "campos": [],
+                }
+                secciones.append(actual)
+                continue
+            cid = item["id"] if isinstance(item, dict) else item
+            requerido = item.get("requerido", False) if isinstance(item, dict) else False
+            base = catalogo.get(cid)
+            if not base:
+                continue
+            campo = dict(base)
+            campo["requerido"] = requerido
+            if actual is None or actual["tipo"] != "grupo":
+                if actual is None or actual["tipo"] != "sueltos":
+                    actual = {"tipo": "sueltos", "gid": "", "nombre": "", "campos": []}
+                    secciones.append(actual)
+                actual["campos"].append(campo)
+            else:
+                actual["campos"].append(campo)
+
+        return jsonify({
+            "id": form["id"],
+            "nombre": form.get("nombre", ""),
+            "descripcion": form.get("descripcion") or "",
+            "secciones": secciones,
+        })
+
+    except Exception as e:
+        current_app.logger.exception("api_movil_formulario")
+        return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
+
+
 @api_movil.route("/api/ping", methods=["GET"])
 def api_ping():
     return jsonify({"ok": True})
