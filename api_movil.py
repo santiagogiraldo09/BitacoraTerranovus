@@ -18,34 +18,10 @@ from functools import wraps
 
 api_movil = Blueprint("api_movil", __name__)
 
-ORIGENES_APP = {
-    "http://localhost", "https://localhost",
-    "capacitor://localhost", "ionic://localhost",
-}
 DIAS_VALIDEZ_TOKEN = 30
 
 
 # ------------------------------ CORS ---------------------------------
-
-@api_movil.after_request
-def _cors(resp):
-    # Si Flask-CORS ya puso la cabecera, NO la duplicamos:
-    # dos Access-Control-Allow-Origin hacen que el navegador bloquee todo.
-    if resp.headers.get("Access-Control-Allow-Origin"):
-        return resp
-
-    origen = request.headers.get("Origin", "")
-    if origen in ORIGENES_APP:
-        resp.headers["Access-Control-Allow-Origin"] = origen
-        resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
-    return resp
-
-
-@api_movil.route("/api/<path:_ruta>", methods=["OPTIONS"])
-def _preflight(_ruta):
-    return ("", 204)
-
 
 # ------------------------------ TOKEN --------------------------------
 
@@ -325,7 +301,7 @@ def api_proyectos():
     return jsonify({"proyectos": proyectos})
 
 
-@api_movil.route("/api/proyecto/<int:project_id>/registros", methods=["GET"])
+@api_movil.route("/api/movil/proyecto/<int:project_id>/registros", methods=["GET"])
 @requiere_token
 def api_proyecto_registros(project_id):
     """Historial de un proyecto desde respuestas_formulario."""
@@ -393,7 +369,7 @@ def _preview_respuestas(respuestas):
     return " · ".join(valores[:3])[:150]
 
 
-@api_movil.route("/api/proyecto/<int:project_id>/formulario/<int:formulario_id>/toggle",
+@api_movil.route("/api/movil/proyecto/<int:project_id>/formulario/<int:formulario_id>/toggle",
                  methods=["POST"])
 @requiere_token
 def api_toggle_formulario(project_id, formulario_id):
@@ -488,3 +464,4 @@ def api_diagnostico():
 
     info["proyectos_devueltos"] = len(_proyectos_del_usuario(uid, emp))
     return jsonify(info)
+
