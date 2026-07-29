@@ -535,6 +535,52 @@ def api_movil_guardar_respuesta():
         return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
 
 
+@api_movil.route("/api/movil/registro/<int:registro_id>", methods=["GET"])
+@requiere_token
+def api_movil_registro(registro_id):
+    """Un registro individual (respuestas + metadatos) para verlo lleno."""
+    from app import supabase_client
+    u = request.usuario
+    empresa_id = _num(u["empresa_id"])
+
+    try:
+        r = (supabase_client.table("respuestas_formulario")
+             .select("id, formulario_id, id_proyecto, respuestas, user_id, created_at")
+             .eq("id", registro_id).limit(1).execute())
+        if not (r.data or []):
+            return jsonify({"error": "no_encontrado"}), 404
+        reg = r.data[0]
+
+        # Verificar que el registro pertenezca a un proyecto de la empresa
+        # del usuario (barrera de tenant, ya que la tabla no tiene empresa_id).
+        proy = (supabase_client.table("proyectos")
+                .select("empresa_id")
+                .eq("id", reg["id_proyecto"]).limit(1).execute())
+        if proy.data and _num(proy.data[0].get("empresa_id")) != empresa_id:
+            return jsonify({"error": "no_autorizado"}), 403
+
+        autor = "Usuario"
+        if reg.get("user_id"):
+            ur = (supabase_client.table("usuario")
+                  .select("name, apellido").eq("user_id", reg["user_id"]).limit(1).execute())
+            if ur.data:
+                autor = (f"{ur.data[0].get('name','')} {ur.data[0].get('apellido','')}").strip() or "Usuario"
+
+        return jsonify({
+            "id": reg["id"],
+            "formulario_id": reg["formulario_id"],
+            "id_proyecto": reg["id_proyecto"],
+            "respuestas": reg.get("respuestas") or {},
+            "autor": autor,
+            "es_autor": _num(reg.get("user_id")) == _num(u["uid"]),
+            "created_at": reg.get("created_at"),
+        })
+
+    except Exception as e:
+        current_app.logger.exception("api_movil_registro")
+        return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
+
+
 @api_movil.route("/api/ping", methods=["GET"])
 def api_ping():
     return jsonify({"ok": True})
