@@ -515,7 +515,6 @@ def api_movil_guardar_respuesta():
             "id_proyecto": _num(project_id),
             "respuestas": respuestas,
             "user_id": uid,
-            "empresa_id": empresa_id,
         }
         # id_local: si la app lo manda, sirve para evitar duplicados al
         # reintentar la subida desde el outbox (idempotencia).
