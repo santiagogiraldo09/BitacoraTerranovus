@@ -1904,6 +1904,39 @@ def toggle_formulario_activo(project_id, formulario_id):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/campos-globales/<int:campo_id>', methods=['PUT'])
+def actualizar_campo_global(campo_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        data          = request.get_json()
+        nombre        = data.get('nombre', '').strip()
+        tipo          = data.get('tipo')
+        objeto        = data.get('objeto', 'formulario')
+        opciones      = data.get('opciones', [])
+        configuracion = data.get('configuracion', {})
+
+        if not nombre or not tipo:
+            return jsonify({'error': 'Nombre y tipo son obligatorios'}), 400
+
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                UPDATE campos_globales
+                SET nombre = %s, tipo = %s, objeto = %s, 
+                    opciones = %s, configuracion = %s
+                WHERE id = %s AND empresa_id = %s AND es_sistema = FALSE
+            """, (
+                nombre, tipo, objeto,
+                json.dumps(opciones), json.dumps(configuracion),
+                campo_id, session.get('empresa_id')
+            ))
+            if cursor.rowcount == 0:
+                return jsonify({'error': 'Campo no encontrado o no editable'}), 404
+            return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/get-synchro-project-data')
 def get_synchro_project_data():
     return jsonify({

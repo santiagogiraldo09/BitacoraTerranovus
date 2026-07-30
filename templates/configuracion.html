@@ -625,6 +625,7 @@
     let proyectoCamposForm     = [];
     let proyectoBuilderFormId  = null;
     let proyectoDragSrcIndex   = null;
+    let campoEditandoId = null;
 
     async function abrirBuilderProyecto(tipoId) {
         proyectoBuilderFormId = tipoId;
@@ -1824,6 +1825,12 @@
     }
 
     function cerrarModalCampo() {
+        campoEditandoId = null;
+        // Restaurar título y botón del modal
+        document.querySelector('#modal-campo .invite-header h3').innerHTML = 
+            '<i class="fas fa-list-alt"></i> Nuevo Campo';
+        document.querySelector('#modal-campo .send-invite-btn').innerHTML = 
+            '<i class="fas fa-save"></i> Guardar campo';
         document.getElementById('modal-campo').classList.remove('active');
         document.getElementById('campo-nombre').value    = '';
         document.getElementById('campo-tipo').value      = '';
@@ -1959,16 +1966,19 @@
         }
 
         try {
-            const res  = await fetch('/api/campos-globales', {
-                method:  'POST',
+            const url    = campoEditandoId ? `/api/campos-globales/${campoEditandoId}` : '/api/campos-globales';
+            const method = campoEditandoId ? 'PUT' : 'POST';
+
+            const res = await fetch(url, {
+                method,
                 headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ nombre, tipo, objeto, opciones, configuracion })  // ← objeto agregado
+                body:    JSON.stringify({ nombre, tipo, objeto, opciones, configuracion })
             });
             const data = await res.json();
             if (data.success) {
                 cerrarModalCampo();
                 cargarCampos();
-                mostrarToast('✅ Campo creado correctamente');
+                mostrarToast(campoEditandoId ? '✅ Campo actualizado' : '✅ Campo creado correctamente');
             } else {
                 fb.textContent = data.error || 'Error al guardar.';
                 fb.className   = 'invite-feedback error';
@@ -2010,7 +2020,10 @@
                     </div>
                     ${campo.es_sistema
                         ? ''
-                        : `<button class="icon-btn danger" onclick="eliminarCampo(${campo.id})">
+                        : `<button class="icon-btn" onclick="editarCampo(${campo.id})" title="Editar">
+                                <i class="fas fa-pen"></i>
+                        </button>
+                        <button class="icon-btn danger" onclick="eliminarCampo(${campo.id})" title="Eliminar">
                                 <i class="fas fa-trash"></i>
                         </button>`
                     }`;
@@ -2018,6 +2031,92 @@
             });
         } catch {
             lista.innerHTML = '<p style="color:var(--gris-texto);">Error al cargar campos.</p>';
+        }
+    }
+
+    async function editarCampo(campoId) {
+        try {
+            const res  = await fetch('/api/campos-globales');
+            const data = await res.json();
+            const campo = (data.campos || []).find(c => c.id === campoId);
+            if (!campo) {
+                mostrarToast('❌ Campo no encontrado');
+                return;
+            }
+
+            campoEditandoId = campoId;
+
+            // Llenar el modal con los datos actuales
+            document.getElementById('campo-nombre').value = campo.nombre;
+            document.getElementById('campo-tipo').value   = campo.tipo;
+            document.getElementById('campo-objeto').value = campo.objeto || 'formulario';
+
+            // Mostrar/ocultar secciones según el tipo
+            onTipoCampoChange();
+
+            // Llenar max caracteres si aplica
+            const maxChars = campo.configuracion?.max_caracteres || '';
+            document.getElementById('campo-max-chars').value = maxChars;
+
+            // Llenar opciones si es selección
+            const opcionesLista = document.getElementById('opciones-lista');
+            opcionesLista.innerHTML = '';
+
+            const conValor = campo.configuracion?.con_valor_asociado || false;
+            document.getElementById('campo-con-valor').checked = conValor;
+            toggleValorAsociado();
+
+            if (conValor) {
+                document.getElementById('etiqueta-izquierda').value = campo.configuracion?.etiqueta_izquierda || '';
+                document.getElementById('etiqueta-derecha').value   = campo.configuracion?.etiqueta_derecha || '';
+                const mostrarComo = campo.configuracion?.mostrar_como || 'izquierda';
+                document.querySelector(`input[name="mostrar-como"][value="${mostrarComo}"]`).checked = true;
+                actualizarRadioLabels();
+            }
+
+            if (['seleccion', 'seleccion_unica'].includes(campo.tipo) && campo.opciones) {
+                campo.opciones.forEach(op => {
+                    const row = document.createElement('div');
+                    row.className = 'opcion-row';
+
+                    let html = '';
+                    if (typeof op === 'object' && op.izquierda !== undefined) {
+                        html = `<input type="text" class="opcion-nombre" value="${op.izquierda}">`;
+                        html += `<input type="text" class="opcion-valor-asociado" value="${op.derecha}" style="flex:1; padding:6px 10px; border:1px solid var(--gris-borde,#e5e7eb); border-radius:6px; font-size:13px; font-family:DM Sans,sans-serif;">`;
+                    } else if (typeof op === 'object' && op.nombre !== undefined) {
+                        html = `<input type="text" class="opcion-nombre" value="${op.nombre}">`;
+                        if (conValor) {
+                            html += `<input type="text" class="opcion-valor-asociado" value="${op.codigo || ''}" style="flex:1; padding:6px 10px; border:1px solid var(--gris-borde,#e5e7eb); border-radius:6px; font-size:13px; font-family:DM Sans,sans-serif;">`;
+                        }
+                    } else {
+                        html = `<input type="text" class="opcion-nombre" value="${op}">`;
+                        if (conValor) {
+                            html += `<input type="text" class="opcion-valor-asociado" value="" style="flex:1; padding:6px 10px; border:1px solid var(--gris-borde,#e5e7eb); border-radius:6px; font-size:13px; font-family:DM Sans,sans-serif;">`;
+                        }
+                    }
+
+                    html += `<button type="button" class="btn-quitar-opcion" onclick="this.parentElement.remove()">
+                                <i class="fas fa-times"></i>
+                            </button>`;
+
+                    row.innerHTML = html;
+                    opcionesLista.appendChild(row);
+                });
+            }
+
+            // Cambiar título del modal
+            document.querySelector('#modal-campo .invite-header h3').innerHTML = 
+                '<i class="fas fa-edit"></i> Editar Campo';
+
+            // Cambiar texto del botón
+            document.querySelector('#modal-campo .send-invite-btn').innerHTML = 
+                '<i class="fas fa-save"></i> Guardar cambios';
+
+            // Abrir modal
+            document.getElementById('modal-campo').classList.add('active');
+
+        } catch {
+            mostrarToast('❌ Error al cargar campo');
         }
     }
 
