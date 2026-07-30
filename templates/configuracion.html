@@ -2020,12 +2020,14 @@
                     </div>
                     ${campo.es_sistema
                         ? ''
-                        : `<button class="icon-btn" onclick="editarCampo(${campo.id})" title="Editar">
-                                <i class="fas fa-pen"></i>
-                        </button>
-                        <button class="icon-btn danger" onclick="eliminarCampo(${campo.id})" title="Eliminar">
-                                <i class="fas fa-trash"></i>
-                        </button>`
+                        : `<div style="display:flex; gap:8px; flex-shrink:0;">
+                                <button class="icon-btn" onclick="editarCampo(${campo.id})" title="Editar">
+                                    <i class="fas fa-pen"></i>
+                                </button>
+                                <button class="icon-btn danger" onclick="eliminarCampo(${campo.id})" title="Eliminar">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                        </div>`
                     }`;
                 lista.appendChild(div);
             });
