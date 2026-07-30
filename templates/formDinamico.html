@@ -568,21 +568,24 @@
             if (!cont || !Array.isArray(lista)) return;
 
             lista.forEach(item => {
-                if (!item || !item.valores) return;
-                let idx;
-                if (item.bloque === 'nuevo' || !item.bloque) {
-                    agregarRepeticion(gid, true);
-                    idx = cont.querySelectorAll('.rep-bloque').length - 1;
-                } else {
-                    idx = parseInt(item.bloque) - 1;
-                    if (isNaN(idx) || idx < 0) return;
-                    // "en la actividad 3" con solo 2 bloques → se crean los que falten
-                    while (cont.querySelectorAll('.rep-bloque').length <= idx) {
+                try {
+                    if (!item || !item.valores) return;
+                    let idx;
+                    if (item.bloque === 'nuevo' || !item.bloque) {
                         agregarRepeticion(gid, true);
+                        idx = cont.querySelectorAll('.rep-bloque').length - 1;
+                    } else {
+                        idx = parseInt(item.bloque) - 1;
+                        if (isNaN(idx) || idx < 0) return;
+                        while (cont.querySelectorAll('.rep-bloque').length <= idx) {
+                            agregarRepeticion(gid, true);
+                        }
                     }
+                    const bloque = cont.querySelectorAll('.rep-bloque')[idx];
+                    if (bloque) llenarCamposEn(bloque, item.valores);
+                } catch (err) {
+                    console.error(`Error al aplicar grupo ${gid}, bloque ${item?.bloque}:`, err);
                 }
-                const bloque = cont.querySelectorAll('.rep-bloque')[idx];
-                if (bloque) llenarCamposEn(bloque, item.valores);
             });
         });
     }
@@ -1328,7 +1331,7 @@
         };
     }
 
-    function agregarRepeticion(gid, silecioso) {
+    function agregarRepeticion(gid, silencioso) {
         const cont    = document.querySelector(`.grupo-rep[data-gid="${gid}"]`);
         const bloques = cont.querySelectorAll('.rep-bloque');
         const nuevo   = bloques[bloques.length - 1].cloneNode(true);
