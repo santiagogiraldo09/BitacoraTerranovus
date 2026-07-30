@@ -1413,7 +1413,7 @@
                     // Guardar código asociado si es un select con código
                     if (input.tagName === 'SELECT' && input.selectedIndex >= 0) {
                         const asociado = input.options[input.selectedIndex]?.dataset.asociado;
-                        if (asociado) respuestas[campoId + '_asociado'] = asociado;
+                        if (asociado) rep[input.dataset.campoId + '_asociado'] = asociado;
                     }
                 });
 
