@@ -2966,8 +2966,7 @@ def exportar_formulario(project_id, formulario_id):
             cursor.execute(query, params)
             registros = cursor.fetchall()
 
-        # ── Mapeo de campos por nombre → columna Excel ──
-        # Invertir: nombre → campo_id
+        # ── Mapeo de campos por nombre → campo_id ──
         nombre_a_id = {v: k for k, v in campos_map.items()}
 
         # ── Ubicar los gid de los grupos "Paro Programado" y "Paro No Programado" por nombre ──
@@ -2983,11 +2982,6 @@ def exportar_formulario(project_id, formulario_id):
         gid_pp  = _gid_de_grupo(lambda n: 'programado' in n and 'no programado' not in n)
         gid_pnp = _gid_de_grupo(lambda n: 'no programado' in n)
 
-        # 🔍 DEBUG TEMPORAL — borrar después de confirmar los nombres
-        print(f"[EXPORT-DEBUG] Campos disponibles: {list(nombre_a_id.keys())}")
-        print(f"[EXPORT-DEBUG] Grupos encontrados: {[(g.get('nombre'), g.get('gid')) for g in grupos_config]}")
-        print(f"[EXPORT-DEBUG] gid_pp={gid_pp}  gid_pnp={gid_pnp}")
-
         # Meses en español
         meses_es = {
             1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'ABRIL',
@@ -3002,34 +2996,42 @@ def exportar_formulario(project_id, formulario_id):
             'Causa PP', 'H.PNP', 'Codigo PNP', 'Causa PNP'
         ]
 
-        # Columnas que salen del registro (nivel raíz, se repiten en todas las filas del registro)
-        mapeo = {
-            'Turno':           'N° de Turno',
-            'Línea':           'Línea de Producción',
-            'Nombre Producto': 'Nombre Producto',
-            'Cant. Aceptada':  'Cantidad Aceptada',
-            'Horas Maq.':      'Tiempo de Máquina (Hora M)',
+        # ── Mapeo de columnas → (nombre real del campo, qué parte leer) ──
+        # 'valor'  = el valor tal cual quedó guardado en ese campo
+        # 'codigo' = el código asociado (dataset.asociado) que viaja junto a ese campo
+        #
+        # Nota: "Código de producto" y "Código Paro (No) Programado" son selects
+        # que traen dos datos en un solo campo: el texto visible (nombre/causa)
+        # y el código asociado — por eso una misma clave de campo alimenta 2 columnas.
+
+        columnas_raiz = {
+            'Turno':           ('N° de Turno', 'valor'),
+            'Línea':           ('Línea de Producción', 'valor'),
+            'Código':          ('Código de producto', 'valor'),
+            'Nombre Producto': ('Código de producto', 'codigo'),
+            'Cant. Aceptada':  ('Cantidad Aceptada', 'valor'),
+            'Horas Maq.':      ('Tiempo de Máquina (Hora M)', 'valor'),
         }
 
-        # Campos cuyo código viene de otro campo (nivel raíz)
-        mapeo_codigo = {
-            'Código': 'Código de producto',
+        columnas_grupo_pp = {
+            'H.PP':      ('Horas Paro Programado', 'valor'),
+            'Causa PP':  ('Código Paro Programado', 'valor'),
+            'Codigo PP': ('Código Paro Programado', 'codigo'),
         }
 
-        # Columnas que salen de CADA BLOQUE del grupo "Paro Programado"
-        # (campo_nombre, es_codigo) — es_codigo=True indica que hay que leer el sufijo '_codigo'
-        mapeo_grupo_pp = {
-            'H.PP':      ('Horas Paro Programado', False),
-            'Codigo PP': ('Código Paro Programado', True),
-            'Causa PP':  ('Causa Paro Programado', False),
+        columnas_grupo_pnp = {
+            'H.PNP':      ('Horas Paro No Programado', 'valor'),
+            'Causa PNP':  ('Código Paro No Programado', 'valor'),
+            'Codigo PNP': ('Código Paro No Programado', 'codigo'),
         }
 
-        # Columnas que salen de CADA BLOQUE del grupo "Paro No Programado"
-        mapeo_grupo_pnp = {
-            'H.PNP':      ('Horas Paro No programado', False),
-            'Codigo PNP': ('Código Paro No Programado', True),
-            'Causa PNP':  ('Causa Paro No Programado', False),
-        }
+        def _leer(fuente, campo_nombre, parte):
+            """Lee 'valor' o 'codigo' de un campo, dentro de resp o de un bloque de grupo."""
+            campo_id = nombre_a_id.get(campo_nombre, '')
+            if not campo_id:
+                return ''
+            clave = campo_id + '_codigo' if parte == 'codigo' else campo_id
+            return fuente.get(clave, '')
 
         # ── Generar Excel ──
         wb = openpyxl.Workbook()
@@ -3085,24 +3087,15 @@ def exportar_formulario(project_id, formulario_id):
                         valor = meses_es.get(created_at.month, '') if created_at else ''
                     elif col_name == 'Día':
                         valor = created_at.day if created_at else ''
-                    elif col_name in mapeo_grupo_pp:
-                        campo_nombre, es_codigo = mapeo_grupo_pp[col_name]
-                        campo_id = nombre_a_id.get(campo_nombre, '')
-                        clave = campo_id + '_codigo' if es_codigo else campo_id
-                        valor = bloque_pp.get(clave, '')
-                    elif col_name in mapeo_grupo_pnp:
-                        campo_nombre, es_codigo = mapeo_grupo_pnp[col_name]
-                        campo_id = nombre_a_id.get(campo_nombre, '')
-                        clave = campo_id + '_codigo' if es_codigo else campo_id
-                        valor = bloque_pnp.get(clave, '')
-                    elif col_name in mapeo_codigo:
-                        campo_origen = mapeo_codigo[col_name]
-                        campo_id = nombre_a_id.get(campo_origen, '')
-                        valor = resp.get(campo_id + '_codigo', '')
-                    elif col_name in mapeo:
-                        campo_nombre = mapeo[col_name]
-                        campo_id = nombre_a_id.get(campo_nombre, '')
-                        valor = resp.get(campo_id, '')
+                    elif col_name in columnas_grupo_pp:
+                        campo_nombre, parte = columnas_grupo_pp[col_name]
+                        valor = _leer(bloque_pp, campo_nombre, parte)
+                    elif col_name in columnas_grupo_pnp:
+                        campo_nombre, parte = columnas_grupo_pnp[col_name]
+                        valor = _leer(bloque_pnp, campo_nombre, parte)
+                    elif col_name in columnas_raiz:
+                        campo_nombre, parte = columnas_raiz[col_name]
+                        valor = _leer(resp, campo_nombre, parte)
 
                     cell = ws.cell(row=fila_actual, column=col_idx, value=valor)
                     cell.font = cell_font
