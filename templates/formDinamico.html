@@ -1463,7 +1463,7 @@
             respuestas[input.dataset.campoId] = valor;
             // Guardar código asociado si es un select con código
             if (input.tagName === 'SELECT' && input.selectedIndex >= 0) {
-                const codigo = input.options[input.selectedIndex]?.dataset.codigo;
+                const codigo = input.options[input.selectedIndex]?.dataset.asociado;
                 if (codigo) respuestas[input.dataset.campoId + '_codigo'] = codigo;
             }
             if (!esEdicion && esRequerido(input) && !tieneValor(valor)) {
@@ -1482,8 +1482,8 @@
 
                     // Guardar código asociado si es un select con código
                     if (input.tagName === 'SELECT' && input.selectedIndex >= 0) {
-                        const asociado = input.options[input.selectedIndex]?.dataset.asociado;
-                        if (asociado) rep[input.dataset.campoId + '_asociado'] = asociado;
+                        const codigo = input.options[input.selectedIndex]?.dataset.asociado;
+                        if (codigo) rep[input.dataset.campoId + '_codigo'] = codigo;
                     }
                 });
 

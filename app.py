@@ -2924,11 +2924,19 @@ def exportar_formulario(project_id, formulario_id):
             nombre_formulario = form_row[0]
             campos_config = form_row[1] or []
 
-            # Obtener IDs de campos
+            def es_grupo(item):
+                return isinstance(item, dict) and item.get('tipo') == 'grupo'
+
+            # Obtener IDs de campos (excluyendo los contenedores de grupo,
+            # que no tienen 'id' propio — solo agrupan otros campos)
             campo_ids = [
                 (item['id'] if isinstance(item, dict) else item)
                 for item in campos_config
+                if not es_grupo(item)
             ]
+
+            # Guardamos también los grupos, para poder ubicar sus 'gid' por nombre
+            grupos_config = [item for item in campos_config if es_grupo(item)]
 
             # Obtener nombres de campos
             campos_map = {}
@@ -2962,6 +2970,19 @@ def exportar_formulario(project_id, formulario_id):
         # Invertir: nombre → campo_id
         nombre_a_id = {v: k for k, v in campos_map.items()}
 
+        # ── Ubicar los gid de los grupos "Paro Programado" y "Paro No Programado" por nombre ──
+        def _norm(s):
+            return (s or '').strip().lower()
+
+        def _gid_de_grupo(condicion):
+            return next(
+                (g.get('gid') for g in grupos_config if condicion(_norm(g.get('nombre', '')))),
+                None
+            )
+
+        gid_pp  = _gid_de_grupo(lambda n: 'programado' in n and 'no programado' not in n)
+        gid_pnp = _gid_de_grupo(lambda n: 'no programado' in n)
+
         # Meses en español
         meses_es = {
             1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'ABRIL',
@@ -2971,28 +2992,38 @@ def exportar_formulario(project_id, formulario_id):
 
         # Definir columnas del Excel
         columnas_excel = [
-            'Mes', 'Día', 'Turno', 'Código', 'Nombre Producto',
+            'Mes', 'Día', 'Turno', 'Línea', 'Código', 'Nombre Producto',
             'Cant. Aceptada', 'Horas Maq.', 'H.PP', 'Codigo PP',
             'Causa PP', 'H.PNP', 'Codigo PNP', 'Causa PNP'
         ]
 
-        # Mapeo: columna excel → campo del formulario (por nombre)
+        # Columnas que salen del registro (nivel raíz, se repiten en todas las filas del registro)
         mapeo = {
             'Turno':           'N° de Turno',
+            'Línea':           'Línea de Producción',
             'Nombre Producto': 'Nombre Producto',
             'Cant. Aceptada':  'Cantidad Aceptada',
             'Horas Maq.':      'Tiempo de Máquina (Hora M)',
-            'H.PP':            'Horas Paro Programado',
-            'Causa PP':        'Causa Paro Programado',
-            'H.PNP':           'Horas Paro No programado',
-            'Causa PNP':       'Causa Paro No Programado',
         }
 
-        # Campos cuyo código viene de otro campo
+        # Campos cuyo código viene de otro campo (nivel raíz)
         mapeo_codigo = {
-            'Código':    'Nombre Producto',
-            'Codigo PP': 'Causa Paro Programado',
-            'Codigo PNP':'Causa Paro No Programado',
+            'Código': 'Nombre Producto',
+        }
+
+        # Columnas que salen de CADA BLOQUE del grupo "Paro Programado"
+        # (campo_nombre, es_codigo) — es_codigo=True indica que hay que leer el sufijo '_codigo'
+        mapeo_grupo_pp = {
+            'H.PP':      ('Horas Paro Programado', False),
+            'Codigo PP': ('Causa Paro Programado', True),
+            'Causa PP':  ('Causa Paro Programado', False),
+        }
+
+        # Columnas que salen de CADA BLOQUE del grupo "Paro No Programado"
+        mapeo_grupo_pnp = {
+            'H.PNP':      ('Horas Paro No programado', False),
+            'Codigo PNP': ('Causa Paro No Programado', True),
+            'Causa PNP':  ('Causa Paro No Programado', False),
         }
 
         # ── Generar Excel ──
@@ -3014,7 +3045,7 @@ def exportar_formulario(project_id, formulario_id):
         )
 
         # Título
-        ws.merge_cells('A1:M1')
+        ws.merge_cells('A1:N1')
         title_cell = ws['A1']
         title_cell.value = f'{nombre_formulario} — {nombre_proyecto}'
         title_cell.font = Font(name='Arial', bold=True, size=13)
@@ -3028,43 +3059,64 @@ def exportar_formulario(project_id, formulario_id):
             cell.alignment = header_align
             cell.border = thin_border
 
-        # Datos
-        for row_idx, (respuestas, created_at) in enumerate(registros, 3):
+        # Datos (una o varias filas por registro, según cuántos bloques de PP/PNP tenga)
+        fila_actual = 3
+        for respuestas, created_at in registros:
             resp = respuestas if isinstance(respuestas, dict) else {}
+            repeticiones = resp.get('__repeticiones') or {}
 
-            for col_idx, col_name in enumerate(columnas_excel, 1):
-                valor = ''
+            bloques_pp  = repeticiones.get(gid_pp, [])  if gid_pp  else []
+            bloques_pnp = repeticiones.get(gid_pnp, []) if gid_pnp else []
+            num_filas   = max(len(bloques_pp), len(bloques_pnp), 1)
 
-                if col_name == 'Mes':
-                    valor = meses_es.get(created_at.month, '') if created_at else ''
-                elif col_name == 'Día':
-                    valor = created_at.day if created_at else ''
-                elif col_name in mapeo_codigo:
-                    # Buscar el código del campo asociado
-                    campo_origen = mapeo_codigo[col_name]
-                    campo_id = nombre_a_id.get(campo_origen, '')
-                    valor = resp.get(campo_id + '_codigo', '')
-                elif col_name in mapeo:
-                    campo_nombre = mapeo[col_name]
-                    campo_id = nombre_a_id.get(campo_nombre, '')
-                    valor = resp.get(campo_id, '')
+            for i in range(num_filas):
+                bloque_pp  = bloques_pp[i]  if i < len(bloques_pp)  else {}
+                bloque_pnp = bloques_pnp[i] if i < len(bloques_pnp) else {}
 
-                cell = ws.cell(row=row_idx, column=col_idx, value=valor)
-                cell.font = cell_font
-                cell.alignment = cell_align
-                cell.border = thin_border
+                for col_idx, col_name in enumerate(columnas_excel, 1):
+                    valor = ''
+
+                    if col_name == 'Mes':
+                        valor = meses_es.get(created_at.month, '') if created_at else ''
+                    elif col_name == 'Día':
+                        valor = created_at.day if created_at else ''
+                    elif col_name in mapeo_grupo_pp:
+                        campo_nombre, es_codigo = mapeo_grupo_pp[col_name]
+                        campo_id = nombre_a_id.get(campo_nombre, '')
+                        clave = campo_id + '_codigo' if es_codigo else campo_id
+                        valor = bloque_pp.get(clave, '')
+                    elif col_name in mapeo_grupo_pnp:
+                        campo_nombre, es_codigo = mapeo_grupo_pnp[col_name]
+                        campo_id = nombre_a_id.get(campo_nombre, '')
+                        clave = campo_id + '_codigo' if es_codigo else campo_id
+                        valor = bloque_pnp.get(clave, '')
+                    elif col_name in mapeo_codigo:
+                        campo_origen = mapeo_codigo[col_name]
+                        campo_id = nombre_a_id.get(campo_origen, '')
+                        valor = resp.get(campo_id + '_codigo', '')
+                    elif col_name in mapeo:
+                        campo_nombre = mapeo[col_name]
+                        campo_id = nombre_a_id.get(campo_nombre, '')
+                        valor = resp.get(campo_id, '')
+
+                    cell = ws.cell(row=fila_actual, column=col_idx, value=valor)
+                    cell.font = cell_font
+                    cell.alignment = cell_align
+                    cell.border = thin_border
+
+                fila_actual += 1
 
         # Ajustar anchos de columna
         anchos = {
-            'A': 12, 'B': 8, 'C': 8, 'D': 12, 'E': 45,
-            'F': 16, 'G': 12, 'H': 10, 'I': 12,
-            'J': 30, 'K': 10, 'L': 12, 'M': 30
+            'A': 12, 'B': 8, 'C': 8, 'D': 14, 'E': 12, 'F': 45,
+            'G': 16, 'H': 12, 'I': 10, 'J': 12,
+            'K': 30, 'L': 10, 'M': 12, 'N': 30
         }
         for col, ancho in anchos.items():
             ws.column_dimensions[col].width = ancho
 
         # Filtro automático
-        ws.auto_filter.ref = f'A2:M{len(registros) + 2}'
+        ws.auto_filter.ref = f'A2:N{fila_actual - 1}'
 
         # Congelar encabezados
         ws.freeze_panes = 'A3'
