@@ -214,7 +214,7 @@
                     <span style="font-size:11px; font-weight:600; color:#9ca3af; display:block; margin-bottom:2px;">
                         {% if mostrar == 'izquierda' %}{{ etiq_der }}{% else %}{{ etiq_izq }}{% endif %}
                     </span>
-                    <span id="asociado-valor-{{ uid }}">—</span>
+                    <span id="asociado-valor-{{ uid }}" class="valor-asociado-texto">—</span>
                 </div>
                 {% endif %}
 
@@ -1142,16 +1142,12 @@
     }
 
     function actualizarValorAsociado(select) {
-        const campoId = select.dataset.campoId;
-        const display = document.getElementById('asociado-valor-' + campoId);
+        const wrapper = select.parentElement;
+        const display = wrapper.querySelector('.valor-asociado-texto');
         if (!display) return;
 
         const selected = select.options[select.selectedIndex];
-        if (selected && selected.dataset.asociado) {
-            display.textContent = selected.dataset.asociado;
-        } else {
-            display.textContent = '—';
-        }
+        display.textContent = (selected && selected.dataset.asociado) ? selected.dataset.asociado : '—';
     }
 
     // Inicializar valores asociados al cargar la página
