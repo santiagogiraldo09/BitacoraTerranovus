@@ -4205,11 +4205,20 @@ def transcribe_audio():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-
 @app.route('/api/distribuir-campos', methods=['POST'])
 def distribuir_campos():
+    # La web valida por sesión; la lógica vive en distribuir_campos_core.
     if 'user_id' not in session:
         return jsonify({'error': 'No autorizado'}), 401
+    data = request.get_json()
+    resultado, codigo = distribuir_campos_core(data)
+    return jsonify(resultado), codigo
+
+
+def distribuir_campos_core(data):
+    """Lógica pura de distribución: recibe el dict data y devuelve
+    (resultado_dict, codigo_http). No usa session ni request; la llaman
+    la ruta web y el blueprint del APK. Sin duplicar la lógica de IA."""
 
     respuesta_texto = ''
     try:
@@ -4223,7 +4232,7 @@ def distribuir_campos():
             sueltos = data.get('campos', [])
 
         if not transcripcion or (not sueltos and not grupos):
-            return jsonify({'error': 'Faltan datos'}), 400
+            return {'error': 'Faltan datos'}, 400
 
         def describir(c):
             desc = f'- {c["id"]}: "{c["nombre"]}" (tipo: {c["tipo"]})'
@@ -4364,21 +4373,21 @@ Devuelve SOLO el JSON con los valores extraídos."""
               f"Grupos: {len(grupos_resultado)} ({bloques} bloques). "
               f"Ambigüedades: {len(ambiguedades)}. Faltantes: {len(faltantes)}")
 
-        return jsonify({
+        return {
             'success':      True,
             'campos':       campos_resultado,
             'grupos':       grupos_resultado,
             'ambiguedades': ambiguedades,
             'faltantes':    faltantes
-        })
+        }, 200
 
     except json.JSONDecodeError as e:
         print(f"[DISTRIBUIR] Error parseando JSON: {e}")
         print(f"[DISTRIBUIR] Respuesta raw: {respuesta_texto}")
-        return jsonify({'error': 'Error al interpretar la respuesta de la IA'}), 500
+        return {'error': 'Error al interpretar la respuesta de la IA'}, 500
     except Exception as e:
         print(f"[DISTRIBUIR] Error: {e}")
-        return jsonify({'error': str(e)}), 500
+        return {'error': str(e)}, 500
 
 #Exportar registros seleccionados a Excel
 @app.route('/exportar-registros-excel', methods=['POST'])
