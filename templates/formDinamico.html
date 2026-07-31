@@ -454,6 +454,19 @@
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
+<!-- Modal: ¿Otro producto en el mismo turno? (solo formulario 8) -->
+<div id="modal-otro-producto" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:14px; padding:24px; max-width:340px; width:90%; text-align:center;">
+        <i class="fas fa-industry" style="font-size:28px; color:var(--naranja, #FFAF33);"></i>
+        <h3 style="margin:12px 0 6px; font-size:16px; color:#111827;">¿Vas a registrar otro producto en este mismo turno?</h3>
+        <p style="font-size:13px; color:#6b7280; margin-bottom:18px;">Si eliges "Sí", el N° de Turno se mantiene.</p>
+        <div style="display:flex; gap:10px;">
+            <button onclick="resolverOtroProducto(false)" style="flex:1; padding:10px; border-radius:8px; border:1px solid #d1d5db; background:#fff; font-weight:600; cursor:pointer;">No, turno completo</button>
+            <button onclick="resolverOtroProducto(true)" style="flex:1; padding:10px; border-radius:8px; border:none; background:var(--naranja, #FFAF33); color:#fff; font-weight:600; cursor:pointer;">Sí, otro producto</button>
+        </div>
+    </div>
+</div>
+
 <script>
     // ── Toast ──
     function mostrarToast(msg) {
@@ -1300,6 +1313,60 @@
         });
     }
 
+    // ── Resuelve la pregunta del modal "¿otro producto?" ──
+    function resolverOtroProducto(otroProducto) {
+        document.getElementById('modal-otro-producto').style.display = 'none';
+        limpiarFormularioProduccion(otroProducto);
+    }
+
+    // ── Encuentra el campo suelto "N° de Turno" por su nombre ──
+    function obtenerCampoTurno() {
+        return Array.from(document.querySelectorAll('.campo-respuesta:not([data-gid])'))
+            .find(input => (input.dataset.nombre || '').toLowerCase().includes('turno'));
+    }
+
+    // ── Limpia el formulario completo, dejándolo listo para un nuevo registro ──
+    function limpiarFormularioProduccion(conservarTurno) {
+        const campoTurno   = obtenerCampoTurno();
+        const valorTurno   = conservarTurno && campoTurno ? campoTurno.value : null;
+
+        // 1. Vaciar todos los campos (sueltos y de grupos)
+        document.querySelectorAll('.campo-respuesta').forEach(input => {
+            if (input.type === 'checkbox') {
+                input.checked = false;
+            } else {
+                input.value = '';
+            }
+            input.classList.remove('campo-lleno');
+        });
+
+        // 2. Colapsar cada grupo repetible de vuelta a un solo bloque
+        document.querySelectorAll('.grupo-rep').forEach(cont => {
+            const gid     = cont.dataset.gid;
+            const bloques = cont.querySelectorAll('.rep-bloque');
+            bloques.forEach((bloque, i) => { if (i > 0) bloque.remove(); });
+            renumerarGrupo(gid);
+        });
+
+        // 3. Restaurar el N° de Turno si el operario sigue en el mismo turno
+        if (valorTurno !== null && campoTurno) {
+            campoTurno.value = valorTurno;
+            campoTurno.classList.add('campo-lleno');
+        }
+
+        // 4. Resetear la sección de voz a su estado inicial
+        mostrarEstado('idle');
+        document.getElementById('voice-transcription-text').textContent = '';
+        document.getElementById('voice-badges').innerHTML = '';
+        document.getElementById('voice-question').style.display = 'none';
+
+        // 5. Reaplicar la visibilidad de Mantecas (por si el select se limpió)
+        if (typeof actualizarVisibilidadMantecas === 'function') actualizarVisibilidadMantecas();
+
+        // 6. Foco en el primer campo para seguir registrando de una vez
+        document.querySelector('.campo-respuesta')?.focus();
+    }
+
     // ── Validación de horas por turno (máximo 8h) ──
     function validarHorasTurno() {
         const formularioId = document.getElementById('formulario-id').value;
@@ -1486,9 +1553,18 @@
 
             if (data.success) {
                 mostrarToast(esEdicion ? '✅ Cambios guardados' : '✅ Registro guardado correctamente');
-                setTimeout(() => {
-                    window.location.href = '/registros';
-                }, 600);
+
+                if (!esEdicion && formularioId === '8') {
+                    // Formulario de producción: preguntamos si hay otro producto en el mismo turno
+                    setTimeout(() => {
+                        document.getElementById('modal-otro-producto').style.display = 'flex';
+                    }, 600);
+                } else {
+                    // Comportamiento actual, sin cambios, para el resto de formularios
+                    setTimeout(() => {
+                        window.location.href = '/registros';
+                    }, 600);
+                }
             } else {
                 mostrarToast('❌ ' + (data.error || 'Error al guardar'));
             }
