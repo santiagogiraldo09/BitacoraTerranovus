@@ -3015,14 +3015,14 @@ def exportar_formulario(project_id, formulario_id):
 
         columnas_grupo_pp = {
             'H.PP':      ('Horas Paro Programado', 'valor'),
-            'Causa PP':  ('Código Paro Programado', 'valor'),
-            'Codigo PP': ('Código Paro Programado', 'codigo'),
+            'Causa PP':  ('Código Paro Programado', 'codigo'),
+            'Codigo PP': ('Código Paro Programado', 'valor'),
         }
 
         columnas_grupo_pnp = {
             'H.PNP':      ('Horas Paro No Programado', 'valor'),
-            'Causa PNP':  ('Código Paro No Programado', 'valor'),
-            'Codigo PNP': ('Código Paro No Programado', 'codigo'),
+            'Causa PNP':  ('Código Paro No Programado', 'codigo'),
+            'Codigo PNP': ('Código Paro No Programado', 'valor'),
         }
 
         def _leer(fuente, campo_nombre, parte):
