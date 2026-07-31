@@ -192,29 +192,29 @@
                             {% if mostrar == 'izquierda' %}
                             <option value="{{ op.izquierda }}" 
                                     data-asociado="{{ op.derecha }}"
-                                    {% if op.izquierda == campo.valor %}selected{% endif %}>
+                                    {% if op.izquierda == valor %}selected{% endif %}>
                                 {{ op.izquierda }}
                             </option>
                             {% else %}
                             <option value="{{ op.derecha }}" 
                                     data-asociado="{{ op.izquierda }}"
-                                    {% if op.derecha == campo.valor %}selected{% endif %}>
+                                    {% if op.derecha == valor %}selected{% endif %}>
                                 {{ op.derecha }}
                             </option>
                             {% endif %}
                         {% else %}
-                        <option value="{{ op }}" {% if op == campo.valor %}selected{% endif %}>{{ op }}</option>
+                        <option value="{{ op }}" {% if op == valor %}selected{% endif %}>{{ op }}</option>
                         {% endif %}
                     {% endfor %}
                 </select>
 
                 {% if con_valor %}
-                <div class="valor-asociado-display" id="asociado-{{ campo.id }}" 
+                <div class="valor-asociado-display" id="asociado-{{ uid }}" 
                     style="margin-top:6px; padding:10px 14px; background:#f3f4f6; border-radius:8px; font-size:13px; color:#4b5563; border:1px solid #e5e7eb;">
                     <span style="font-size:11px; font-weight:600; color:#9ca3af; display:block; margin-bottom:2px;">
                         {% if mostrar == 'izquierda' %}{{ etiq_der }}{% else %}{{ etiq_izq }}{% endif %}
                     </span>
-                    <span id="asociado-valor-{{ campo.id }}">—</span>
+                    <span id="asociado-valor-{{ uid }}">—</span>
                 </div>
                 {% endif %}
 
