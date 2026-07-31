@@ -184,7 +184,7 @@
                         data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
                         data-opciones="{{ campo.opciones | tojson }}"
                         data-con-valor="{{ con_valor }}"
-                        data-mostrar="{{ mostrar }}"
+                        data-mostrar="{{ mostrar }}"{{ extra }}
                         {% if con_valor %}onchange="actualizarValorAsociado(this)"{% endif %}>
                     <option value="">Selecciona...</option>
                     {% for op in campo.opciones %}
