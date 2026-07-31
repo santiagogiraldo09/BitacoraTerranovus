@@ -2360,7 +2360,7 @@ def formulario_dinamico():
 
 # ── Formulario Dinámico: POST ───────────────────────────────────
 @app.route('/api/respuestas-formulario', methods=['POST'])
-def guardar_respuesta_formulario():
+def guardar_respuesta_formulario(_reintento=False):
     if 'user_id' not in session:
         return jsonify({'error': 'No autorizado'}), 401
 
@@ -2387,6 +2387,16 @@ def guardar_respuesta_formulario():
             ))
             nuevo_id = cursor.fetchone()[0]
             return jsonify({'success': True, 'id': nuevo_id})
+
+    except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+        # Errores de conexión/SSL transitorios (conexión invalidada por el pooler,
+        # SSL corrupto tras inactividad, etc.) — con db_connection() ya descartando
+        # la conexión rota, un solo reintento debería bastar.
+        print(f"Error de conexión al guardar respuesta: {e}")
+        if not _reintento:
+            print("Reintentando guardado con una conexión nueva...")
+            return guardar_respuesta_formulario(_reintento=True)
+        return jsonify({'error': 'No se pudo conectar a la base de datos. Intenta guardar de nuevo.'}), 503
 
     except Exception as e:
         print(f"Error al guardar respuesta: {e}")
