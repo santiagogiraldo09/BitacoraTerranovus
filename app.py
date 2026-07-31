@@ -4121,6 +4121,111 @@ def eliminar_proyecto():
             cursor.close()
             connection_pool.putconn(conn)
 
+@app.route('/api/analitica/pareto')
+def analitica_pareto():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    project_id    = request.args.get('project_id', '')
+    formulario_id = request.args.get('formulario_id', '')
+    linea         = request.args.get('linea', '')
+    desde         = request.args.get('desde', '')
+    hasta         = request.args.get('hasta', '')
+
+    if not formulario_id:
+        return jsonify({'error': 'Debes seleccionar un formulario'}), 400
+
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT campos FROM formularios
+                WHERE id = %s AND empresa_id = %s
+            """, (formulario_id, session.get('empresa_id')))
+            form_row = cursor.fetchone()
+            if not form_row:
+                return jsonify({'error': 'Formulario no encontrado'}), 404
+
+            campos_config = form_row[0] or []
+
+            def es_grupo(item):
+                return isinstance(item, dict) and item.get('tipo') == 'grupo'
+
+            grupos_config = [item for item in campos_config if es_grupo(item)]
+            campo_ids = [
+                (item['id'] if isinstance(item, dict) else item)
+                for item in campos_config if not es_grupo(item)
+            ]
+
+            campos_map = {}
+            if campo_ids:
+                cursor.execute("SELECT id, nombre FROM campos_globales WHERE id = ANY(%s)", (campo_ids,))
+                for r in cursor.fetchall():
+                    campos_map[str(r[0])] = r[1]
+            nombre_a_id = {v: k for k, v in campos_map.items()}
+
+            def _norm(s):
+                return (s or '').strip().lower()
+
+            def _gid_de_grupo(cond):
+                return next((g.get('gid') for g in grupos_config if cond(_norm(g.get('nombre', '')))), None)
+
+            gid_pp  = _gid_de_grupo(lambda n: 'programado' in n and 'no programado' not in n)
+            gid_pnp = _gid_de_grupo(lambda n: 'no programado' in n)
+
+            campo_id_linea     = nombre_a_id.get('Línea de Producción', '')
+            campo_id_causa_pp  = nombre_a_id.get('Código Paro Programado', '')
+            campo_id_horas_pp  = nombre_a_id.get('Horas Paro Programado', '')
+            campo_id_causa_pnp = nombre_a_id.get('Código Paro No Programado', '')
+            campo_id_horas_pnp = nombre_a_id.get('Horas Paro No Programado', '')
+
+            query = "SELECT rf.respuestas, rf.created_at FROM respuestas_formulario rf WHERE rf.formulario_id = %s"
+            params = [formulario_id]
+            if project_id:
+                query += " AND rf.id_proyecto = %s"
+                params.append(project_id)
+            if desde:
+                query += " AND rf.created_at::date >= %s"
+                params.append(desde)
+            if hasta:
+                query += " AND rf.created_at::date <= %s"
+                params.append(hasta)
+
+            cursor.execute(query, params)
+            registros = cursor.fetchall()
+
+        acumulado_pp, acumulado_pnp = {}, {}
+
+        for respuestas, created_at in registros:
+            resp = respuestas if isinstance(respuestas, dict) else {}
+
+            if linea and campo_id_linea and resp.get(campo_id_linea, '') != linea:
+                continue
+
+            repeticiones = resp.get('__repeticiones') or {}
+
+            for bloque in (repeticiones.get(gid_pp, []) if gid_pp else []):
+                codigo = bloque.get(campo_id_causa_pp, '') or 'sin-codigo'
+                causa  = bloque.get(campo_id_causa_pp + '_codigo', '') or f'Código {codigo}'
+                horas  = float(bloque.get(campo_id_horas_pp, '') or 0)
+                acumulado_pp.setdefault(codigo, {'causa': causa, 'horas': 0})
+                acumulado_pp[codigo]['horas'] += horas
+
+            for bloque in (repeticiones.get(gid_pnp, []) if gid_pnp else []):
+                codigo = bloque.get(campo_id_causa_pnp, '') or 'sin-codigo'
+                causa  = bloque.get(campo_id_causa_pnp + '_codigo', '') or f'Código {codigo}'
+                horas  = float(bloque.get(campo_id_horas_pnp, '') or 0)
+                acumulado_pnp.setdefault(codigo, {'causa': causa, 'horas': 0})
+                acumulado_pnp[codigo]['horas'] += horas
+
+        a_lista = lambda dic: [{'causa': v['causa'], 'horas': round(v['horas'], 2)} for v in dic.values()]
+
+        return jsonify({'pp': a_lista(acumulado_pp), 'pnp': a_lista(acumulado_pnp)})
+
+    except Exception as e:
+        print(f"Error en analitica_pareto: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/analitica')
 def analitica():
     if 'user_id' not in session or session.get('user_rol') != 'admin':

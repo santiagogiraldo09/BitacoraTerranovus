@@ -87,6 +87,14 @@
                 </div>
 
                 <div class="an-filtro-campo">
+                    <label for="f-formulario">Formulario</label>
+                    <select id="f-formulario">
+                        <option value="">Selecciona un formulario</option>
+                        <!-- TODO: llenar dinámicamente, igual que se hace en la pantalla de exportación -->
+                    </select>
+                </div>
+
+                <div class="an-filtro-campo">
                     <label for="f-linea">Línea de producción</label>
                     <select id="f-linea">
                         <option value="">Todas</option>
@@ -140,24 +148,23 @@
                 </div>
             </section>
 
-            <!-- Cuerpo: gráfico + tabla -->
+            <!-- ===== PARO PROGRAMADO ===== -->
+            <h2 class="an-seccion-titulo">Paros Programados</h2>
             <section class="an-cuerpo">
 
                 <div class="an-card an-card--grafico">
                     <div class="an-card-header">
-                        <h2>Diagrama de Pareto</h2>
-                        <span class="an-card-subtitulo" id="grafico-subtitulo">Selecciona filtros y genera el reporte</span>
+                        <h2>Diagrama de Pareto — PP</h2>
+                        <span class="an-card-subtitulo" id="grafico-subtitulo-pp">Selecciona filtros y genera el reporte</span>
                     </div>
                     <div class="an-chart-wrap">
-                        <canvas id="chart-pareto"></canvas>
+                        <canvas id="chart-pareto-pp"></canvas>
                     </div>
-                    <!-- Estado vacío -->
-                    <div class="an-estado-vacio" id="estado-vacio">
+                    <div class="an-estado-vacio" id="estado-vacio-pp">
                         <i class="fas fa-chart-bar"></i>
                         <p>Aún no hay datos que mostrar.<br>Ajusta los filtros y presiona <strong>Generar</strong>.</p>
                     </div>
-                    <!-- Estado de carga -->
-                    <div class="an-estado-cargando" id="estado-cargando" style="display:none;">
+                    <div class="an-estado-cargando" id="estado-cargando-pp" style="display:none;">
                         <div class="an-spinner"></div>
                         <p>Calculando...</p>
                     </div>
@@ -165,10 +172,10 @@
 
                 <div class="an-card an-card--tabla">
                     <div class="an-card-header">
-                        <h2>Detalle por causa</h2>
+                        <h2>Detalle por causa — PP</h2>
                     </div>
                     <div class="an-tabla-wrap">
-                        <table class="an-tabla" id="tabla-pareto">
+                        <table class="an-tabla" id="tabla-pareto-pp">
                             <thead>
                                 <tr>
                                     <th>Causa</th>
@@ -177,7 +184,54 @@
                                     <th>Acumulado</th>
                                 </tr>
                             </thead>
-                            <tbody id="tabla-pareto-body">
+                            <tbody id="tabla-pareto-body-pp">
+                                <tr class="an-tabla-vacia">
+                                    <td colspan="4">Sin datos aún</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- ===== PARO NO PROGRAMADO ===== -->
+            <h2 class="an-seccion-titulo">Paros No Programados</h2>
+            <section class="an-cuerpo">
+
+                <div class="an-card an-card--grafico">
+                    <div class="an-card-header">
+                        <h2>Diagrama de Pareto — PNP</h2>
+                        <span class="an-card-subtitulo" id="grafico-subtitulo-pnp">Selecciona filtros y genera el reporte</span>
+                    </div>
+                    <div class="an-chart-wrap">
+                        <canvas id="chart-pareto-pnp"></canvas>
+                    </div>
+                    <div class="an-estado-vacio" id="estado-vacio-pnp">
+                        <i class="fas fa-chart-bar"></i>
+                        <p>Aún no hay datos que mostrar.<br>Ajusta los filtros y presiona <strong>Generar</strong>.</p>
+                    </div>
+                    <div class="an-estado-cargando" id="estado-cargando-pnp" style="display:none;">
+                        <div class="an-spinner"></div>
+                        <p>Calculando...</p>
+                    </div>
+                </div>
+
+                <div class="an-card an-card--tabla">
+                    <div class="an-card-header">
+                        <h2>Detalle por causa — PNP</h2>
+                    </div>
+                    <div class="an-tabla-wrap">
+                        <table class="an-tabla" id="tabla-pareto-pnp">
+                            <thead>
+                                <tr>
+                                    <th>Causa</th>
+                                    <th>Tiempo perdido</th>
+                                    <th>Peso</th>
+                                    <th>Acumulado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-pareto-body-pnp">
                                 <tr class="an-tabla-vacia">
                                     <td colspan="4">Sin datos aún</td>
                                 </tr>
@@ -222,70 +276,36 @@
             setTimeout(() => t.classList.remove('show'), 2500);
         }
 
-        let chartPareto = null;
+        const graficos = { pp: null, pnp: null };
 
-        /**
-         * Punto de conexión con el backend.
-         * TODO: reemplazar por la ruta real, por ejemplo:
-         *   GET /api/analitica/pareto?project_id=...&linea=...&tipo=...&desde=...&hasta=...
-         * La respuesta esperada por este esqueleto es un array así:
-         *   [{ causa: "Comedor", horas: 289.75 }, { causa: "Cambio de Formato", horas: 229.75 }, ...]
-         * ya viene sin ordenar es responsabilidad del frontend ordenarlo de mayor a menor.
-         */
         async function obtenerDatosPareto(filtros) {
-            // ── DATOS DE EJEMPLO (borrar cuando el endpoint real esté listo) ──
-            return [
-                { causa: 'Comedor', horas: 289.75 },
-                { causa: 'Cambio de Formato', horas: 229.75 },
-                { causa: 'Cambio de Producto', horas: 187 },
-                { causa: 'Arranque de Producción', horas: 175.25 },
-                { causa: 'Fin de Producción', horas: 174.5 },
-                { causa: 'Arranque de Producción (T2)', horas: 138.5 },
-                { causa: 'Fin de Producción (T2)', horas: 138.25 },
-                { causa: 'Mantenimiento de Uso', horas: 118.25 },
-                { causa: 'Limpieza de Instalaciones', horas: 79.5 },
-                { causa: 'Cambio de Rollo', horas: 52.5 },
-            ];
-
-            /* Implementación real:
             const params = new URLSearchParams(filtros);
             const res = await fetch(`/api/analitica/pareto?${params}`);
             if (!res.ok) throw new Error('No se pudo cargar la analítica');
-            return await res.json();
-            */
+            return await res.json();   // { pp: [...], pnp: [...] }
         }
 
         function calcularPareto(datos) {
             const ordenado = [...datos].sort((a, b) => b.horas - a.horas);
             const total = ordenado.reduce((sum, d) => sum + d.horas, 0);
-
-            let acumulado = 0;
-            let causasPara80 = 0;
-            let yaPaso80 = false;
-
+            let acumulado = 0, causasPara80 = 0, yaPaso80 = false;
             const filas = ordenado.map(d => {
                 const peso = total ? (d.horas / total) * 100 : 0;
                 acumulado += peso;
-                if (!yaPaso80) {
-                    causasPara80++;
-                    if (acumulado >= 80) yaPaso80 = true;
-                }
+                if (!yaPaso80) { causasPara80++; if (acumulado >= 80) yaPaso80 = true; }
                 return { ...d, peso, acumulado };
             });
-
             return { filas, total, causasPara80 };
         }
 
-        function renderKPIs({ filas, total, causasPara80 }) {
-            document.getElementById('kpi-total').textContent = total.toFixed(2);
-            document.getElementById('kpi-causa-principal').textContent = filas[0]?.causa || '—';
-            document.getElementById('kpi-causas-80').textContent = causasPara80;
-            document.getElementById('kpi-causas-total').textContent = filas.length;
-        }
-
-        function renderTabla(filas) {
-            const body = document.getElementById('tabla-pareto-body');
+        function renderTabla(filas, sufijo) {
+            const body = document.getElementById('tabla-pareto-body-' + sufijo);
             body.innerHTML = '';
+
+            if (!filas.length) {
+                body.innerHTML = '<tr class="an-tabla-vacia"><td colspan="4">Sin datos aún</td></tr>';
+                return;
+            }
 
             filas.forEach(f => {
                 const tr = document.createElement('tr');
@@ -299,13 +319,13 @@
             });
         }
 
-        function renderGrafico(filas) {
-            const ctx = document.getElementById('chart-pareto').getContext('2d');
+        function renderGrafico(filas, sufijo) {
+            const ctx = document.getElementById('chart-pareto-' + sufijo).getContext('2d');
             const colorAcento = getComputedStyle(document.documentElement).getPropertyValue('--naranja').trim() || '#FFAF33';
 
-            if (chartPareto) chartPareto.destroy();
+            if (graficos[sufijo]) graficos[sufijo].destroy();
 
-            chartPareto = new Chart(ctx, {
+            graficos[sufijo] = new Chart(ctx, {
                 data: {
                     labels: filas.map(f => f.causa),
                     datasets: [
@@ -348,71 +368,61 @@
                     maintainAspectRatio: false,
                     interaction: { mode: 'index', intersect: false },
                     scales: {
-                        y: {
-                            type: 'linear',
-                            position: 'left',
-                            title: { display: true, text: 'Horas' },
-                            grid: { color: '#F0F0F0' }
-                        },
-                        y1: {
-                            type: 'linear',
-                            position: 'right',
-                            min: 0,
-                            max: 100,
-                            title: { display: true, text: '% Acumulado' },
-                            grid: { drawOnChartArea: false },
-                            ticks: { callback: v => v + '%' }
-                        },
-                        x: {
-                            ticks: { autoSkip: false, maxRotation: 60, minRotation: 45 }
-                        }
+                        y:  { type: 'linear', position: 'left',  title: { display: true, text: 'Horas' }, grid: { color: '#F0F0F0' } },
+                        y1: { type: 'linear', position: 'right', min: 0, max: 100, title: { display: true, text: '% Acumulado' }, grid: { drawOnChartArea: false }, ticks: { callback: v => v + '%' } },
+                        x:  { ticks: { autoSkip: false, maxRotation: 60, minRotation: 45 } }
                     },
-                    plugins: {
-                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
-                    }
+                    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } }
                 }
             });
         }
 
+        function renderDataset(datos, sufijo) {
+            document.getElementById('estado-cargando-' + sufijo).style.display = 'none';
+
+            if (!datos.length) {
+                document.getElementById('estado-vacio-' + sufijo).style.display = 'flex';
+                renderTabla([], sufijo);
+                return;
+            }
+
+            document.getElementById('estado-vacio-' + sufijo).style.display = 'none';
+
+            const resultado = calcularPareto(datos);
+            renderTabla(resultado.filas, sufijo);
+            renderGrafico(resultado.filas, sufijo);
+
+            document.getElementById('grafico-subtitulo-' + sufijo).textContent =
+                `${resultado.filas.length} causas · ${resultado.total.toFixed(1)} horas totales`;
+        }
+
         async function cargarPareto() {
             const filtros = {
-                project_id: document.getElementById('f-proyecto').value,
-                linea:      document.getElementById('f-linea').value,
-                tipo:       document.getElementById('f-tipo-paro').value,
-                desde:      document.getElementById('f-desde').value,
-                hasta:      document.getElementById('f-hasta').value,
+                project_id:    document.getElementById('f-proyecto').value,
+                formulario_id: '8',   // fijo por ahora
+                linea:         document.getElementById('f-linea').value,
+                desde:         document.getElementById('f-desde').value,
+                hasta:         document.getElementById('f-hasta').value,
             };
 
-            document.getElementById('estado-vacio').style.display = 'none';
-            document.getElementById('estado-cargando').style.display = 'flex';
+            ['pp', 'pnp'].forEach(sufijo => {
+                document.getElementById('estado-vacio-' + sufijo).style.display = 'none';
+                document.getElementById('estado-cargando-' + sufijo).style.display = 'flex';
+            });
 
             try {
-                const datos = await obtenerDatosPareto(filtros);
-
-                if (!datos.length) {
-                    document.getElementById('estado-cargando').style.display = 'none';
-                    document.getElementById('estado-vacio').style.display = 'flex';
-                    document.querySelector('.an-estado-vacio p').innerHTML = 'No hay registros de paros en este rango.<br>Prueba con otros filtros.';
-                    return;
-                }
-
-                const resultado = calcularPareto(datos);
-                renderKPIs(resultado);
-                renderTabla(resultado.filas);
-                renderGrafico(resultado.filas);
-
-                document.getElementById('grafico-subtitulo').textContent =
-                    `${resultado.filas.length} causas · ${resultado.total.toFixed(1)} horas totales`;
-
+                const data = await obtenerDatosPareto(filtros);   // { pp: [...], pnp: [...] }
+                renderDataset(data.pp || [], 'pp');
+                renderDataset(data.pnp || [], 'pnp');
             } catch (err) {
                 console.error(err);
                 mostrarToast('❌ No se pudo generar la analítica');
-            } finally {
-                document.getElementById('estado-cargando').style.display = 'none';
+                ['pp', 'pnp'].forEach(sufijo => {
+                    document.getElementById('estado-cargando-' + sufijo).style.display = 'none';
+                });
             }
         }
 
-        // Carga inicial con los datos de ejemplo, para que la pantalla nunca se vea "muerta"
         document.addEventListener('DOMContentLoaded', cargarPareto);
     </script>
 </body>
