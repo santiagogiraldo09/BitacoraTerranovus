@@ -1620,6 +1620,29 @@
             }
         });
     }
+
+    // ── Mantecas: visible solo si Línea de Producción = "Mantecas" (formulario 8) ──
+    function actualizarVisibilidadMantecas() {
+        const campoLinea = Array.from(document.querySelectorAll('.campo-respuesta:not([data-gid])'))
+            .find(input => (input.dataset.nombre || '').toLowerCase().includes('línea de producción')
+                        || (input.dataset.nombre || '').toLowerCase().includes('linea de produccion'));
+        const grupoMantecas = Array.from(document.querySelectorAll('.grupo-rep'))
+            .find(cont => (cont.dataset.nombre || '').toLowerCase().includes('manteca'));
+
+        if (!campoLinea || !grupoMantecas) return;
+        grupoMantecas.style.display = (campoLinea.value === 'Mantecas') ? '' : 'none';
+    }
+
+    if (document.getElementById('formulario-id').value === '8') {
+        const campoLinea = Array.from(document.querySelectorAll('.campo-respuesta:not([data-gid])'))
+            .find(input => (input.dataset.nombre || '').toLowerCase().includes('línea de producción')
+                        || (input.dataset.nombre || '').toLowerCase().includes('linea de produccion'));
+        if (campoLinea) {
+            campoLinea.addEventListener('change', actualizarVisibilidadMantecas);
+            actualizarVisibilidadMantecas(); // estado inicial, por si viene precargado (modo edición)
+        }
+    }
+
 </script>
 </body>
 </html>
