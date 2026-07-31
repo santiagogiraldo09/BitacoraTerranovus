@@ -2983,6 +2983,11 @@ def exportar_formulario(project_id, formulario_id):
         gid_pp  = _gid_de_grupo(lambda n: 'programado' in n and 'no programado' not in n)
         gid_pnp = _gid_de_grupo(lambda n: 'no programado' in n)
 
+        # 🔍 DEBUG TEMPORAL — borrar después de confirmar los nombres
+        print(f"[EXPORT-DEBUG] Campos disponibles: {list(nombre_a_id.keys())}")
+        print(f"[EXPORT-DEBUG] Grupos encontrados: {[(g.get('nombre'), g.get('gid')) for g in grupos_config]}")
+        print(f"[EXPORT-DEBUG] gid_pp={gid_pp}  gid_pnp={gid_pnp}")
+
         # Meses en español
         meses_es = {
             1: 'ENERO', 2: 'FEBRERO', 3: 'MARZO', 4: 'ABRIL',
@@ -3008,21 +3013,21 @@ def exportar_formulario(project_id, formulario_id):
 
         # Campos cuyo código viene de otro campo (nivel raíz)
         mapeo_codigo = {
-            'Código': 'Nombre Producto',
+            'Código': 'Código de producto',
         }
 
         # Columnas que salen de CADA BLOQUE del grupo "Paro Programado"
         # (campo_nombre, es_codigo) — es_codigo=True indica que hay que leer el sufijo '_codigo'
         mapeo_grupo_pp = {
             'H.PP':      ('Horas Paro Programado', False),
-            'Codigo PP': ('Causa Paro Programado', True),
+            'Codigo PP': ('Código Paro Programado', True),
             'Causa PP':  ('Causa Paro Programado', False),
         }
 
         # Columnas que salen de CADA BLOQUE del grupo "Paro No Programado"
         mapeo_grupo_pnp = {
             'H.PNP':      ('Horas Paro No programado', False),
-            'Codigo PNP': ('Causa Paro No Programado', True),
+            'Codigo PNP': ('Código Paro No Programado', True),
             'Causa PNP':  ('Causa Paro No Programado', False),
         }
 
