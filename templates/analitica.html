@@ -130,27 +130,27 @@
                 </button>
             </section>
 
-            <!-- Tarjetas resumen -->
-            <section class="an-kpis" id="an-kpis">
-                <div class="an-kpi-card">
-                    <span class="an-kpi-label">Tiempo total perdido</span>
-                    <span class="an-kpi-valor" id="kpi-total">—</span>
-                    <span class="an-kpi-unidad">horas</span>
-                </div>
-                <div class="an-kpi-card">
-                    <span class="an-kpi-label">Causa principal</span>
-                    <span class="an-kpi-valor an-kpi-valor--texto" id="kpi-causa-principal">—</span>
-                </div>
-                <div class="an-kpi-card">
-                    <span class="an-kpi-label">Causas que explican el 80%</span>
-                    <span class="an-kpi-valor" id="kpi-causas-80">—</span>
-                    <span class="an-kpi-unidad">de <span id="kpi-causas-total">—</span></span>
-                </div>
-            </section>
-
             <!-- ===== PARO PROGRAMADO ===== -->
             <h2 class="an-seccion-titulo">Paros Programados</h2>
             <section class="an-cuerpo">
+
+                <!-- KPIs — Paros Programados -->
+                <section class="an-kpis">
+                    <div class="an-kpi-card">
+                        <span class="an-kpi-label">Tiempo total perdido</span>
+                        <span class="an-kpi-valor" id="kpi-total-pp">—</span>
+                        <span class="an-kpi-unidad">horas</span>
+                    </div>
+                    <div class="an-kpi-card">
+                        <span class="an-kpi-label">Causa principal</span>
+                        <span class="an-kpi-valor an-kpi-valor--texto" id="kpi-causa-principal-pp">—</span>
+                    </div>
+                    <div class="an-kpi-card">
+                        <span class="an-kpi-label">Causas que explican el 80%</span>
+                        <span class="an-kpi-valor" id="kpi-causas-80-pp">—</span>
+                        <span class="an-kpi-unidad">de <span id="kpi-causas-total-pp">—</span></span>
+                    </div>
+                </section>
 
                 <div class="an-card an-card--grafico">
                     <div class="an-card-header">
@@ -198,6 +198,24 @@
             <!-- ===== PARO NO PROGRAMADO ===== -->
             <h2 class="an-seccion-titulo">Paros No Programados</h2>
             <section class="an-cuerpo">
+
+                <!-- KPIs — Paros Programados -->
+                <section class="an-kpis">
+                    <div class="an-kpi-card">
+                        <span class="an-kpi-label">Tiempo total perdido</span>
+                        <span class="an-kpi-valor" id="kpi-total-pnp">—</span>
+                        <span class="an-kpi-unidad">horas</span>
+                    </div>
+                    <div class="an-kpi-card">
+                        <span class="an-kpi-label">Causa principal</span>
+                        <span class="an-kpi-valor an-kpi-valor--texto" id="kpi-causa-principal-pnp">—</span>
+                    </div>
+                    <div class="an-kpi-card">
+                        <span class="an-kpi-label">Causas que explican el 80%</span>
+                        <span class="an-kpi-valor" id="kpi-causas-80-pnp">—</span>
+                        <span class="an-kpi-unidad">de <span id="kpi-causas-total-pnp">—</span></span>
+                    </div>
+                </section>
 
                 <div class="an-card an-card--grafico">
                     <div class="an-card-header">
@@ -298,6 +316,13 @@
             return { filas, total, causasPara80 };
         }
 
+        function renderKPIs({ filas, total, causasPara80 }, sufijo) {
+            document.getElementById('kpi-total-' + sufijo).textContent = total.toFixed(2);
+            document.getElementById('kpi-causa-principal-' + sufijo).textContent = filas[0]?.causa || '—';
+            document.getElementById('kpi-causas-80-' + sufijo).textContent = causasPara80;
+            document.getElementById('kpi-causas-total-' + sufijo).textContent = filas.length;
+        }
+
         function renderTabla(filas, sufijo) {
             const body = document.getElementById('tabla-pareto-body-' + sufijo);
             body.innerHTML = '';
@@ -389,6 +414,7 @@
             document.getElementById('estado-vacio-' + sufijo).style.display = 'none';
 
             const resultado = calcularPareto(datos);
+            renderKPIs(resultado, sufijo);
             renderTabla(resultado.filas, sufijo);
             renderGrafico(resultado.filas, sufijo);
 
