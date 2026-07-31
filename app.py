@@ -4121,6 +4121,12 @@ def eliminar_proyecto():
             cursor.close()
             connection_pool.putconn(conn)
 
+@app.route('/analitica')
+   def analitica():
+       if 'user_id' not in session or session.get('user_rol') != 'admin':
+           return redirect(url_for('registros'))
+       return render_template('analitica.html')
+
 @app.route('/transcribe-audio', methods=['POST'])
 def transcribe_audio():
     try:

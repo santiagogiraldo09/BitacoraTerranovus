@@ -36,6 +36,10 @@
                     <i class="fas fa-cog"></i>
                     <span>Configuración</span>
                 </a>
+                <a href="{{ url_for('analitica') }}" class="nav-item">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Analítica</span>
+                </a>
                 {% if session.get('empresa_id') == 1 %}
                 <a href="#" class="nav-item" onclick="event.preventDefault(); abrirModalEmpresa()">
                     <i class="fas fa-building"></i>

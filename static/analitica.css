@@ -1,0 +1,292 @@
+/* ============================================================
+   ANALÍTICA — estilos propios de esta pantalla.
+   Depende de registros.css para: .app-layout, .sidebar, .nav-item,
+   .sidebar-logo, .sidebar-footer, .toast
+   ============================================================ */
+
+:root {
+    --an-bg:        #F7F8FA;
+    --an-card-bg:   #FFFFFF;
+    --an-borde:     #E5E7EB;
+    --an-texto:     #111827;
+    --an-texto-sec: #6B7280;
+    --an-radio:     14px;
+    --an-sombra:    0 1px 2px rgba(16, 24, 40, 0.04), 0 1px 3px rgba(16, 24, 40, 0.06);
+}
+
+.an-main {
+    flex: 1;
+    background: var(--an-bg);
+    min-height: 100vh;
+    padding: 28px 32px 60px;
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    color: var(--an-texto);
+    overflow-y: auto;
+}
+
+/* ── Header ── */
+.an-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 22px;
+}
+
+.an-title {
+    font-family: 'Sora', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    margin: 0 0 4px;
+}
+
+.an-subtitle {
+    font-size: 13.5px;
+    color: var(--an-texto-sec);
+    margin: 0;
+}
+
+/* ── Filtros ── */
+.an-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 14px;
+    background: var(--an-card-bg);
+    border: 1px solid var(--an-borde);
+    border-radius: var(--an-radio);
+    padding: 18px 20px;
+    margin-bottom: 20px;
+    box-shadow: var(--an-sombra);
+}
+
+.an-filtro-campo {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 150px;
+}
+
+.an-filtro-campo label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--an-texto-sec);
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+
+.an-filtro-campo select,
+.an-filtro-campo input {
+    border: 1px solid var(--an-borde);
+    border-radius: 9px;
+    padding: 9px 11px;
+    font-size: 13.5px;
+    font-family: inherit;
+    color: var(--an-texto);
+    background: #fff;
+    outline: none;
+    transition: border-color .15s ease;
+}
+
+.an-filtro-campo select:focus,
+.an-filtro-campo input:focus {
+    border-color: var(--naranja, #FFAF33);
+}
+
+.an-btn-generar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--naranja, #FFAF33);
+    color: #fff;
+    border: none;
+    border-radius: 9px;
+    padding: 10px 20px;
+    font-size: 13.5px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    height: fit-content;
+    transition: filter .15s ease, transform .1s ease;
+}
+
+.an-btn-generar:hover { filter: brightness(0.94); }
+.an-btn-generar:active { transform: scale(0.98); }
+
+/* ── KPIs ── */
+.an-kpis {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.an-kpi-card {
+    background: var(--an-card-bg);
+    border: 1px solid var(--an-borde);
+    border-radius: var(--an-radio);
+    padding: 18px 20px;
+    box-shadow: var(--an-sombra);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.an-kpi-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--an-texto-sec);
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+
+.an-kpi-valor {
+    font-family: 'Sora', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--an-texto);
+}
+
+.an-kpi-valor--texto {
+    font-size: 18px;
+    line-height: 1.3;
+}
+
+.an-kpi-unidad {
+    font-size: 12px;
+    color: var(--an-texto-sec);
+}
+
+/* ── Cuerpo: gráfico + tabla ── */
+.an-cuerpo {
+    display: grid;
+    grid-template-columns: 2.1fr 1fr;
+    gap: 16px;
+    align-items: start;
+}
+
+.an-card {
+    background: var(--an-card-bg);
+    border: 1px solid var(--an-borde);
+    border-radius: var(--an-radio);
+    box-shadow: var(--an-sombra);
+    padding: 20px 22px;
+    position: relative;
+}
+
+.an-card-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 14px;
+}
+
+.an-card-header h2 {
+    font-family: 'Sora', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.an-card-subtitulo {
+    font-size: 12.5px;
+    color: var(--an-texto-sec);
+}
+
+.an-chart-wrap {
+    position: relative;
+    height: 380px;
+}
+
+/* ── Estados vacío / cargando (superpuestos al gráfico) ── */
+.an-estado-vacio,
+.an-estado-cargando {
+    position: absolute;
+    inset: 56px 22px 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 10px;
+    background: var(--an-card-bg);
+    border-radius: 10px;
+}
+
+.an-estado-vacio i {
+    font-size: 30px;
+    color: #D1D5DB;
+}
+
+.an-estado-vacio p {
+    font-size: 13px;
+    color: var(--an-texto-sec);
+    max-width: 240px;
+    line-height: 1.5;
+}
+
+.an-spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid #E5E7EB;
+    border-top-color: var(--naranja, #FFAF33);
+    border-radius: 50%;
+    animation: an-spin .8s linear infinite;
+}
+
+@keyframes an-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ── Tabla de detalle ── */
+.an-tabla-wrap {
+    max-height: 380px;
+    overflow-y: auto;
+}
+
+.an-tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.an-tabla thead th {
+    position: sticky;
+    top: 0;
+    background: var(--an-card-bg);
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--an-texto-sec);
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    padding: 8px 6px;
+    border-bottom: 1px solid var(--an-borde);
+}
+
+.an-tabla tbody td {
+    padding: 9px 6px;
+    border-bottom: 1px solid #F3F4F6;
+    color: var(--an-texto);
+}
+
+.an-tabla tbody tr:last-child td { border-bottom: none; }
+
+.an-tabla-vacia td {
+    text-align: center;
+    color: var(--an-texto-sec);
+    padding: 24px 0;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1100px) {
+    .an-cuerpo { grid-template-columns: 1fr; }
+    .an-kpis   { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 640px) {
+    .an-main { padding: 20px 16px 90px; }
+    .an-filtros { flex-direction: column; align-items: stretch; }
+    .an-btn-generar { justify-content: center; }
+}
