@@ -646,6 +646,25 @@ def api_movil_config():
         return jsonify({"error": "error_servidor", "detalle": str(ex)}), 500
 
 
+# ======================= VOZ / IA (reusa app.py) =====================
+# La lógica de distribución (prompt + OpenAI) vive en app.py, en una
+# función PURA que solo depende del JSON, no de session. Aquí la
+# llamamos tras validar el token. Sin trucos de sesión.
+
+@api_movil.route("/api/movil/distribuir-campos", methods=["POST"])
+@requiere_token
+def api_movil_distribuir():
+    import app as appmod
+    data = request.get_json(silent=True) or {}
+    try:
+        # distribuir_campos_core devuelve un dict listo para jsonify
+        resultado, codigo = appmod.distribuir_campos_core(data)
+        return jsonify(resultado), codigo
+    except Exception as e:
+        current_app.logger.exception("api_movil_distribuir")
+        return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
+
+
 @api_movil.route("/api/ping", methods=["GET"])
 def api_ping():
     return jsonify({"ok": True})
