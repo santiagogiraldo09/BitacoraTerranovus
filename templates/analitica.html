@@ -76,59 +76,7 @@
                 </div>
             </header>
 
-            <!-- Barra de filtros -->
-            <section class="an-filtros" aria-label="Filtros del reporte">
-                <div class="an-filtro-campo">
-                    <label for="f-proyecto">Proyecto</label>
-                    <select id="f-proyecto">
-                        <option value="">Todos los proyectos</option>
-                        <!-- TODO: llenar dinámicamente con los proyectos del usuario -->
-                    </select>
-                </div>
-
-                <div class="an-filtro-campo">
-                    <label for="f-formulario">Formulario</label>
-                    <select id="f-formulario">
-                        <option value="">Selecciona un formulario</option>
-                        <!-- TODO: llenar dinámicamente, igual que se hace en la pantalla de exportación -->
-                    </select>
-                </div>
-
-                <div class="an-filtro-campo">
-                    <label for="f-linea">Línea de producción</label>
-                    <select id="f-linea">
-                        <option value="">Todas</option>
-                        <option value="Bidones">Bidones</option>
-                        <option value="Botellas">Botellas</option>
-                        <option value="Fundas">Fundas</option>
-                        <option value="Mantecas">Mantecas</option>
-                    </select>
-                </div>
-
-                <div class="an-filtro-campo">
-                    <label for="f-tipo-paro">Tipo de paro</label>
-                    <select id="f-tipo-paro">
-                        <option value="ambos">Programado + No programado</option>
-                        <option value="pp">Solo programado</option>
-                        <option value="pnp">Solo no programado</option>
-                    </select>
-                </div>
-
-                <div class="an-filtro-campo">
-                    <label for="f-desde">Desde</label>
-                    <input type="date" id="f-desde">
-                </div>
-
-                <div class="an-filtro-campo">
-                    <label for="f-hasta">Hasta</label>
-                    <input type="date" id="f-hasta">
-                </div>
-
-                <button class="an-btn-generar" id="btn-generar" onclick="cargarPareto()">
-                    <i class="fas fa-chart-bar"></i>
-                    Generar
-                </button>
-            </section>
+            <!--AQUÍ DEBE DE IR LA SECCIÓN PARA FILTRAR-->
 
             <!-- ===== PARO PROGRAMADO ===== -->
             <h2 class="an-seccion-titulo">Paros Programados</h2>
