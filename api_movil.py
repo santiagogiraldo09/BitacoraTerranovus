@@ -581,6 +581,71 @@ def api_movil_registro(registro_id):
         return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
 
 
+# ==================== CONFIGURACIÓN (solo admin) =====================
+
+def _es_admin(u):
+    return (u.get("rol") or "").lower() in ("admin", "administrador")
+
+
+@api_movil.route("/api/movil/config", methods=["GET"])
+@requiere_token
+def api_movil_config():
+    """Trae en una sola llamada todo lo que muestra Configuración:
+       identidad visual, usuarios, tipos de proyecto, campos y formularios.
+       Solo lectura — Fase 1."""
+    from app import supabase_client
+    u = request.usuario
+    if not _es_admin(u):
+        return jsonify({"error": "solo_admin"}), 403
+    empresa_id = _num(u["empresa_id"])
+
+    out = {}
+    try:
+        # Identidad visual
+        emp = (supabase_client.table("empresas")
+               .select("logo_url, color_primario, color_secundario")
+               .eq("id", empresa_id).limit(1).execute())
+        e = (emp.data or [{}])[0]
+        out["identidad"] = {
+            "logo_url": e.get("logo_url"),
+            "color_primario": e.get("color_primario") or "#FBAF33",
+            "color_secundario": e.get("color_secundario") or "#E3E3E3",
+        }
+
+        # Usuarios del tenant
+        us = (supabase_client.table("usuario")
+              .select("user_id, name, apellido, email, rol, estado")
+              .eq("empresa_id", empresa_id).order("name").execute())
+        out["usuarios"] = [{
+            "user_id": x["user_id"], "nombre": x.get("name",""),
+            "apellido": x.get("apellido","") or "", "email": x.get("email",""),
+            "rol": x.get("rol") or "Sin rol", "estado": x.get("estado") or "pendiente",
+        } for x in (us.data or [])]
+
+        # Tipos de proyecto
+        tp = (supabase_client.table("tipos_proyecto")
+              .select("*").eq("empresa_id", empresa_id).execute())
+        out["tipos_proyecto"] = tp.data or []
+
+        # Campos globales
+        cg = (supabase_client.table("campos_globales")
+              .select("id, nombre, tipo, objeto, opciones, configuracion")
+              .eq("empresa_id", empresa_id).order("nombre").execute())
+        out["campos_globales"] = cg.data or []
+
+        # Formularios (lista, sin resolver campos)
+        fm = (supabase_client.table("formularios")
+              .select("id, nombre, descripcion")
+              .eq("empresa_id", empresa_id).order("nombre").execute())
+        out["formularios"] = fm.data or []
+
+        return jsonify(out)
+
+    except Exception as ex:
+        current_app.logger.exception("api_movil_config")
+        return jsonify({"error": "error_servidor", "detalle": str(ex)}), 500
+
+
 @api_movil.route("/api/ping", methods=["GET"])
 def api_ping():
     return jsonify({"ok": True})
