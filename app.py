@@ -134,15 +134,11 @@ def db_connection():
     try:
         conn = connection_pool.getconn()
 
-        # Validar que la conexión sigue viva antes de usarla.
-        # Si Supabase ya la cerró por su lado, la descartamos y pedimos otra.
         if conn.closed:
             connection_pool.putconn(conn, close=True)
             conn = connection_pool.getconn()
 
         cursor = conn.cursor()
-        empresa_id = session.get('empresa_id', 1)
-        cursor.execute("SET app.empresa_id = %s", (empresa_id,))
         yield conn, cursor
         conn.commit()
     except Exception as e:
@@ -151,7 +147,7 @@ def db_connection():
             try:
                 conn.rollback()
             except Exception:
-                pass  # la conexión ya está muerta: no hay nada que revertir
+                pass
         raise e
     finally:
         if conn:
@@ -160,9 +156,9 @@ def db_connection():
             except Exception:
                 pass
             if conn_ok and not conn.closed:
-                connection_pool.putconn(conn)          # sana → se reutiliza
+                connection_pool.putconn(conn)
             else:
-                connection_pool.putconn(conn, close=True)  # rota → se descarta, NO se recicla
+                connection_pool.putconn(conn, close=True)
 #app.secret_key = secrets.token_hex(16)  # Clave secreta para sesiones
 app.secret_key = os.environ.get('SECRET_KEY', 'bitacora-iac-2026-fallback')
 #app.secret_key = '78787878tyg8987652vgdfdf3445'
