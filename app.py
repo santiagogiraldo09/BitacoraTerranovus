@@ -3327,27 +3327,44 @@ def detalleContacto(id_contacto):
 def obtener_tipos_proyecto():
     if 'user_id' not in session:
         return jsonify({'error': 'No autorizado'}), 401
+
     try:
+        empresa_id = session.get('empresa_id')
+        print(f"[TIPOS PROYECTO] empresa_id={empresa_id}")
+
         with db_connection() as (conn, cursor):
+
+            print("[TIPOS PROYECTO] Ejecutando SELECT")
+
             cursor.execute("""
                 SELECT id, nombre, descripcion, campos, created_at
                 FROM tipos_proyecto
                 WHERE empresa_id = %s
                 ORDER BY created_at DESC
-            """, (session.get('empresa_id'),))
+            """, (empresa_id,))
+
             rows = cursor.fetchall()
-            tipos = [
-                {
+
+            print(f"[TIPOS PROYECTO] Registros encontrados: {len(rows)}")
+
+            tipos = []
+
+            for r in rows:
+                print(f"[TIPOS PROYECTO] Procesando ID={r[0]} created_at={r[4]}")
+
+                tipos.append({
                     'id': r[0],
                     'nombre': r[1],
                     'descripcion': r[2],
                     'campos': r[3] or [],
                     'created_at': r[4].strftime('%d/%m/%Y') if r[4] else ''
-                }
-                for r in rows
-            ]
+                })
+
             return jsonify({'tipos': tipos})
+
     except Exception as e:
+        print(f"[ERROR] obtener_tipos_proyecto: {e}")
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
