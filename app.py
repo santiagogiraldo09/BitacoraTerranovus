@@ -119,10 +119,17 @@ def make_session_permanent():
     session.permanent = True
 def init_pool():
     global connection_pool
+
     connection_pool = pg_pool.ThreadedConnectionPool(
         minconn=2,
         maxconn=10,
         dsn=os.environ.get('DATABASE_URL')
+    )
+
+    print(
+        f"[POOL] Inicializado | "
+        f"minconn=2 | maxconn=10 | "
+        f"pool={id(connection_pool)}"
     )
 
 init_pool()
@@ -137,6 +144,13 @@ def db_connection():
         for intento in range(2):
             try:
                 conn = connection_pool.getconn()
+
+                print(
+                    f"[POOL] db_connection | "
+                    f"pool={id(connection_pool)} | "
+                    f"usadas={len(connection_pool._used)} | "
+                    f"disponibles={len(connection_pool._pool)}"
+                )
 
                 if conn.closed:
                     connection_pool.putconn(conn, close=True)
@@ -1351,6 +1365,14 @@ def get_db_connection():
 
     try:
         conn = connection_pool.getconn()
+
+        print(
+            f"[POOL] getconn | "
+            f"PID={os.getpid()} | "
+            f"pool={id(connection_pool)} | "
+            f"usadas={len(connection_pool._used)} | "
+            f"disponibles={len(connection_pool._pool)}"
+        )
 
         # Verificar si la conexión está marcada como cerrada
         if conn.closed:
