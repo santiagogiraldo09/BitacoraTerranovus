@@ -134,53 +134,46 @@ def db_connection():
     conn_ok = False
 
     try:
-        # Primer intento
-        conn = connection_pool.getconn()
+        for intento in range(2):
+            try:
+                conn = connection_pool.getconn()
 
-        try:
-            if conn.closed:
-                connection_pool.putconn(conn, close=True)
-                conn = None
-                raise psycopg2.OperationalError(
-                    "Conexión cerrada en el pool"
-                )
-
-            cursor = conn.cursor()
-
-            # Verificar que la conexión realmente responde
-            cursor.execute("SELECT 1")
-            cursor.fetchone()
-
-        except Exception:
-            # La conexión no sirve → eliminarla del pool
-            if cursor:
-                try:
-                    cursor.close()
-                except Exception:
-                    pass
-                cursor = None
-
-            if conn:
-                try:
+                if conn.closed:
                     connection_pool.putconn(conn, close=True)
-                except Exception:
-                    pass
+                    conn = None
+                    continue
 
-            conn = None
+                cursor = conn.cursor()
 
-            # Segundo intento con una conexión nueva
-            conn = connection_pool.getconn()
+                # Comprobar conexión real
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
 
-            if conn.closed:
-                connection_pool.putconn(conn, close=True)
-                conn = None
-                raise
+                # Conexión válida
+                break
 
-            cursor = conn.cursor()
+            except psycopg2.OperationalError:
+                if cursor:
+                    try:
+                        cursor.close()
+                    except Exception:
+                        pass
+                    cursor = None
 
-            # Verificar nuevamente
-            cursor.execute("SELECT 1")
-            cursor.fetchone()
+                if conn:
+                    try:
+                        connection_pool.putconn(conn, close=True)
+                    except Exception:
+                        pass
+                    conn = None
+
+                if intento == 1:
+                    raise
+
+        if conn is None or cursor is None:
+            raise psycopg2.OperationalError(
+                "No se pudo obtener una conexión válida"
+            )
 
         empresa_id = session.get('empresa_id', 1)
 
@@ -200,7 +193,6 @@ def db_connection():
                 conn.rollback()
             except Exception:
                 pass
-
         raise
 
     finally:
