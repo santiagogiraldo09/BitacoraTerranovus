@@ -424,6 +424,34 @@
                 `${resultado.filas.length} causas · ${resultado.total.toFixed(1)} horas totales`;
         }
 
+        async function verificarFormularioAnalitica() {
+            try {
+                const res = await fetch('/api/formularios');
+
+                if (!res.ok) {
+                    throw new Error('No se pudieron consultar los formularios');
+                }
+
+                const formularios = await res.json();
+
+                const formulario8 = formularios.find(
+                    f => Number(f.id) === 8
+                );
+
+                if (!formulario8) {
+                    mostrarEstadoSinFormulario();
+                    return;
+                }
+
+                // El formulario 8 existe: cargar normalmente la analítica
+                cargarPareto();
+
+            } catch (err) {
+                console.error('Error verificando formulario de analítica:', err);
+                mostrarToast('❌ No se pudieron consultar los formularios');
+            }
+        }
+
         async function cargarPareto() {
             const filtros = {
                 project_id:    document.getElementById('f-proyecto').value,
@@ -451,7 +479,31 @@
             }
         }
 
-        document.addEventListener('DOMContentLoaded', cargarPareto);
+        function mostrarEstadoSinFormulario() {
+            ['pp', 'pnp'].forEach(sufijo => {
+
+                document.getElementById('estado-cargando-' + sufijo).style.display = 'none';
+
+                const estadoVacio = document.getElementById(
+                    'estado-vacio-' + sufijo
+                );
+
+                estadoVacio.style.display = 'flex';
+
+                estadoVacio.innerHTML = `
+                    <i class="fas fa-chart-bar"></i>
+                    <p>
+                        Esta empresa no tiene configurado el
+                        <strong>formulario requerido para la analítica</strong>.
+                        <br>
+                    </p>
+                `;
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            verificarFormularioAnalitica();
+        });
     </script>
 </body>
 </html>
