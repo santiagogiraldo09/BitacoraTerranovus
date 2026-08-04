@@ -419,7 +419,7 @@ def invitar_empresa():
 
 
 @app.route('/invitar-usuarios', methods=['POST'])
-def invitar_usuarios():
+def invitar_usuarios(_reintento=0):
     if 'user_id' not in session:
         return jsonify({'success': False, 'error': 'No autenticado'}), 401
 
@@ -429,110 +429,111 @@ def invitar_usuarios():
     if not personas:
         return jsonify({'success': False, 'error': 'No se recibieron datos'})
 
-    conn = None
     try:
-        conn, cursor = get_db_connection()
-        empresa_id = session.get('empresa_id')
-
-        cursor.execute("""
-            SELECT name, empresa_id FROM usuario WHERE user_id = %s
-        """, (session['user_id'],))
-        admin      = cursor.fetchone()
-        admin_nombre = admin[0] if admin else 'El administrador'
-
-        enviados = []
-        omitidos = []
-
-        for p in personas:
-            nombre   = p.get('nombre', '')
-            apellido = p.get('apellido', '')
-            correo   = p.get('correo', '')
-            cargo    = p.get('cargo', 'Sin asignar')
-            rol      = p.get('rol', 'viewer')
-
-            if not nombre or not apellido or not correo:
-                omitidos.append(correo or 'sin correo')
-                continue
-
-            cursor.execute(
-                "SELECT user_id FROM usuario WHERE email = %s", (correo,)
-            )
-            if cursor.fetchone():
-                omitidos.append(correo)
-                continue
-
-            password_temp = generar_password_temporal()
-            hashed        = generate_password_hash(password_temp)
+        with db_connection() as (conn, cursor):
+            empresa_id = session.get('empresa_id')
 
             cursor.execute("""
-                INSERT INTO usuario
-                    (name, apellido, email, password, cargo, rol, empresa_id, estado)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, 'pendiente')
-            """, (nombre, apellido, correo, hashed, cargo, rol, empresa_id))
+                SELECT name, empresa_id FROM usuario WHERE user_id = %s
+            """, (session['user_id'],))
+            admin        = cursor.fetchone()
+            admin_nombre = admin[0] if admin else 'El administrador'
 
-            try:
-                cuerpo_html = f"""
-                <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;
-                            padding:32px;background:#fff;border-radius:12px;border:1px solid #eee;">
-                    <h2 style="color:#1A1A2E;margin:0 0 8px;">Has sido invitado</h2>
-                    <p style="color:#555;font-size:15px;margin:0 0 24px;">
-                        <strong>{admin_nombre}</strong> te ha invitado a unirte a Bitácora App.
-                    </p>
-                    <div style="background:#F5F6FA;border-radius:10px;padding:20px;margin-bottom:24px;">
-                        <p style="margin:0 0 8px;color:#888;font-size:13px;">TUS CREDENCIALES</p>
-                        <p style="margin:0 0 4px;font-size:15px;">
-                            <strong>Correo:</strong> {correo}
-                        </p>
-                        <p style="margin:0;font-size:15px;">
-                            <strong>Contraseña temporal:</strong>
-                            <span style="font-family:monospace;background:#fff;padding:2px 8px;
-                                         border-radius:4px;border:1px solid #ddd;">
-                                {password_temp}
-                            </span>
-                        </p>
-                    </div>
-                    <p style="color:#e09a1f;font-size:13px;margin:0 0 24px;">
-                        ⚠️ Cambia tu contraseña después de ingresar por primera vez.
-                    </p>
-                    <a href="https://bitacoraiac.onrender.com"
-                       style="display:block;text-align:center;background:#FBAF33;color:#fff;
-                              padding:14px;border-radius:8px;text-decoration:none;
-                              font-weight:bold;font-size:16px;">
-                        Ingresar a la app
-                    </a>
-                </div>
-                """
-                enviar_correo(
-                    destinatarios=correo,
-                    asunto='Invitación — Bitácora App',
-                    cuerpo_html=cuerpo_html
+            enviados = []
+            omitidos = []
+
+            for p in personas:
+                nombre   = p.get('nombre', '')
+                apellido = p.get('apellido', '')
+                correo   = p.get('correo', '')
+                cargo    = p.get('cargo', 'Sin asignar')
+                rol      = p.get('rol', 'viewer')
+
+                if not nombre or not apellido or not correo:
+                    omitidos.append(correo or 'sin correo')
+                    continue
+
+                cursor.execute(
+                    "SELECT user_id FROM usuario WHERE email = %s", (correo,)
                 )
-            except Exception as mail_err:
-                print(f"Error enviando correo a {correo}: {mail_err}")
+                if cursor.fetchone():
+                    omitidos.append(correo)
+                    continue
 
-            enviados.append(correo)
+                password_temp = generar_password_temporal()
+                hashed        = generate_password_hash(password_temp)
 
-        conn.commit()
+                cursor.execute("""
+                    INSERT INTO usuario
+                        (name, apellido, email, password, cargo, rol, empresa_id, estado)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, 'pendiente')
+                """, (nombre, apellido, correo, hashed, cargo, rol, empresa_id))
 
-        mensaje = f'Invitación enviada a {len(enviados)} persona(s).'
-        if omitidos:
-            mensaje += f' {len(omitidos)} omitido(s) por ya existir.'
+                try:
+                    cuerpo_html = f"""
+                    <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;
+                                padding:32px;background:#fff;border-radius:12px;border:1px solid #eee;">
+                        <h2 style="color:#1A1A2E;margin:0 0 8px;">Has sido invitado</h2>
+                        <p style="color:#555;font-size:15px;margin:0 0 24px;">
+                            <strong>{admin_nombre}</strong> te ha invitado a unirte a Bitácora App.
+                        </p>
+                        <div style="background:#F5F6FA;border-radius:10px;padding:20px;margin-bottom:24px;">
+                            <p style="margin:0 0 8px;color:#888;font-size:13px;">TUS CREDENCIALES</p>
+                            <p style="margin:0 0 4px;font-size:15px;">
+                                <strong>Correo:</strong> {correo}
+                            </p>
+                            <p style="margin:0;font-size:15px;">
+                                <strong>Contraseña temporal:</strong>
+                                <span style="font-family:monospace;background:#fff;padding:2px 8px;
+                                             border-radius:4px;border:1px solid #ddd;">
+                                    {password_temp}
+                                </span>
+                            </p>
+                        </div>
+                        <p style="color:#e09a1f;font-size:13px;margin:0 0 24px;">
+                            ⚠️ Cambia tu contraseña después de ingresar por primera vez.
+                        </p>
+                        <a href="https://bitacoraiac.onrender.com"
+                           style="display:block;text-align:center;background:#FBAF33;color:#fff;
+                                  padding:14px;border-radius:8px;text-decoration:none;
+                                  font-weight:bold;font-size:16px;">
+                            Ingresar a la app
+                        </a>
+                    </div>
+                    """
+                    enviar_correo(
+                        destinatarios=correo,
+                        asunto='Invitación — Bitácora App',
+                        cuerpo_html=cuerpo_html
+                    )
+                except Exception as mail_err:
+                    print(f"Error enviando correo a {correo}: {mail_err}")
 
+                enviados.append(correo)
+
+            mensaje = f'Invitación enviada a {len(enviados)} persona(s).'
+            if omitidos:
+                mensaje += f' {len(omitidos)} omitido(s) por ya existir.'
+
+            return jsonify({
+                'success':  True,
+                'enviados': len(enviados),
+                'omitidos': omitidos,
+                'mensaje':  mensaje
+            })
+
+    except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+        print(f"Error de conexión en invitar_usuarios: {e} (intento {_reintento + 1})")
+        if _reintento < 2:
+            return invitar_usuarios(_reintento=_reintento + 1)
         return jsonify({
-            'success': True,
-            'enviados': len(enviados),
-            'omitidos': omitidos,
-            'mensaje':  mensaje
-        })
+            'success': False,
+            'error':   'No se pudo conectar a la base de datos. Intenta enviar la invitación de nuevo.'
+        }), 503
 
     except Exception as e:
         print(f"Error en invitar_usuarios: {e}")
-        if conn: conn.rollback()
-        return jsonify({'success': False, 'error': str(e)})
-    finally:
-        if conn:
-            cursor.close()
-            connection_pool.putconn(conn)
+        return jsonify({'success': False, 'error': 'Ocurrió un error al procesar la invitación. Intenta de nuevo.'}), 500
 
 # ── Utilidad: generar slug ──────────────────────────────────────
 def generar_slug(nombre_empresa):
