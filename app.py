@@ -2252,6 +2252,8 @@ def get_formularios():
                 })
             return jsonify({'formularios': formularios})
     except Exception as e:
+        print(f"[ERROR] get_formularios: {e}")
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
