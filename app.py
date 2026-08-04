@@ -128,11 +128,11 @@ def init_pool():
 
     print(
         f"[POOL] Inicializado | "
-        f"minconn=2 | maxconn=10 | "
-        f"pool={id(connection_pool)}"
+        f"PID={os.getpid()} | "
+        f"pool={id(connection_pool)} | "
+        f"minconn=2 | maxconn=10"
     )
 
-init_pool()
 
 @contextmanager
 def db_connection():
