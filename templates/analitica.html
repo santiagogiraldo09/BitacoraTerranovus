@@ -432,7 +432,13 @@
                     throw new Error('No se pudieron consultar los formularios');
                 }
 
-                const formularios = await res.json();
+                const data = await res.json();
+
+                // La API puede devolver directamente un array
+                // o un objeto que contiene el array de formularios.
+                const formularios = Array.isArray(data)
+                    ? data
+                    : (Array.isArray(data.formularios) ? data.formularios : []);
 
                 const formulario8 = formularios.find(
                     f => Number(f.id) === 8
@@ -447,7 +453,11 @@
                 cargarPareto();
 
             } catch (err) {
-                console.error('Error verificando formulario de analítica:', err);
+                console.error(
+                    'Error verificando formulario de analítica:',
+                    err
+                );
+
                 mostrarToast('❌ No se pudieron consultar los formularios');
             }
         }
