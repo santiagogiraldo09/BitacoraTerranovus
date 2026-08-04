@@ -117,32 +117,47 @@ openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 @app.before_request
 def make_session_permanent():
     session.permanent = True
+
+
+class DirectConnectionPool:
+    """
+    Reemplazo del ThreadedConnectionPool. En vez de mantener conexiones
+    persistentes (incompatible con PgBouncer en modo Transaction de Supabase),
+    abre una conexión nueva por cada getconn() y la cierra en putconn().
+    PgBouncer hace el pooling real por debajo.
+    """
+    def __init__(self, dsn):
+        self.dsn = dsn
+
+    def getconn(self):
+        return psycopg2.connect(self.dsn, connect_timeout=10)
+
+    def putconn(self, conn, close=True):
+        # Siempre se cierra: no reutilizamos conexiones del lado de la app.
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+connection_pool = None
+
 def init_pool():
     global connection_pool
-    connection_pool = pg_pool.ThreadedConnectionPool(
-        minconn=2,
-        maxconn=10,
-        dsn=os.environ.get('DATABASE_URL')
-    )
+    connection_pool = DirectConnectionPool(os.environ.get('DATABASE_URL'))
+    print("[POOL] Inicializado en modo conexión directa (compatible con PgBouncer)")
 
 init_pool()
 
 @contextmanager
 def db_connection():
     conn = None
-    conn_ok = True
     try:
         conn = connection_pool.getconn()
-
-        if conn.closed:
-            connection_pool.putconn(conn, close=True)
-            conn = connection_pool.getconn()
-
         cursor = conn.cursor()
         yield conn, cursor
         conn.commit()
     except Exception as e:
-        conn_ok = False
         if conn:
             try:
                 conn.rollback()
@@ -155,10 +170,7 @@ def db_connection():
                 cursor.close()
             except Exception:
                 pass
-            if conn_ok and not conn.closed:
-                connection_pool.putconn(conn)
-            else:
-                connection_pool.putconn(conn, close=True)
+            connection_pool.putconn(conn)
 #app.secret_key = secrets.token_hex(16)  # Clave secreta para sesiones
 app.secret_key = os.environ.get('SECRET_KEY', 'bitacora-iac-2026-fallback')
 #app.secret_key = '78787878tyg8987652vgdfdf3445'
@@ -1295,12 +1307,20 @@ def create_project(user_id, nombre, fecha_inicio, fecha_fin, director, ubicacion
             connection_pool.putconn(conn)
 
 def get_db_connection():
+    """Devuelve (conn, cursor). Compatible con el patrón antiguo."""
+    conn = connection_pool.getconn()
+    cursor = conn.cursor()
+    return conn, cursor
+
+'''
+def get_db_connection():
     conn = connection_pool.getconn()
     cursor = conn.cursor()
     empresa_id = session.get('empresa_id', 1)
     cursor.execute("SET app.empresa_id = %s", (empresa_id,))
     print(f"[POOL] Conexiones en uso: {len(connection_pool._used)}")
     return conn, cursor
+'''
 
 '''
 def get_db_connection():
