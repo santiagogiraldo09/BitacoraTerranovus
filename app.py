@@ -168,6 +168,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'bitacora-iac-2026-fallback')
 #app.secret_key = '78787878tyg8987652vgdfdf3445'
 CORS(app)
 
+'''
 from flask_mail import Mail, Message
 import random, string
 
@@ -180,6 +181,69 @@ app.config['MAIL_PASSWORD'] = 'rxghrdeqoupdkaex'         # ← contraseña de ap
 app.config['MAIL_DEFAULT_SENDER'] = 'muneragacias@gmail.com'
 
 mail = Mail(app)
+'''
+import random, string
+import msal
+import requests
+
+# ── Configuración de correo vía Microsoft Graph (Outlook / Microsoft 365) ──
+GRAPH_TENANT_ID     = os.environ.get('GRAPH_TENANT_ID')
+GRAPH_CLIENT_ID     = os.environ.get('GRAPH_CLIENT_ID')
+GRAPH_CLIENT_SECRET = os.environ.get('GRAPH_CLIENT_SECRET')
+GRAPH_SENDER_EMAIL  = os.environ.get('GRAPH_SENDER_EMAIL', 'bitacora.notificaciones@iaclatam.com')
+
+_graph_app = msal.ConfidentialClientApplication(
+    GRAPH_CLIENT_ID,
+    authority=f'https://login.microsoftonline.com/{GRAPH_TENANT_ID}',
+    client_credential=GRAPH_CLIENT_SECRET
+)
+
+def _obtener_token_graph():
+    """Pide un access token a Azure AD (con caché interno de msal)."""
+    resultado = _graph_app.acquire_token_silent(
+        scopes=['https://graph.microsoft.com/.default'], account=None
+    )
+    if not resultado:
+        resultado = _graph_app.acquire_token_for_client(
+            scopes=['https://graph.microsoft.com/.default']
+        )
+    if 'access_token' not in resultado:
+        raise Exception(f"No se pudo autenticar con Microsoft Graph: {resultado.get('error_description')}")
+    return resultado['access_token']
+
+
+def enviar_correo(destinatarios, asunto, cuerpo_html):
+    """
+    Envía un correo usando Microsoft Graph API, desde GRAPH_SENDER_EMAIL.
+    destinatarios: string o lista de strings con los correos.
+    """
+    if isinstance(destinatarios, str):
+        destinatarios = [destinatarios]
+
+    token = _obtener_token_graph()
+
+    payload = {
+        "message": {
+            "subject": asunto,
+            "body": {"contentType": "HTML", "content": cuerpo_html},
+            "toRecipients": [{"emailAddress": {"address": d}} for d in destinatarios]
+        },
+        "saveToSentItems": "false"
+    }
+
+    resp = requests.post(
+        f'https://graph.microsoft.com/v1.0/users/{GRAPH_SENDER_EMAIL}/sendMail',
+        headers={
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json'
+        },
+        json=payload,
+        timeout=15
+    )
+
+    if resp.status_code != 202:
+        raise Exception(f"Error enviando correo ({resp.status_code}): {resp.text}")
+
 
 projects = []
 
@@ -254,11 +318,7 @@ def invitar_empresa():
                 VALUES (%s, %s, %s)
             """, (token, email, expira_en))
 
-        msg      = Message(
-            subject='Invitación para registrar tu empresa en Bitácora IAC',
-            recipients=[email]
-        )
-        msg.html = f"""
+        cuerpo_html = f"""
         <div style="font-family:'DM Sans',Arial,sans-serif;max-width:560px;margin:auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08);">
 
             <!-- Header -->
@@ -345,7 +405,11 @@ def invitar_empresa():
 
         </div>
         """
-        mail.send(msg)
+        enviar_correo(
+            destinatarios=email,
+            asunto='Invitación para registrar tu empresa en Bitácora IAC',
+            cuerpo_html=cuerpo_html
+        )
 
         return jsonify({'success': True})
 
@@ -407,11 +471,7 @@ def invitar_usuarios():
             """, (nombre, apellido, correo, hashed, cargo, rol, empresa_id))
 
             try:
-                msg = Message(
-                    subject=f'Invitación — Bitácora App',
-                    recipients=[correo]
-                )
-                msg.html = f"""
+                cuerpo_html = f"""
                 <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;
                             padding:32px;background:#fff;border-radius:12px;border:1px solid #eee;">
                     <h2 style="color:#1A1A2E;margin:0 0 8px;">Has sido invitado</h2>
@@ -442,7 +502,11 @@ def invitar_usuarios():
                     </a>
                 </div>
                 """
-                mail.send(msg)
+                enviar_correo(
+                    destinatarios=correo,
+                    asunto='Invitación — Bitácora App',
+                    cuerpo_html=cuerpo_html
+                )
             except Exception as mail_err:
                 print(f"Error enviando correo a {correo}: {mail_err}")
 
