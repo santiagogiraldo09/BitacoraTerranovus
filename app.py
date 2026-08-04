@@ -119,27 +119,11 @@ def make_session_permanent():
     session.permanent = True
 def init_pool():
     global connection_pool
-    import time
-    for intento in range(3):
-        try:
-            connection_pool = pg_pool.ThreadedConnectionPool(
-                minconn=2,
-                maxconn=10,
-                dsn=os.environ.get('DATABASE_URL'),
-                keepalives=1,
-                keepalives_idle=10,
-                keepalives_interval=5,
-                keepalives_count=3
-            )
-            print(f"[POOL] Conectado a la base de datos (intento {intento + 1})")
-            return
-        except Exception as e:
-            print(f"[POOL] Error al conectar (intento {intento + 1}): {e}")
-            if intento < 2:
-                time.sleep(3)
-    raise Exception("[POOL] No se pudo conectar a la base de datos después de 3 intentos")
-
-init_pool()
+    connection_pool = pg_pool.ThreadedConnectionPool(
+        minconn=2,
+        maxconn=10,
+        dsn=os.environ.get('DATABASE_URL')
+    )
 
 init_pool()
 
