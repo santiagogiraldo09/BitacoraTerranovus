@@ -130,35 +130,62 @@ init_pool()
 @contextmanager
 def db_connection():
     conn = None
-    conn_ok = True
+    cursor = None
+    conn_ok = False
+
     try:
         conn = connection_pool.getconn()
 
+        # Verificar si la conexión está marcada como cerrada
         if conn.closed:
             connection_pool.putconn(conn, close=True)
             conn = connection_pool.getconn()
 
         cursor = conn.cursor()
+
+        # Verificar que la conexión PostgreSQL/SSL
+        # realmente siga funcionando
+        cursor.execute("SELECT 1")
+        cursor.fetchone()
+
+        empresa_id = session.get('empresa_id', 1)
+
+        cursor.execute(
+            "SET app.empresa_id = %s",
+            (empresa_id,)
+        )
+
         yield conn, cursor
+
         conn.commit()
-    except Exception as e:
-        conn_ok = False
+        conn_ok = True
+
+    except Exception:
         if conn:
             try:
                 conn.rollback()
             except Exception:
                 pass
-        raise e
+
+        raise
+
     finally:
-        if conn:
+        if cursor:
             try:
                 cursor.close()
             except Exception:
                 pass
-            if conn_ok and not conn.closed:
-                connection_pool.putconn(conn)
-            else:
-                connection_pool.putconn(conn, close=True)
+
+        if conn:
+            try:
+                if conn_ok and not conn.closed:
+                    # Conexión saludable → devolver al pool
+                    connection_pool.putconn(conn)
+                else:
+                    # Conexión con error → eliminar del pool
+                    connection_pool.putconn(conn, close=True)
+            except Exception:
+                pass
 #app.secret_key = secrets.token_hex(16)  # Clave secreta para sesiones
 app.secret_key = os.environ.get('SECRET_KEY', 'bitacora-iac-2026-fallback')
 #app.secret_key = '78787878tyg8987652vgdfdf3445'
@@ -1295,12 +1322,53 @@ def create_project(user_id, nombre, fecha_inicio, fecha_fin, director, ubicacion
             connection_pool.putconn(conn)
 
 def get_db_connection():
-    conn = connection_pool.getconn()
-    cursor = conn.cursor()
-    empresa_id = session.get('empresa_id', 1)
-    cursor.execute("SET app.empresa_id = %s", (empresa_id,))
-    print(f"[POOL] Conexiones en uso: {len(connection_pool._used)}")
-    return conn, cursor
+    conn = None
+    cursor = None
+
+    try:
+        conn = connection_pool.getconn()
+
+        # Verificar si la conexión está marcada como cerrada
+        if conn.closed:
+            connection_pool.putconn(conn, close=True)
+            conn = connection_pool.getconn()
+
+        cursor = conn.cursor()
+
+        # Verificar que la conexión PostgreSQL/SSL
+        # realmente siga funcionando
+        cursor.execute("SELECT 1")
+        cursor.fetchone()
+
+        empresa_id = session.get('empresa_id', 1)
+
+        cursor.execute(
+            "SET app.empresa_id = %s",
+            (empresa_id,)
+        )
+
+        print(f"[POOL] Conexiones en uso: {len(connection_pool._used)}")
+
+        return conn, cursor
+
+    except Exception as e:
+        print(f"[POOL] Error obteniendo conexión: {e}")
+
+        # Cerrar cursor si llegó a crearse
+        if cursor:
+            try:
+                cursor.close()
+            except Exception:
+                pass
+
+        # La conexión fallida NO debe volver al pool
+        if conn:
+            try:
+                connection_pool.putconn(conn, close=True)
+            except Exception:
+                pass
+
+        raise
 
 '''
 def get_db_connection():
