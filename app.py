@@ -134,19 +134,53 @@ def db_connection():
     conn_ok = False
 
     try:
+        # Primer intento
         conn = connection_pool.getconn()
 
-        # Verificar si la conexión está marcada como cerrada
-        if conn.closed:
-            connection_pool.putconn(conn, close=True)
+        try:
+            if conn.closed:
+                connection_pool.putconn(conn, close=True)
+                conn = None
+                raise psycopg2.OperationalError(
+                    "Conexión cerrada en el pool"
+                )
+
+            cursor = conn.cursor()
+
+            # Verificar que la conexión realmente responde
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
+
+        except Exception:
+            # La conexión no sirve → eliminarla del pool
+            if cursor:
+                try:
+                    cursor.close()
+                except Exception:
+                    pass
+                cursor = None
+
+            if conn:
+                try:
+                    connection_pool.putconn(conn, close=True)
+                except Exception:
+                    pass
+
+            conn = None
+
+            # Segundo intento con una conexión nueva
             conn = connection_pool.getconn()
 
-        cursor = conn.cursor()
+            if conn.closed:
+                connection_pool.putconn(conn, close=True)
+                conn = None
+                raise
 
-        # Verificar que la conexión PostgreSQL/SSL
-        # realmente siga funcionando
-        cursor.execute("SELECT 1")
-        cursor.fetchone()
+            cursor = conn.cursor()
+
+            # Verificar nuevamente
+            cursor.execute("SELECT 1")
+            cursor.fetchone()
 
         empresa_id = session.get('empresa_id', 1)
 
@@ -179,10 +213,8 @@ def db_connection():
         if conn:
             try:
                 if conn_ok and not conn.closed:
-                    # Conexión saludable → devolver al pool
                     connection_pool.putconn(conn)
                 else:
-                    # Conexión con error → eliminar del pool
                     connection_pool.putconn(conn, close=True)
             except Exception:
                 pass
