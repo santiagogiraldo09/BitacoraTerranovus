@@ -665,6 +665,92 @@ def api_movil_distribuir():
         return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
 
 
+# ==================== CAMPOS GLOBALES =================================
+
+@api_movil.route("/api/movil/campos-globales", methods=["POST"])
+@requiere_token
+def api_movil_crear_campo():
+    """Crea un campo global."""
+    from app import supabase_client
+    u = request.usuario
+    if not _es_admin(u):
+        return jsonify({"error": "solo_admin"}), 403
+    empresa_id = _num(u["empresa_id"])
+    data = request.get_json(silent=True) or {}
+
+    nombre = (data.get("nombre") or "").strip()
+    tipo = data.get("tipo")
+    objeto = data.get("objeto", "formulario")
+    opciones = data.get("opciones", [])
+    configuracion = data.get("configuracion", {})
+
+    if not nombre or not tipo:
+        return jsonify({"error": "Nombre y tipo son obligatorios"}), 400
+    if objeto not in ("formulario", "proyecto"):
+        return jsonify({"error": "Objeto inválido"}), 400
+
+    try:
+        r = (supabase_client.table("campos_globales")
+             .insert({
+                 "empresa_id": empresa_id, "nombre": nombre, "tipo": tipo,
+                 "objeto": objeto, "opciones": opciones, "configuracion": configuracion
+             }).execute())
+        nuevo_id = (r.data or [{}])[0].get("id")
+        return jsonify({"success": True, "id": nuevo_id})
+    except Exception as e:
+        current_app.logger.exception("api_movil_crear_campo")
+        return jsonify({"error": str(e)}), 500
+
+
+@api_movil.route("/api/movil/campos-globales/<int:campo_id>", methods=["PUT"])
+@requiere_token
+def api_movil_editar_campo(campo_id):
+    """Edita un campo global existente."""
+    from app import supabase_client
+    u = request.usuario
+    if not _es_admin(u):
+        return jsonify({"error": "solo_admin"}), 403
+    empresa_id = _num(u["empresa_id"])
+    data = request.get_json(silent=True) or {}
+
+    nombre = (data.get("nombre") or "").strip()
+    tipo = data.get("tipo")
+    objeto = data.get("objeto", "formulario")
+    opciones = data.get("opciones", [])
+    configuracion = data.get("configuracion", {})
+
+    if not nombre or not tipo:
+        return jsonify({"error": "Nombre y tipo son obligatorios"}), 400
+
+    try:
+        (supabase_client.table("campos_globales")
+         .update({"nombre": nombre, "tipo": tipo, "objeto": objeto,
+                  "opciones": opciones, "configuracion": configuracion})
+         .eq("id", campo_id).eq("empresa_id", empresa_id).execute())
+        return jsonify({"success": True})
+    except Exception as e:
+        current_app.logger.exception("api_movil_editar_campo")
+        return jsonify({"error": str(e)}), 500
+
+
+@api_movil.route("/api/movil/campos-globales/<int:campo_id>", methods=["DELETE"])
+@requiere_token
+def api_movil_eliminar_campo(campo_id):
+    """Elimina un campo global."""
+    from app import supabase_client
+    u = request.usuario
+    if not _es_admin(u):
+        return jsonify({"error": "solo_admin"}), 403
+    empresa_id = _num(u["empresa_id"])
+    try:
+        (supabase_client.table("campos_globales")
+         .delete().eq("id", campo_id).eq("empresa_id", empresa_id).execute())
+        return jsonify({"success": True})
+    except Exception as e:
+        current_app.logger.exception("api_movil_eliminar_campo")
+        return jsonify({"error": str(e)}), 500
+
+
 # ==================== GESTIÓN DE USUARIOS ============================
 
 @api_movil.route("/api/movil/invitar-usuarios", methods=["POST"])
