@@ -635,7 +635,7 @@ def api_movil_config():
 
         # Formularios (lista, sin resolver campos)
         fm = (supabase_client.table("formularios")
-              .select("id, nombre, descripcion, campos")
+              .select("id, nombre, descripcion")
               .eq("empresa_id", empresa_id).order("nombre").execute())
         out["formularios"] = fm.data or []
 
@@ -663,6 +663,82 @@ def api_movil_distribuir():
     except Exception as e:
         current_app.logger.exception("api_movil_distribuir")
         return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
+
+
+# ==================== IDENTIDAD VISUAL ================================
+
+@api_movil.route("/api/movil/subir-logo", methods=["POST"])
+@requiere_token
+def api_movil_subir_logo():
+    """Sube un logo (base64) a Supabase Storage y guarda en empresa_logos."""
+    from app import supabase_client, SUPABASE_URL
+    import base64, uuid
+    u = request.usuario
+    if not _es_admin(u): return jsonify({"error":"solo_admin"}), 403
+    empresa_id = _num(u["empresa_id"])
+    data = request.get_json(silent=True) or {}
+    file_data = data.get("imagen")
+    if not file_data: return jsonify({"error":"No se recibió imagen"}), 400
+    try:
+        if "," in file_data:
+            header, b64 = file_data.split(",", 1)
+            ext = "png" if "png" in header else "jpg"
+        else:
+            b64, ext = file_data, "jpg"
+        imagen_bytes = base64.b64decode(b64)
+        nombre = f"{uuid.uuid4()}.{ext}"
+        ruta = f"logos/{empresa_id}/{nombre}"
+        supabase_client.storage.from_("fotos-bitacora").upload(
+            ruta, imagen_bytes, {"content-type": f"image/{ext}"})
+        url_publica = f"{SUPABASE_URL}/storage/v1/object/public/fotos-bitacora/{ruta}"
+        supabase_client.table("empresa_logos").insert({
+            "empresa_id": empresa_id, "url": url_publica,
+            "creado_por": _num(u["uid"])}).execute()
+        return jsonify({"url": url_publica})
+    except Exception as e:
+        current_app.logger.exception("api_movil_subir_logo")
+        return jsonify({"error": str(e)}), 500
+
+
+@api_movil.route("/api/movil/logos-empresa", methods=["GET"])
+@requiere_token
+def api_movil_logos():
+    """Lista los logos subidos de la empresa."""
+    from app import supabase_client
+    u = request.usuario
+    if not _es_admin(u): return jsonify({"error":"solo_admin"}), 403
+    empresa_id = _num(u["empresa_id"])
+    try:
+        r = (supabase_client.table("empresa_logos")
+             .select("id, url, created_at")
+             .eq("empresa_id", empresa_id)
+             .order("created_at", desc=True).execute())
+        logos = [{"id":l["id"], "url":l["url"],
+                  "fecha":l.get("created_at","")[:10]} for l in (r.data or [])]
+        return jsonify({"logos": logos})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@api_movil.route("/api/movil/guardar-configuracion", methods=["POST"])
+@requiere_token
+def api_movil_guardar_config():
+    """Guarda colores y logo de la empresa."""
+    from app import supabase_client
+    u = request.usuario
+    if not _es_admin(u): return jsonify({"error":"solo_admin"}), 403
+    empresa_id = _num(u["empresa_id"])
+    data = request.get_json(silent=True) or {}
+    try:
+        (supabase_client.table("empresas").update({
+            "color_primario": data.get("color_primario", "#FBAF33"),
+            "color_secundario": data.get("color_secundario", "#E3E3E3"),
+            "logo_url": data.get("logo", ""),
+        }).eq("id", empresa_id).execute())
+        return jsonify({"success": True})
+    except Exception as e:
+        current_app.logger.exception("api_movil_guardar_config")
+        return jsonify({"error": str(e)}), 500
 
 
 # ==================== TIPOS DE PROYECTO ===============================
