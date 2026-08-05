@@ -635,7 +635,7 @@ def api_movil_config():
 
         # Formularios (lista, sin resolver campos)
         fm = (supabase_client.table("formularios")
-              .select("id, nombre, descripcion")
+              .select("id, nombre, descripcion, campos" )
               .eq("empresa_id", empresa_id).order("nombre").execute())
         out["formularios"] = fm.data or []
 
