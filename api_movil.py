@@ -665,6 +665,59 @@ def api_movil_distribuir():
         return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
 
 
+# ==================== GESTIÓN DE USUARIOS ============================
+
+@api_movil.route("/api/movil/invitar-usuarios", methods=["POST"])
+@requiere_token
+def api_movil_invitar():
+    """Invita usuarios — llama al core puro de app.py, sin sesión."""
+    import app as appmod
+    u = request.usuario
+    if not _es_admin(u):
+        return jsonify({"error": "solo_admin"}), 403
+
+    data = request.get_json(silent=True) or {}
+    try:
+        resultado, codigo = appmod.invitar_usuarios_core(
+            data, _num(u["uid"]), _num(u["empresa_id"])
+        )
+        return jsonify(resultado), codigo
+    except Exception as e:
+        current_app.logger.exception("api_movil_invitar")
+        return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
+
+
+@api_movil.route("/api/movil/eliminar-usuario/<int:uid>", methods=["DELETE"])
+@requiere_token
+def api_movil_eliminar_usuario(uid):
+    """Elimina un usuario de la organización."""
+    from app import supabase_client
+    u = request.usuario
+    if not _es_admin(u):
+        return jsonify({"error": "solo_admin"}), 403
+
+    admin_uid = _num(u["uid"])
+    empresa_id = _num(u["empresa_id"])
+
+    if uid == admin_uid:
+        return jsonify({"success": False, "error": "No puedes eliminarte a ti mismo"})
+
+    try:
+        # Verificar que el usuario pertenece a la misma empresa
+        check = (supabase_client.table("usuario")
+                 .select("user_id").eq("user_id", uid)
+                 .eq("empresa_id", empresa_id).limit(1).execute())
+        if not (check.data or []):
+            return jsonify({"success": False, "error": "Usuario no encontrado en tu organización"})
+
+        supabase_client.table("usuario").delete().eq("user_id", uid).execute()
+        return jsonify({"success": True})
+
+    except Exception as e:
+        current_app.logger.exception("api_movil_eliminar_usuario")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @api_movil.route("/api/ping", methods=["GET"])
 def api_ping():
     return jsonify({"ok": True})

@@ -480,23 +480,28 @@ def invitar_empresa():
 
 
 @app.route('/invitar-usuarios', methods=['POST'])
-def invitar_usuarios(_reintento=0):
+def invitar_usuarios():
     if 'user_id' not in session:
         return jsonify({'success': False, 'error': 'No autenticado'}), 401
+    data = request.get_json()
+    resultado, codigo = invitar_usuarios_core(data, session['user_id'], session.get('empresa_id'))
+    return jsonify(resultado), codigo
 
-    data     = request.get_json()
+
+def invitar_usuarios_core(data, admin_user_id, empresa_id, _reintento=0):
+    """Lógica pura de invitación. No usa session ni request.
+    La llaman la ruta web y el blueprint del APK."""
     personas = data.get('personas', [])
 
     if not personas:
-        return jsonify({'success': False, 'error': 'No se recibieron datos'})
+        return {'success': False, 'error': 'No se recibieron datos'}, 400
 
     try:
         with db_connection() as (conn, cursor):
-            empresa_id = session.get('empresa_id')
 
             cursor.execute("""
                 SELECT name, empresa_id FROM usuario WHERE user_id = %s
-            """, (session['user_id'],))
+            """, (admin_user_id,))
             admin        = cursor.fetchone()
             admin_nombre = admin[0] if admin else 'El administrador'
 
@@ -554,7 +559,7 @@ def invitar_usuarios(_reintento=0):
                         <p style="color:#e09a1f;font-size:13px;margin:0 0 24px;">
                             ⚠️ Cambia tu contraseña después de ingresar por primera vez.
                         </p>
-                        <a href="https://bitacoraiac.onrender.com"
+                        <a href="https://bitacora.iaclatam.com"
                            style="display:block;text-align:center;background:#FBAF33;color:#fff;
                                   padding:14px;border-radius:8px;text-decoration:none;
                                   font-weight:bold;font-size:16px;">
@@ -576,25 +581,25 @@ def invitar_usuarios(_reintento=0):
             if omitidos:
                 mensaje += f' {len(omitidos)} omitido(s) por ya existir.'
 
-            return jsonify({
+            return {
                 'success':  True,
                 'enviados': len(enviados),
                 'omitidos': omitidos,
                 'mensaje':  mensaje
-            })
+            }, 200
 
     except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
         print(f"Error de conexión en invitar_usuarios: {e} (intento {_reintento + 1})")
         if _reintento < 2:
-            return invitar_usuarios(_reintento=_reintento + 1)
-        return jsonify({
+            return invitar_usuarios_core(data, admin_user_id, empresa_id, _reintento=_reintento + 1)
+        return {
             'success': False,
             'error':   'No se pudo conectar a la base de datos. Intenta enviar la invitación de nuevo.'
-        }), 503
+        }, 503
 
     except Exception as e:
         print(f"Error en invitar_usuarios: {e}")
-        return jsonify({'success': False, 'error': 'Ocurrió un error al procesar la invitación. Intenta de nuevo.'}), 500
+        return {'success': False, 'error': 'Ocurrió un error al procesar la invitación. Intenta de nuevo.'}, 500
 
 # ── Utilidad: generar slug ──────────────────────────────────────
 def generar_slug(nombre_empresa):
