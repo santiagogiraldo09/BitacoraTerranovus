@@ -665,6 +665,148 @@ def api_movil_distribuir():
         return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
 
 
+# ==================== TIPOS DE PROYECTO ===============================
+
+@api_movil.route("/api/movil/tipos-proyecto", methods=["GET"])
+@requiere_token
+def api_movil_tipos_proyecto():
+    from app import supabase_client
+    u = request.usuario
+    if not _es_admin(u): return jsonify({"error":"solo_admin"}), 403
+    empresa_id = _num(u["empresa_id"])
+    try:
+        r = (supabase_client.table("tipos_proyecto")
+             .select("*").eq("empresa_id", empresa_id).execute())
+        return jsonify({"tipos": r.data or []})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@api_movil.route("/api/movil/tipos-proyecto", methods=["POST"])
+@requiere_token
+def api_movil_crear_tipo():
+    from app import supabase_client
+    u = request.usuario
+    if not _es_admin(u): return jsonify({"error":"solo_admin"}), 403
+    data = request.get_json(silent=True) or {}
+    nombre = (data.get("nombre") or "").strip()
+    if not nombre: return jsonify({"error":"Nombre obligatorio"}), 400
+    try:
+        r = (supabase_client.table("tipos_proyecto").insert({
+            "empresa_id": _num(u["empresa_id"]), "nombre": nombre,
+            "descripcion": data.get("descripcion",""), "campos": data.get("campos",[])
+        }).execute())
+        return jsonify({"success":True, "id":(r.data or [{}])[0].get("id")})
+    except Exception as e: return jsonify({"error":str(e)}), 500
+
+@api_movil.route("/api/movil/tipos-proyecto/<int:tid>", methods=["PUT"])
+@requiere_token
+def api_movil_editar_tipo(tid):
+    from app import supabase_client
+    u = request.usuario
+    if not _es_admin(u): return jsonify({"error":"solo_admin"}), 403
+    data = request.get_json(silent=True) or {}
+    try:
+        (supabase_client.table("tipos_proyecto").update({
+            "nombre": (data.get("nombre") or "").strip(),
+            "descripcion": data.get("descripcion",""), "campos": data.get("campos",[])
+        }).eq("id", tid).eq("empresa_id", _num(u["empresa_id"])).execute())
+        return jsonify({"success":True})
+    except Exception as e: return jsonify({"error":str(e)}), 500
+
+@api_movil.route("/api/movil/tipos-proyecto/<int:tid>", methods=["DELETE"])
+@requiere_token
+def api_movil_eliminar_tipo(tid):
+    from app import supabase_client
+    u = request.usuario
+    if not _es_admin(u): return jsonify({"error":"solo_admin"}), 403
+    try:
+        (supabase_client.table("tipos_proyecto").delete()
+         .eq("id", tid).eq("empresa_id", _num(u["empresa_id"])).execute())
+        return jsonify({"success":True})
+    except Exception as e: return jsonify({"error":str(e)}), 500
+
+
+# ==================== FORMULARIOS =====================================
+
+@api_movil.route("/api/movil/formularios", methods=["GET"])
+@requiere_token
+def api_movil_get_formularios():
+    from app import supabase_client
+    u = request.usuario
+    if not _es_admin(u): return jsonify({"error":"solo_admin"}), 403
+    try:
+        r = (supabase_client.table("formularios")
+             .select("id, nombre, descripcion, campos, created_at")
+             .eq("empresa_id", _num(u["empresa_id"])).order("created_at", desc=True).execute())
+        return jsonify({"formularios": r.data or []})
+    except Exception as e: return jsonify({"error":str(e)}), 500
+
+@api_movil.route("/api/movil/formularios", methods=["POST"])
+@requiere_token
+def api_movil_crear_formulario():
+    from app import supabase_client
+    u = request.usuario
+    if not _es_admin(u): return jsonify({"error":"solo_admin"}), 403
+    data = request.get_json(silent=True) or {}
+    nombre = (data.get("nombre") or "").strip()
+    if not nombre: return jsonify({"error":"Nombre obligatorio"}), 400
+    try:
+        r = (supabase_client.table("formularios").insert({
+            "empresa_id": _num(u["empresa_id"]), "nombre": nombre,
+            "descripcion": (data.get("descripcion") or "").strip(),
+            "campos": data.get("campos",[])
+        }).execute())
+        return jsonify({"success":True, "id":(r.data or [{}])[0].get("id")})
+    except Exception as e: return jsonify({"error":str(e)}), 500
+
+@api_movil.route("/api/movil/formularios/<int:fid>", methods=["PUT"])
+@requiere_token
+def api_movil_editar_formulario(fid):
+    from app import supabase_client
+    u = request.usuario
+    if not _es_admin(u): return jsonify({"error":"solo_admin"}), 403
+    data = request.get_json(silent=True) or {}
+    nombre = (data.get("nombre") or "").strip()
+    if not nombre: return jsonify({"error":"Nombre obligatorio"}), 400
+    try:
+        (supabase_client.table("formularios").update({
+            "nombre": nombre, "descripcion": (data.get("descripcion") or "").strip(),
+            "campos": data.get("campos",[])
+        }).eq("id", fid).eq("empresa_id", _num(u["empresa_id"])).execute())
+        return jsonify({"success":True})
+    except Exception as e: return jsonify({"error":str(e)}), 500
+
+@api_movil.route("/api/movil/formularios/<int:fid>", methods=["DELETE"])
+@requiere_token
+def api_movil_eliminar_formulario(fid):
+    from app import supabase_client
+    u = request.usuario
+    if not _es_admin(u): return jsonify({"error":"solo_admin"}), 403
+    try:
+        (supabase_client.table("formularios").delete()
+         .eq("id", fid).eq("empresa_id", _num(u["empresa_id"])).execute())
+        return jsonify({"success":True})
+    except Exception as e: return jsonify({"error":str(e)}), 500
+
+
+@api_movil.route("/api/movil/campos-globales", methods=["GET"])
+@requiere_token
+def api_movil_get_campos():
+    """Lista campos globales, con filtro opcional por objeto."""
+    from app import supabase_client
+    u = request.usuario
+    if not _es_admin(u): return jsonify({"error":"solo_admin"}), 403
+    empresa_id = _num(u["empresa_id"])
+    objeto = request.args.get("objeto")
+    try:
+        q = (supabase_client.table("campos_globales")
+             .select("id, nombre, tipo, objeto, opciones, configuracion")
+             .eq("empresa_id", empresa_id).order("nombre"))
+        if objeto: q = q.eq("objeto", objeto)
+        return jsonify({"campos": q.execute().data or []})
+    except Exception as e: return jsonify({"error":str(e)}), 500
+
+
 # ==================== CAMPOS GLOBALES =================================
 
 @api_movil.route("/api/movil/campos-globales", methods=["POST"])
