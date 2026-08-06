@@ -4577,6 +4577,8 @@ def distribuir_campos_core(data):
             grupos_desc.append('\n'.join(lineas))
         grupos_texto = '\n\n'.join(grupos_desc) or '(ninguno)'
 
+        fecha_hoy = date.today().strftime('%Y-%m-%d')
+
         prompt_sistema = """Eres un asistente que extrae información de una transcripción de voz de un reporte de obra y la distribuye en los campos de un formulario.
 
 El formulario tiene dos partes:
@@ -4635,8 +4637,6 @@ FORMATO DE RESPUESTA:
 - "faltantes": SOLO campos sueltos que tienen la etiqueta [obligatorio] en su descripción Y que quedaron sin valor tras analizar la transcripción. Si un campo NO tiene la etiqueta [obligatorio], jamás lo incluyas en faltantes aunque esté vacío — es opcional y el usuario eligió no mencionarlo. NO reportes faltantes de campos dentro de un grupo."
 - Si no hay grupos, "grupos" debe ser {}. Si no hay ambigüedades o faltantes, arrays vacíos.
 - Las preguntas: naturales, cortas y en español colombiano."""
-
-        fecha_hoy = date.today().strftime('%Y-%m-%d')
 
         prompt_usuario = f"""Fecha actual: {fecha_hoy}
 
