@@ -367,6 +367,7 @@
 
 /* ── Tabla detalle completo (debajo del gráfico, ancho completo) ── */
 .an-card--tabla-full {
+    margin-top: 16px;
     margin-bottom: 20px;
 }
 
