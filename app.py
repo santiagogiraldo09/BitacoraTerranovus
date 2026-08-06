@@ -4394,7 +4394,7 @@ def analitica_pareto():
 
         acumulado_pp, acumulado_pnp = {}, {}
 
-        for respuestas, created_at in registros:
+        for (respuestas,) in registros:
             resp = respuestas if isinstance(respuestas, dict) else {}
 
             if linea and campo_id_linea and resp.get(campo_id_linea, '') != linea:
