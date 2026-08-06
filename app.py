@@ -4377,16 +4377,16 @@ def analitica_pareto():
             campo_id_causa_pnp = nombre_a_id.get('Código Paro No Programado', '')
             campo_id_horas_pnp = nombre_a_id.get('Horas Paro No Programado', '')
 
-            query = "SELECT rf.respuestas, rf.created_at FROM respuestas_formulario rf WHERE rf.formulario_id = %s"
+            query  = "SELECT rf.respuestas FROM respuestas_formulario rf WHERE rf.formulario_id = %s"
             params = [formulario_id]
             if project_id:
                 query += " AND rf.id_proyecto = %s"
                 params.append(project_id)
             if desde:
-                query += " AND rf.created_at::date >= %s"
+                query += " AND (rf.respuestas->>'96')::date >= %s"
                 params.append(desde)
             if hasta:
-                query += " AND rf.created_at::date <= %s"
+                query += " AND (rf.respuestas->>'96')::date <= %s"
                 params.append(hasta)
 
             cursor.execute(query, params)
