@@ -4383,10 +4383,11 @@ def analitica_pareto():
                 query += " AND rf.id_proyecto = %s"
                 params.append(project_id)
             if desde:
-                query += " AND (rf.respuestas->>'96')::date >= %s"
+                query += " AND NULLIF(rf.respuestas->>'96', '')::date >= %s"
                 params.append(desde)
             if hasta:
-                query += " AND (rf.respuestas->>'96')::date <= %s"
+                query += " AND NULLIF(rf.respuestas->>'96', '')::date <= %s"
+                params.append(hasta)
                 params.append(hasta)
 
             cursor.execute(query, params)
