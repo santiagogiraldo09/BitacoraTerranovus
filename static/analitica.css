@@ -298,3 +298,83 @@
     color: var(--an-texto-sec);
     margin: 24px 0 10px;
 }
+
+/* ── Top 5 ── */
+.an-card--top5 {
+    align-self: start;
+}
+
+.an-top5-lista {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    counter-reset: top5;
+}
+
+.an-top5-lista li {
+    counter-increment: top5;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #F3F4F6;
+    font-size: 13.5px;
+}
+
+.an-top5-lista li:last-child {
+    border-bottom: none;
+}
+
+.an-top5-lista li::before {
+    content: counter(top5);
+    min-width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--naranja, #FFAF33);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.an-top5-causa {
+    flex: 1;
+    color: var(--an-texto);
+    font-weight: 500;
+}
+
+.an-top5-horas {
+    font-weight: 700;
+    color: var(--an-texto);
+    white-space: nowrap;
+}
+
+.an-top5-peso {
+    font-size: 11px;
+    color: var(--an-texto-sec);
+    white-space: nowrap;
+}
+
+.an-top5-vacio {
+    color: var(--an-texto-sec);
+    font-size: 13px;
+    text-align: center;
+    padding: 16px 0;
+}
+
+/* ── Tabla detalle completo (debajo del gráfico, ancho completo) ── */
+.an-card--tabla-full {
+    margin-bottom: 20px;
+}
+
+.an-card--tabla-full .an-tabla-wrap {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+    .an-top5-wrap { grid-template-columns: 1fr; }
+}

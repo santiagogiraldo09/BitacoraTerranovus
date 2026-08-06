@@ -151,6 +151,7 @@
                 </div>
             </section>
 
+            <!-- Gráfico + Top 5 lado a lado -->
             <section class="an-cuerpo">
 
                 <div class="an-card an-card--grafico">
@@ -171,30 +172,40 @@
                     </div>
                 </div>
 
-                <div class="an-card an-card--tabla">
+                <div class="an-card an-card--top5">
                     <div class="an-card-header">
-                        <h2>Detalle por causa — PP</h2>
+                        <h2>Top 5 Causas — PP</h2>
+                        <span class="an-card-subtitulo">Paros programados</span>
                     </div>
-                    <div class="an-tabla-wrap">
-                        <table class="an-tabla" id="tabla-pareto-pp">
-                            <thead>
-                                <tr>
-                                    <th>Causa</th>
-                                    <th>Tiempo perdido</th>
-                                    <th>Peso</th>
-                                    <th>Acumulado</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tabla-pareto-body-pp">
-                                <tr class="an-tabla-vacia">
-                                    <td colspan="4">Sin datos aún</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <ol class="an-top5-lista" id="top5-pp"></ol>
                 </div>
 
             </section>
+
+            <!-- Tabla de detalle completo — ancho completo debajo del gráfico -->
+            <div class="an-card an-card--tabla-full">
+                <div class="an-card-header">
+                    <h2>Detalle por causa — PP</h2>
+                    <span class="an-card-subtitulo">Todas las causas ordenadas por impacto</span>
+                </div>
+                <div class="an-tabla-wrap">
+                    <table class="an-tabla" id="tabla-pareto-pp">
+                        <thead>
+                            <tr>
+                                <th>Causa</th>
+                                <th>Tiempo perdido</th>
+                                <th>Peso</th>
+                                <th>Acumulado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-pareto-body-pp">
+                            <tr class="an-tabla-vacia">
+                                <td colspan="4">Sin datos aún</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
             <!-- ===== PARO NO PROGRAMADO ===== -->
             <h2 class="an-seccion-titulo">Paros No Programados</h2>
@@ -404,11 +415,33 @@
             });
         }
 
+        function renderTop5(filas, sufijo) {
+            const lista = document.getElementById('top5-' + sufijo);
+            if (!lista) return;
+            lista.innerHTML = '';
+
+            if (!filas.length) {
+                lista.innerHTML = '<li class="an-top5-vacio">Sin datos aún</li>';
+                return;
+            }
+
+            filas.slice(0, 5).forEach(f => {
+                const li = document.createElement('li');
+                li.innerHTML = `
+                    <span class="an-top5-causa">${f.causa}</span>
+                    <span class="an-top5-horas">${f.horas.toFixed(2)} h</span>
+                    <span class="an-top5-peso">${f.peso.toFixed(0)}%</span>
+                `;
+                lista.appendChild(li);
+            });
+        }
+
         function renderDataset(datos, sufijo) {
             document.getElementById('estado-cargando-' + sufijo).style.display = 'none';
 
             if (!datos.length) {
                 document.getElementById('estado-vacio-' + sufijo).style.display = 'flex';
+                renderTop5([], sufijo);
                 renderTabla([], sufijo);
                 return;
             }
@@ -417,6 +450,7 @@
 
             const resultado = calcularPareto(datos);
             renderKPIs(resultado, sufijo);
+            renderTop5(resultado.filas, sufijo);
             renderTabla(resultado.filas, sufijo);
             renderGrafico(resultado.filas, sufijo);
 
