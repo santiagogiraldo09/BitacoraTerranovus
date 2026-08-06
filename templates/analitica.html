@@ -248,30 +248,39 @@
                     </div>
                 </div>
 
-                <div class="an-card an-card--tabla">
+                <div class="an-card an-card--top5">
                     <div class="an-card-header">
-                        <h2>Detalle por causa — PNP</h2>
+                        <h2>Top 5 Causas — PNP</h2>
+                        <span class="an-card-subtitulo">Paros no programados</span>
                     </div>
-                    <div class="an-tabla-wrap">
-                        <table class="an-tabla" id="tabla-pareto-pnp">
-                            <thead>
-                                <tr>
-                                    <th>Causa</th>
-                                    <th>Tiempo perdido</th>
-                                    <th>Peso</th>
-                                    <th>Acumulado</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tabla-pareto-body-pnp">
-                                <tr class="an-tabla-vacia">
-                                    <td colspan="4">Sin datos aún</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <ol class="an-top5-lista" id="top5-pnp"></ol>
                 </div>
 
             </section>
+
+            <div class="an-card an-card--tabla">
+                <div class="an-card-header">
+                    <h2>Detalle por causa — PNP</h2>
+                    <span class="an-card-subtitulo">Todas las causas ordenadas por impacto</span>
+                </div>
+                <div class="an-tabla-wrap">
+                    <table class="an-tabla" id="tabla-pareto-pnp">
+                        <thead>
+                            <tr>
+                                <th>Causa</th>
+                                <th>Tiempo perdido</th>
+                                <th>Peso</th>
+                                <th>Acumulado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabla-pareto-body-pnp">
+                            <tr class="an-tabla-vacia">
+                                <td colspan="4">Sin datos aún</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
 
         </main>
 
