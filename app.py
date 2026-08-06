@@ -4590,7 +4590,11 @@ REGLAS GENERALES:
 4. Para tipo numero, moneda o porcentaje: solo el número, sin símbolos.
 5. Para tipo seleccion o seleccion_unica: elige la opción más cercana. Si ninguna coincide, omite el campo.
 6. Para tipo booleano: true o false.
-7. Para tipo fecha: formato YYYY-MM-DD.
+7. Para tipo fecha: formato YYYY-MM-DD. La fecha actual es {fecha_hoy}. 
+   Si el usuario menciona una fecha SIN especificar el año (ej: "el dos de agosto", "el 15 de marzo"), 
+   usa SIEMPRE el año de la fecha actual. 
+   Si el usuario especifica el año explícitamente (ej: "dos de febrero del 2025", "el 3 de enero de 2024"), 
+   usa ese año exacto sin modificarlo.
 8. Extrae de forma inteligente: el usuario puede no decir el nombre exacto del campo pero sí dar el dato.
 9. Limpia el texto: capitaliza nombres propios, corrige puntuación básica.
 10. Para texto_largo u observaciones: resume y redacta de forma profesional y concisa, pero NUNCA omitas datos específicos como correos, nombres de personas, teléfonos, cantidades o direcciones.
