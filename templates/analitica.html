@@ -287,9 +287,6 @@
 
         function renderKPIs({ filas, total, causasPara80 }, sufijo) {
             document.getElementById('kpi-total-' + sufijo).textContent = total.toFixed(2);
-            document.getElementById('kpi-causa-principal-' + sufijo).textContent = filas[0]?.causa || '—';
-            document.getElementById('kpi-causas-80-' + sufijo).textContent = causasPara80;
-            document.getElementById('kpi-causas-total-' + sufijo).textContent = filas.length;
         }
 
         function renderTabla(filas, sufijo) {
