@@ -4628,7 +4628,7 @@ FORMATO DE RESPUESTA:
   ]
 }
 
-- "faltantes": SOLO campos sueltos [obligatorio] que quedaron sin valor y que no estén en ambiguedades. NO reportes faltantes de campos que estén dentro de un grupo.
+- "faltantes": SOLO campos sueltos que tienen la etiqueta [obligatorio] en su descripción Y que quedaron sin valor tras analizar la transcripción. Si un campo NO tiene la etiqueta [obligatorio], jamás lo incluyas en faltantes aunque esté vacío — es opcional y el usuario eligió no mencionarlo. NO reportes faltantes de campos dentro de un grupo."
 - Si no hay grupos, "grupos" debe ser {}. Si no hay ambigüedades o faltantes, arrays vacíos.
 - Las preguntas: naturales, cortas y en español colombiano."""
 
