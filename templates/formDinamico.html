@@ -248,15 +248,45 @@
                 </div>
 
                 {% elif campo.tipo == 'imagen' %}
-                <input type="file" class="field-input campo-respuesta"
-                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
-                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"{{ extra }}
-                    accept="image/*">
-                {% if valor %}
-                <span style="font-size:12px;color:var(--gris-texto,#6b7280);margin-top:4px;display:block;">
-                    <i class="fas fa-image"></i> Archivo actual: {{ valor }}
-                </span>
-                {% endif %}
+                <div class="imagen-campo-wrap" data-campo-id="{{ campo.id }}">
+
+                    <div class="imagen-preview-grid" id="previews-{{ campo.id }}">
+                        {% if valor %}
+                            {% if valor is string %}
+                                {% set urls = [valor] %}
+                            {% else %}
+                                {% set urls = valor %}
+                            {% endif %}
+                            {% for url in urls %}
+                            <div class="imagen-preview-item">
+                                <img src="{{ url }}" class="imagen-preview-thumb"
+                                    onclick="window.open('{{ url }}', '_blank')">
+                                <button type="button" class="imagen-preview-delete"
+                                        onclick="eliminarImagenGuardada(this, '{{ campo.id }}', '{{ url }}')">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                                <span class="imagen-preview-label">Guardada</span>
+                                <input type="hidden" class="imagen-url-guardada"
+                                    data-campo-id="{{ campo.id }}" value="{{ url }}">
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+
+                    <label class="btn-evidencia" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-top:8px;">
+                        <i class="fas fa-image"></i> Agregar imagen(es)
+                        <input type="file"
+                            class="imagen-file-input"
+                            data-campo-id="{{ campo.id }}"
+                            data-requerido="{{ campo.requerido }}"
+                            data-nombre="{{ campo.nombre }}"
+                            data-tipo="{{ campo.tipo }}"{{ extra }}
+                            accept="image/*"
+                            multiple
+                            style="display:none;"
+                            onchange="previsualizarImagenes(this, '{{ campo.id }}')">
+                    </label>
+                </div>
 
                 {% elif campo.tipo == 'adjunto' %}
                 <input type="file" class="field-input campo-respuesta"
@@ -489,6 +519,126 @@
     let countdownInterval   = null;
     let ambiguedadesPendientes = [];
     let ambiguedadActual       = null;
+
+    // ── Imágenes en campos tipo imagen ──
+    const imagenesNuevasPendientes = {};
+
+    function previsualizarImagenes(input, campoId) {
+        const archivos = Array.from(input.files || []);
+        if (!archivos.length) return;
+
+        if (!imagenesNuevasPendientes[campoId]) {
+            imagenesNuevasPendientes[campoId] = [];
+        }
+
+        const grid = document.getElementById(`previews-${campoId}`);
+
+        archivos.forEach(archivo => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const base64 = e.target.result;
+                const idx    = imagenesNuevasPendientes[campoId].length;
+                imagenesNuevasPendientes[campoId].push({ base64, nombre: archivo.name });
+
+                const item = document.createElement('div');
+                item.className = 'imagen-preview-item';
+                item.dataset.nuevaIdx = idx;
+                item.dataset.campoId  = campoId;
+                item.innerHTML = `
+                    <img src="${base64}" class="imagen-preview-thumb"
+                        onclick="window.open('${base64}', '_blank')">
+                    <button type="button" class="imagen-preview-delete"
+                            onclick="eliminarImagenNueva(this, '${campoId}', ${idx})">
+                        <i class="fas fa-times"></i>
+                    </button>
+                    <span class="imagen-preview-label">Nueva</span>
+                `;
+                grid.appendChild(item);
+            };
+            reader.readAsDataURL(archivo);
+        });
+
+        input.value = '';
+    }
+
+    function eliminarImagenNueva(btn, campoId, idx) {
+        if (imagenesNuevasPendientes[campoId]) {
+            imagenesNuevasPendientes[campoId][idx] = null;
+        }
+        btn.closest('.imagen-preview-item').remove();
+    }
+
+    function eliminarImagenGuardada(btn, campoId, url) {
+        btn.closest('.imagen-preview-item').remove();
+    }
+
+    async function subirImagenesDeFormulario(respuestas) {
+        // ── Diagnóstico: imprime en consola qué imágenes hay pendientes ──
+        console.log('[IMAGENES] Pendientes:', JSON.stringify(
+            Object.entries(imagenesNuevasPendientes).map(([k, v]) => ({
+                campo: k,
+                cantidad: (v || []).filter(Boolean).length
+            }))
+        ));
+
+        for (const [campoId, lista] of Object.entries(imagenesNuevasPendientes)) {
+            const nuevasValidas = (lista || []).filter(Boolean);
+            if (!nuevasValidas.length) continue;
+
+            const urlsNuevas = [];
+            for (const { base64 } of nuevasValidas) {
+                try {
+                    const resp = await fetch('/upload_foto', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ file_data: base64 })
+                    });
+
+                    if (!resp.ok) {
+                        const err = await resp.json().catch(() => ({}));
+                        console.error(`[IMAGENES] Error HTTP ${resp.status} subiendo imagen del campo ${campoId}:`, err);
+                        continue;
+                    }
+
+                    const data = await resp.json();
+                    if (data.url) {
+                        urlsNuevas.push(data.url);
+                        console.log(`[IMAGENES] Campo ${campoId} → subida OK: ${data.url}`);
+                    } else {
+                        console.error(`[IMAGENES] Campo ${campoId} → respuesta sin URL:`, data);
+                    }
+                } catch (e) {
+                    console.error(`[IMAGENES] Campo ${campoId} → error de conexión:`, e);
+                }
+            }
+
+            const urlsGuardadas = Array.from(
+                document.querySelectorAll(`.imagen-url-guardada[data-campo-id="${campoId}"]`)
+            ).map(i => i.value).filter(Boolean);
+
+            const todasLasUrls = [...urlsGuardadas, ...urlsNuevas];
+            if (todasLasUrls.length > 0) {
+                respuestas[campoId] = todasLasUrls.length === 1
+                    ? todasLasUrls[0]
+                    : todasLasUrls;
+            }
+        }
+
+        // Campos de imagen sin cambios — conservar URLs guardadas
+        document.querySelectorAll('.imagen-file-input').forEach(input => {
+            const campoId = input.dataset.campoId;
+            if (imagenesNuevasPendientes[campoId] !== undefined) return;
+
+            const urlsGuardadas = Array.from(
+                document.querySelectorAll(`.imagen-url-guardada[data-campo-id="${campoId}"]`)
+            ).map(i => i.value).filter(Boolean);
+
+            if (urlsGuardadas.length === 1) respuestas[campoId] = urlsGuardadas[0];
+            else if (urlsGuardadas.length > 1) respuestas[campoId] = urlsGuardadas;
+        });
+
+        return respuestas;
+    }
 
     function mostrarEstado(estado) {
         document.getElementById('voice-idle').style.display       = estado === 'idle'       ? 'flex' : 'none';
@@ -1536,6 +1686,8 @@
                 ? `/api/respuestas-formulario/${registroId}`
                 : '/api/respuestas-formulario';
             const method = esEdicion ? 'PUT' : 'POST';
+            // Subir imágenes pendientes y conservar URLs existentes
+            respuestas = await subirImagenesDeFormulario(respuestas);
             const body   = esEdicion
                 ? { respuestas }
                 : {

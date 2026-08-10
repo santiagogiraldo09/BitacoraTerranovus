@@ -329,12 +329,19 @@ def upload_foto():
         data = request.json
         file_data = data.get('file_data', '')
 
-        # Quitar el prefijo data:image/...;base64,
+        if not file_data:
+            return jsonify({"error": "No se recibió imagen"}), 400
+
         if ',' in file_data:
             header, b64 = file_data.split(',', 1)
-            ext = 'png' if 'png' in header else 'jpg'
+            if 'png' in header:
+                ext, mime = 'png', 'image/png'
+            elif 'webp' in header:
+                ext, mime = 'webp', 'image/webp'
+            else:
+                ext, mime = 'jpg', 'image/jpeg'
         else:
-            b64, ext = file_data, 'jpg'
+            b64, ext, mime = file_data, 'jpg', 'image/jpeg'
 
         imagen_bytes = base64.b64decode(b64)
         nombre_archivo = f"{uuid.uuid4()}.{ext}"
@@ -343,7 +350,7 @@ def upload_foto():
         supabase_client.storage.from_('fotos-bitacora').upload(
             ruta,
             imagen_bytes,
-            {"content-type": f"image/{ext}"}
+            {"content-type": mime}
         )
 
         url_publica = f"{SUPABASE_URL}/storage/v1/object/public/fotos-bitacora/{ruta}"
