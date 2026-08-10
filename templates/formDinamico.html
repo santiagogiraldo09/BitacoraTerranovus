@@ -248,42 +248,15 @@
                 </div>
 
                 {% elif campo.tipo == 'imagen' %}
-                <div class="imagen-campo-wrap" data-campo-id="{{ campo.id }}">
-
-                    {% if valor %}
-                    <div class="imagen-preview-item" id="preview-{{ campo.id }}-0">
-                        <img src="{{ valor }}" class="imagen-preview-thumb"
-                            onclick="window.open('{{ valor }}', '_blank')">
-                        <button type="button" class="imagen-preview-delete"
-                                onclick="descartarImagenExistente('{{ campo.id }}')">
-                            <i class="fas fa-times"></i>
-                        </button>
-                        <span class="imagen-preview-label">Imagen guardada</span>
-                    </div>
-                    <input type="hidden"
-                        class="campo-respuesta imagen-url-guardada"
-                        data-campo-id="{{ campo.id }}"
-                        data-requerido="{{ campo.requerido }}"
-                        data-nombre="{{ campo.nombre }}"
-                        data-tipo="{{ campo.tipo }}"{{ extra }}
-                        value="{{ valor }}">
-                    {% endif %}
-
-                    <div class="imagen-preview-grid" id="previews-{{ campo.id }}"></div>
-
-                    <label class="btn-evidencia" style="cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin-top:8px;">
-                        <i class="fas fa-image"></i> Seleccionar imagen
-                        <input type="file"
-                            class="campo-respuesta imagen-file-input"
-                            data-campo-id="{{ campo.id }}"
-                            data-requerido="{{ campo.requerido }}"
-                            data-nombre="{{ campo.nombre }}"
-                            data-tipo="{{ campo.tipo }}"{{ extra }}
-                            accept="image/*"
-                            style="display:none;"
-                            onchange="previsualizarImagen(this, '{{ campo.id }}')">
-                    </label>
-                </div>
+                <input type="file" class="field-input campo-respuesta"
+                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"{{ extra }}
+                    accept="image/*">
+                {% if valor %}
+                <span style="font-size:12px;color:var(--gris-texto,#6b7280);margin-top:4px;display:block;">
+                    <i class="fas fa-image"></i> Archivo actual: {{ valor }}
+                </span>
+                {% endif %}
 
                 {% elif campo.tipo == 'adjunto' %}
                 <input type="file" class="field-input campo-respuesta"
@@ -516,97 +489,7 @@
     let countdownInterval   = null;
     let ambiguedadesPendientes = [];
     let ambiguedadActual       = null;
-    // Estado de imágenes nuevas pendientes de subir (por campo_id)
-    const imagenesNuevasPendientes = {};
 
-    function previsualizarImagen(input, campoId) {
-        const archivo = input.files?.[0];
-        if (!archivo) return;
-
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            const base64 = e.target.result;
-
-            // Guardar en estado pendiente
-            imagenesNuevasPendientes[campoId] = base64;
-
-            // Ocultar imagen guardada previa si la hay
-            const guardada = document.querySelector(`#preview-${campoId}-0`);
-            if (guardada) guardada.style.display = 'none';
-            const urlGuardada = document.querySelector(`.imagen-url-guardada[data-campo-id="${campoId}"]`);
-            if (urlGuardada) urlGuardada.value = '';
-
-            // Mostrar preview de la imagen nueva
-            const grid = document.getElementById(`previews-${campoId}`);
-            grid.innerHTML = '';
-            const item = document.createElement('div');
-            item.className = 'imagen-preview-item';
-            item.innerHTML = `
-                <img src="${base64}" class="imagen-preview-thumb"
-                    onclick="window.open('${base64}', '_blank')">
-                <button type="button" class="imagen-preview-delete"
-                        onclick="descartarImagenNueva('${campoId}')">
-                    <i class="fas fa-times"></i>
-                </button>
-                <span class="imagen-preview-label">Nueva imagen</span>
-            `;
-            grid.appendChild(item);
-        };
-        reader.readAsDataURL(archivo);
-    }
-
-    function descartarImagenNueva(campoId) {
-        delete imagenesNuevasPendientes[campoId];
-        const grid = document.getElementById(`previews-${campoId}`);
-        if (grid) grid.innerHTML = '';
-        // Si había imagen guardada, volver a mostrarla
-        const guardada = document.querySelector(`#preview-${campoId}-0`);
-        if (guardada) guardada.style.display = '';
-        const urlGuardada = document.querySelector(`.imagen-url-guardada[data-campo-id="${campoId}"]`);
-        if (urlGuardada) {
-            const originalUrl = guardada?.querySelector('img')?.src || '';
-            urlGuardada.value = originalUrl;
-        }
-        // Limpiar el input file
-        const fileInput = document.querySelector(`.imagen-file-input[data-campo-id="${campoId}"]`);
-        if (fileInput) fileInput.value = '';
-    }
-
-    function descartarImagenExistente(campoId) {
-        const guardada = document.querySelector(`#preview-${campoId}-0`);
-        if (guardada) guardada.style.display = 'none';
-        const urlGuardada = document.querySelector(`.imagen-url-guardada[data-campo-id="${campoId}"]`);
-        if (urlGuardada) urlGuardada.value = '';
-    }
-
-    async function subirImagenesDeFormulario(respuestas) {
-        for (const [campoId, base64] of Object.entries(imagenesNuevasPendientes)) {
-            try {
-                const resp = await fetch('/upload_foto', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ file_data: base64 })
-                });
-                const data = await resp.json();
-                if (data.url) {
-                    respuestas[campoId] = data.url;
-                }
-            } catch (e) {
-                console.error(`Error subiendo imagen del campo ${campoId}:`, e);
-            }
-        }
-
-        // También conservar URLs de imágenes guardadas que no se descartaron
-        document.querySelectorAll('.imagen-url-guardada').forEach(input => {
-            if (input.value && !respuestas[input.dataset.campoId]) {
-                respuestas[input.dataset.campoId] = input.value;
-            }
-        });
-
-        return respuestas;
-    }
-
-    
     function mostrarEstado(estado) {
         document.getElementById('voice-idle').style.display       = estado === 'idle'       ? 'flex' : 'none';
         document.getElementById('voice-recording').style.display  = estado === 'recording'  ? 'flex' : 'none';
@@ -1653,8 +1536,6 @@
                 ? `/api/respuestas-formulario/${registroId}`
                 : '/api/respuestas-formulario';
             const method = esEdicion ? 'PUT' : 'POST';
-            // Subir imágenes pendientes y conservar URLs existentes
-            respuestas = await subirImagenesDeFormulario(respuestas);
             const body   = esEdicion
                 ? { respuestas }
                 : {
@@ -1662,8 +1543,6 @@
                     project_id:    parseInt(projectId),
                     respuestas
                 };
-
-            
 
             const res = await fetch(url, {
                 method,
