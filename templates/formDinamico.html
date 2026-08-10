@@ -1720,8 +1720,9 @@
             } else {
                 mostrarToast('❌ ' + (data.error || 'Error al guardar'));
             }
-        } catch {
-            mostrarToast('❌ Error de conexión');
+        } catch (err) {
+            console.error('[GUARDAR] Error:', err);
+            mostrarToast('❌ Error de conexión al guardar. Intenta de nuevo.');
         } finally {
             btn.disabled  = false;
             btn.innerHTML = textoOriginal;
