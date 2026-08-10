@@ -4522,6 +4522,7 @@ def distribuir_campos():
         return jsonify({'error': 'No autorizado'}), 401
     data = request.get_json()
     resultado, codigo = distribuir_campos_core(data)
+    print(f"[DISTRIBUIR] Grupos resultado: {grupos_resultado}")
     return jsonify(resultado), codigo
 
 
