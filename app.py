@@ -4522,7 +4522,6 @@ def distribuir_campos():
         return jsonify({'error': 'No autorizado'}), 401
     data = request.get_json()
     resultado, codigo = distribuir_campos_core(data)
-    print(f"[DISTRIBUIR] Grupos resultado: {grupos_resultado}")
     return jsonify(resultado), codigo
 
 
@@ -4580,7 +4579,7 @@ def distribuir_campos_core(data):
 
         fecha_hoy = date.today().strftime('%Y-%m-%d')
 
-        prompt_sistema = """Eres un asistente que extrae información de una transcripción de voz de un reporte de obra y la distribuye en los campos de un formulario.
+        prompt_sistema = f"""Eres un asistente que extrae información de una transcripción de voz de un reporte de obra y la distribuye en los campos de un formulario.
 
 El formulario tiene dos partes:
 - CAMPOS SUELTOS: un solo valor cada uno.
@@ -4683,6 +4682,7 @@ Devuelve SOLO el JSON con los valores extraídos."""
         grupos_resultado = {k: v for k, v in grupos_resultado.items()
                             if k in gids_validos and isinstance(v, list)}
 
+        print(f"[DISTRIBUIR] Grupos resultado: {grupos_resultado}")
         bloques = sum(len(v) for v in grupos_resultado.values())
         print(f"[DISTRIBUIR] Sueltos: {len([v for v in campos_resultado.values() if v])}/{len(sueltos)}. "
               f"Grupos: {len(grupos_resultado)} ({bloques} bloques). "
