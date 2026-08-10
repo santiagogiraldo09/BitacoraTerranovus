@@ -580,11 +580,14 @@
             const cont = document.querySelector(`.grupo-rep[data-gid="${gid}"]`);
             if (!cont || !Array.isArray(lista)) return;
 
+            const bloquesUsados = new Set();
+
             lista.forEach(item => {
                 try {
                     if (!item || !item.valores) return;
                     let idx;
-                    if (item.bloque === 'nuevo' || !item.bloque) {
+                    if (item.bloque === 'nuevo' || !item.bloque || bloquesUsados.has(String(item.bloque))) {
+                        // "nuevo" explícito, sin bloque, o bloque ya ocupado → crear uno nuevo
                         agregarRepeticion(gid, true);
                         idx = cont.querySelectorAll('.rep-bloque').length - 1;
                     } else {
@@ -593,6 +596,7 @@
                         while (cont.querySelectorAll('.rep-bloque').length <= idx) {
                             agregarRepeticion(gid, true);
                         }
+                        bloquesUsados.add(String(item.bloque));
                     }
                     const bloque = cont.querySelectorAll('.rep-bloque')[idx];
                     if (bloque) llenarCamposEn(bloque, item.valores);

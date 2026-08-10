@@ -4604,7 +4604,7 @@ REGLAS GENERALES:
 
 REGLAS DE LOS GRUPOS (lo más importante):
 12. Un grupo representa algo de lo que el usuario pudo hablar varias veces. Devuelve un elemento por cada ocurrencia REAL que mencione.
-13. Cada elemento lleva "bloque": el número que el usuario mencionó. "En la actividad 2..." → "bloque": 2. Si habla de algo nuevo sin numerar, usa "bloque": "nuevo".
+13. Cada elemento lleva "bloque": el número que el usuario mencionó cuando se refiere explícitamente a un bloque del formulario ("en la actividad 2", "el registro 3"). Si el usuario menciona varias ocurrencias distintas de forma seguida SIN referirse a bloques del formulario (ej: "el primero son albañiles, el segundo maestros, el tercero peones"), usa "bloque": "nuevo" para cada una — nunca repitas "bloque": 1 para ocurrencias distintas.
 14. Si el usuario se refiere a un bloque por su contenido en vez de por número (ej. "el del vaciado"), usa el número de ese bloque según los bloques que ya existen en pantalla.
 15. En "valores" pon SOLO los campos que el usuario mencionó para ese bloque. Los que no mencionó se omiten: lo que ya está escrito en pantalla se conserva solo.
 16. Si el usuario NO usó marcadores ni números y no está claro que sean varias ocurrencias, trátalo como UNA SOLA: un elemento con "bloque": 1. Ante la duda, NO partas.
