@@ -4579,7 +4579,7 @@ def distribuir_campos_core(data):
 
         fecha_hoy = date.today().strftime('%Y-%m-%d')
 
-        prompt_sistema = f"""Eres un asistente que extrae información de una transcripción de voz de un reporte de obra y la distribuye en los campos de un formulario.
+        prompt_sistema = """Eres un asistente que extrae información de una transcripción de voz de un reporte de obra y la distribuye en los campos de un formulario.
 
 El formulario tiene dos partes:
 - CAMPOS SUELTOS: un solo valor cada uno.
