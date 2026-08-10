@@ -325,3 +325,62 @@ textarea.field-input { resize: vertical; min-height: 90px; }
         grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
     }
 }
+
+/* ── Campos tipo imagen en formulario dinámico ── */
+.imagen-campo-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.imagen-preview-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.imagen-preview-item {
+    position: relative;
+    width: 90px;
+    height: 90px;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--borde, #e5e7eb);
+}
+
+.imagen-preview-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    cursor: pointer;
+}
+
+.imagen-preview-label {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0,0,0,0.45);
+    color: #fff;
+    font-size: 9px;
+    text-align: center;
+    padding: 2px 0;
+}
+
+.imagen-preview-delete {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(239,68,68,0.85);
+    border: none;
+    color: #fff;
+    font-size: 9px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
