@@ -608,6 +608,292 @@ def invitar_usuarios_core(data, admin_user_id, empresa_id, _reintento=0):
         print(f"Error en invitar_usuarios: {e}")
         return {'success': False, 'error': 'Ocurrió un error al procesar la invitación. Intenta de nuevo.'}, 500
 
+
+# ── BI: CRUD de tableros ─────────────────────────────────────────────
+
+@app.route('/api/bi/tableros', methods=['GET'])
+def bi_listar_tableros():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT id, nombre, created_at
+                FROM tableros_bi
+                WHERE empresa_id = %s
+                ORDER BY created_at DESC
+            """, (session.get('empresa_id'),))
+            tableros = [{'id': r[0], 'nombre': r[1], 'created_at': str(r[2])}
+                        for r in cursor.fetchall()]
+        return jsonify({'tableros': tableros})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/bi/tableros', methods=['POST'])
+def bi_crear_tablero():
+    if 'user_id' not in session or session.get('user_rol') != 'admin':
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        data   = request.get_json()
+        nombre = data.get('nombre', '').strip()
+        if not nombre:
+            return jsonify({'error': 'El nombre es obligatorio'}), 400
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                INSERT INTO tableros_bi (empresa_id, nombre)
+                VALUES (%s, %s) RETURNING id
+            """, (session.get('empresa_id'), nombre))
+            nuevo_id = cursor.fetchone()[0]
+        return jsonify({'success': True, 'id': nuevo_id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/bi/tableros/<int:tablero_id>', methods=['DELETE'])
+def bi_eliminar_tablero(tablero_id):
+    if 'user_id' not in session or session.get('user_rol') != 'admin':
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                DELETE FROM tableros_bi
+                WHERE id = %s AND empresa_id = %s
+            """, (tablero_id, session.get('empresa_id')))
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ── BI: CRUD de visualizaciones ──────────────────────────────────────
+
+@app.route('/api/bi/tableros/<int:tablero_id>/visualizaciones', methods=['GET'])
+def bi_listar_visualizaciones(tablero_id):
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        with db_connection() as (conn, cursor):
+            # Verificar que el tablero pertenece a la empresa
+            cursor.execute("""
+                SELECT id FROM tableros_bi
+                WHERE id = %s AND empresa_id = %s
+            """, (tablero_id, session.get('empresa_id')))
+            if not cursor.fetchone():
+                return jsonify({'error': 'Tablero no encontrado'}), 404
+
+            cursor.execute("""
+                SELECT id, tipo, titulo, config, posicion
+                FROM visualizaciones_bi
+                WHERE tablero_id = %s
+                ORDER BY posicion ASC
+            """, (tablero_id,))
+            vizs = [{'id': r[0], 'tipo': r[1], 'titulo': r[2],
+                     'config': r[3], 'posicion': r[4]}
+                    for r in cursor.fetchall()]
+        return jsonify({'visualizaciones': vizs})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/bi/tableros/<int:tablero_id>/visualizaciones', methods=['POST'])
+def bi_guardar_visualizaciones(tablero_id):
+    if 'user_id' not in session or session.get('user_rol') != 'admin':
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        data           = request.get_json()
+        visualizaciones = data.get('visualizaciones', [])
+        with db_connection() as (conn, cursor):
+            # Verificar pertenencia
+            cursor.execute("""
+                SELECT id FROM tableros_bi
+                WHERE id = %s AND empresa_id = %s
+            """, (tablero_id, session.get('empresa_id')))
+            if not cursor.fetchone():
+                return jsonify({'error': 'Tablero no encontrado'}), 404
+
+            # Reemplazar todas las visualizaciones del tablero
+            cursor.execute("DELETE FROM visualizaciones_bi WHERE tablero_id = %s", (tablero_id,))
+            for i, viz in enumerate(visualizaciones):
+                cursor.execute("""
+                    INSERT INTO visualizaciones_bi (tablero_id, tipo, titulo, config, posicion)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (tablero_id, viz['tipo'], viz['titulo'],
+                      json.dumps(viz.get('config', {})), i))
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ── BI: datos para una visualización ─────────────────────────────────
+
+@app.route('/api/bi/datos', methods=['POST'])
+def bi_datos():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        data     = request.get_json()
+        datasets = data.get('datasets', [])
+        filtros  = data.get('filtros', {})
+        desde    = filtros.get('desde', '')
+        hasta    = filtros.get('hasta', '')
+        proyecto = filtros.get('proyecto_id', '')
+
+        empresa_id = session.get('empresa_id')
+        acumulado  = {}
+
+        for ds in datasets:
+            formulario_id    = ds.get('formulario_id')
+            campo_valor      = str(ds.get('campo_valor', ''))
+            campo_agrupacion = str(ds.get('campo_agrupacion', ''))
+            agregacion       = ds.get('agregacion', 'suma')
+            es_grupo         = ds.get('es_grupo', False)
+            gid              = ds.get('gid', '')
+            campo_fecha_id   = str(ds.get('campo_fecha_id', ''))
+
+            if not formulario_id or not campo_valor:
+                continue
+
+            with db_connection() as (conn, cursor):
+                # Verificar que el formulario pertenece a la empresa
+                cursor.execute("""
+                    SELECT id FROM formularios
+                    WHERE id = %s AND empresa_id = %s
+                """, (formulario_id, empresa_id))
+                if not cursor.fetchone():
+                    continue
+
+                query  = """
+                    SELECT rf.respuestas FROM respuestas_formulario rf
+                    WHERE rf.formulario_id = %s
+                """
+                params = [formulario_id]
+
+                if proyecto:
+                    query += " AND rf.id_proyecto = %s"
+                    params.append(proyecto)
+
+                if desde and campo_fecha_id:
+                    query += f" AND NULLIF(rf.respuestas->>'{campo_fecha_id}', '')::date >= %s"
+                    params.append(desde)
+                if hasta and campo_fecha_id:
+                    query += f" AND NULLIF(rf.respuestas->>'{campo_fecha_id}', '')::date <= %s"
+                    params.append(hasta)
+
+                cursor.execute(query, params)
+                registros = [r[0] for r in cursor.fetchall() if isinstance(r[0], dict)]
+
+            for resp in registros:
+                if es_grupo and gid:
+                    for bloque in (resp.get('__repeticiones') or {}).get(gid, []):
+                        label = str(bloque.get(campo_agrupacion)
+                                 or bloque.get(campo_agrupacion + '_codigo')
+                                 or 'Sin dato')
+                        try:
+                            val = float(bloque.get(campo_valor) or 0)
+                        except:
+                            continue
+                        acumulado[label] = acumulado.get(label, 0) + val
+                else:
+                    label = str(resp.get(campo_agrupacion)
+                             or resp.get(campo_agrupacion + '_codigo')
+                             or 'Sin dato')
+                    try:
+                        val = float(resp.get(campo_valor) or 0)
+                    except:
+                        continue
+                    if agregacion == 'conteo':
+                        acumulado[label] = acumulado.get(label, 0) + 1
+                    elif agregacion == 'promedio':
+                        if label not in acumulado:
+                            acumulado[label] = {'suma': 0, 'n': 0}
+                        acumulado[label]['suma'] += val
+                        acumulado[label]['n']    += 1
+                    else:  # suma
+                        acumulado[label] = acumulado.get(label, 0) + val
+
+        if any(isinstance(v, dict) for v in acumulado.values()):
+            acumulado = {k: round(v['suma'] / v['n'], 2)
+                         for k, v in acumulado.items() if isinstance(v, dict) and v['n']}
+
+        ordenado = sorted(acumulado.items(), key=lambda x: x[1], reverse=True)
+        labels   = [x[0] for x in ordenado]
+        valores  = [round(x[1], 2) for x in ordenado]
+
+        return jsonify({'labels': labels, 'valores': valores, 'total': round(sum(valores), 2)})
+
+    except Exception as e:
+        print(f"Error en bi_datos: {e}")
+        import traceback; traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/bi/campos')
+def bi_campos():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    formulario_id = request.args.get('formulario_id', '')
+    if not formulario_id:
+        return jsonify({'error': 'Falta formulario_id'}), 400
+
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT campos FROM formularios
+                WHERE id = %s AND empresa_id = %s
+            """, (formulario_id, session.get('empresa_id')))
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({'error': 'Formulario no encontrado'}), 404
+
+            campos_config = row[0] or []
+
+            def es_grupo(item):
+                return isinstance(item, dict) and item.get('tipo') == 'grupo'
+
+            campo_ids     = [
+                (item['id'] if isinstance(item, dict) else item)
+                for item in campos_config if not es_grupo(item)
+            ]
+            grupos_config = [item for item in campos_config if es_grupo(item)]
+
+            campos_map = {}
+            if campo_ids:
+                cursor.execute("""
+                    SELECT id, nombre, tipo FROM campos_globales WHERE id = ANY(%s)
+                """, (campo_ids,))
+                for r in cursor.fetchall():
+                    campos_map[str(r[0])] = {'nombre': r[1], 'tipo': r[2]}
+
+        sueltos = [
+            {'id': cid, 'nombre': info['nombre'], 'tipo': info['tipo']}
+            for cid, info in campos_map.items()
+        ]
+
+        grupos = []
+        for g in grupos_config:
+            campos_grupo = []
+            for c in g.get('campos', []):
+                cid = str(c['id']) if isinstance(c, dict) else str(c)
+                if cid in campos_map:
+                    campos_grupo.append({
+                        'id':     cid,
+                        'nombre': campos_map[cid]['nombre'],
+                        'tipo':   campos_map[cid]['tipo']
+                    })
+            if campos_grupo:
+                grupos.append({
+                    'gid':    g.get('gid'),
+                    'nombre': g.get('nombre'),
+                    'campos': campos_grupo
+                })
+
+        return jsonify({'sueltos': sueltos, 'grupos': grupos})
+
+    except Exception as e:
+        print(f"Error en bi_campos: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 # ── Utilidad: generar slug ──────────────────────────────────────
 def generar_slug(nombre_empresa):
     # Normalizar: quitar tildes, minúsculas, reemplazar espacios
