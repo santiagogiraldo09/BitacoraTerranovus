@@ -405,15 +405,17 @@
                 </div>
             </div>
             <!-- Pregunta por campo faltante -->
+            <!--
             <div id="voice-question" style="display:none; margin:16px 0; padding:0 16px;">
                 <div style="background:#FFF7ED; border:1px solid #FDBA74; border-radius:10px; padding:14px 16px;">
                     <div style="font-size:11px; font-weight:600; color:#EA580C; margin-bottom:6px; display:flex; align-items:center; gap:4px;">
                         <i class="fas fa-question-circle"></i> Campo faltante
                     </div>
                     <div id="voice-question-text" style="font-size:14px; color:#9A3412; line-height:1.5; font-weight:500;"></div>
-                </div>
+                </div>-->
 
                 <!-- Micrófono para responder + timer -->
+                <!--
                 <div id="question-mic-area" style="display:flex; flex-direction:column; align-items:center; gap:6px; margin-top:12px;">
                     <div id="question-recording" style="display:none; flex-direction:column; align-items:center; gap:4px;">
                         <div style="width:48px; height:48px; border-radius:50%; background:#ef4444; color:white; font-size:20px; display:flex; align-items:center; justify-content:center; animation:pulse 1.5s infinite;">
@@ -427,16 +429,18 @@
                         </div>
                         <span style="font-size:12px; color:#9ca3af;">Procesando respuesta...</span>
                     </div>
-                </div>
+                </div>-->
 
                 <!-- Botón para omitir -->
+                <!--
                 <div style="text-align:center; margin-top:8px;">
                     <button type="button" onclick="omitirActual()"
                             style="background:none; border:none; font-size:12px; color:#9ca3af; cursor:pointer; text-decoration:underline;">
                         Omitir este campo
                     </button>
-                </div>
-            </div>
+                </div>-->
+            <!--
+            </div>-->
         </div>
         {% endif %}
 
@@ -828,9 +832,11 @@
             ambiguedadesPendientes = data.ambiguedades || [];
             if (ambiguedadesPendientes.length > 0) {
                 setTimeout(() => preguntarSiguienteAmbiguedad(), 1000);
-            } else if (faltantesPendientes.length > 0) {
-                setTimeout(() => preguntarSiguienteFaltante(), 1000);
-            }
+            } 
+            // COMENTADO TEMPORALMENTE — flujo de preguntas por faltantes
+            // else if (faltantesPendientes.length > 0) {
+            //     setTimeout(() => preguntarSiguienteFaltante(), 1000);
+            // }
 
         } catch {
             mostrarToast('❌ Error al procesar');
@@ -850,11 +856,11 @@
 
     function preguntarSiguienteAmbiguedad() {
         if (ambiguedadesPendientes.length === 0) {
-            // Ya no hay ambigüedades, pasar a faltantes
             document.getElementById('voice-question').style.display = 'none';
-            if (faltantesPendientes.length > 0) {
-                setTimeout(() => preguntarSiguienteFaltante(), 500);
-            }
+            // COMENTADO TEMPORALMENTE — flujo de preguntas por faltantes
+            // if (faltantesPendientes.length > 0) {
+            //     setTimeout(() => preguntarSiguienteFaltante(), 500);
+            // }
             return;
         }
 
