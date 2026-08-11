@@ -289,7 +289,7 @@ def enviar_correo(destinatarios, asunto, cuerpo_html):
             "body": {"contentType": "HTML", "content": cuerpo_html},
             "toRecipients": [{"emailAddress": {"address": d}} for d in destinatarios]
         },
-        "saveToSentItems": "false"
+        "saveToSentItems": "true"
     }
 
     resp = requests.post(
