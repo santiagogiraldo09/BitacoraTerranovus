@@ -71,7 +71,11 @@
             <!-- Header -->
             <header class="an-header">
                 <div>
-                    <h1 class="an-title">Analítica</h1>
+                    <a href="{{ url_for('analitica') }}"
+                    style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--an-texto-sec);text-decoration:none;margin-bottom:8px;">
+                        <i class="fas fa-arrow-left"></i> Analítica
+                    </a>
+                    <h1 class="an-title">Análisis de Paros</h1>
                     <p class="an-subtitle">Causas de paro ordenadas por impacto — principio de Pareto (80/20)</p>
                 </div>
             </header>
