@@ -1,0 +1,374 @@
+/* ============================================================
+   ANALÍTICA TABLERO — estilos del constructor y visualizaciones BI
+   Depende de registros.css y analitica.css
+   ============================================================ */
+
+/* ── Filtros globales en el header ── */
+.tb-filtros {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tb-filtro-select,
+.tb-filtro-input {
+    border: 1px solid var(--an-borde);
+    border-radius: 9px;
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: inherit;
+    color: var(--an-texto);
+    background: #fff;
+    outline: none;
+    transition: border-color .15s;
+}
+
+.tb-filtro-select:focus,
+.tb-filtro-input:focus {
+    border-color: var(--naranja, #FFAF33);
+}
+
+.tb-filtro-input {
+    width: 130px;
+}
+
+.tb-btn-aplicar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 9px;
+    border: 1px solid var(--an-borde);
+    background: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    color: var(--an-texto);
+    transition: border-color .15s, background .15s;
+}
+
+.tb-btn-aplicar:hover {
+    border-color: var(--naranja, #FFAF33);
+    background: #fff8ee;
+}
+
+/* ── Grid de visualizaciones ── */
+.tb-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    gap: 20px;
+    margin-top: 16px;
+}
+
+/* ── Estado vacío ── */
+.tb-vacio {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 60px 20px;
+    color: var(--an-texto-sec);
+    text-align: center;
+}
+
+.tb-vacio i {
+    font-size: 36px;
+    color: #D1D5DB;
+}
+
+.tb-vacio p {
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 280px;
+    margin: 0;
+}
+
+/* ── Card de visualización ── */
+.tb-viz-card {
+    background: var(--an-card-bg, #fff);
+    border: 1px solid var(--an-borde, #E5E7EB);
+    border-radius: var(--an-radio, 14px);
+    box-shadow: var(--an-sombra);
+    overflow: hidden;
+}
+
+.tb-viz-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 18px 0;
+}
+
+.tb-viz-titulo {
+    font-family: 'Sora', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0;
+    color: var(--an-texto, #111827);
+}
+
+.tb-viz-eliminar {
+    opacity: 0;
+    transition: opacity .15s;
+    background: none;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    padding: 4px 6px;
+    font-size: 12px;
+    border-radius: 6px;
+}
+
+.tb-viz-card:hover .tb-viz-eliminar {
+    opacity: 1;
+}
+
+.tb-viz-body {
+    padding: 14px 18px 18px;
+}
+
+.tb-viz-cargando {
+    display: flex;
+    justify-content: center;
+    padding: 32px 0;
+}
+
+.tb-viz-error {
+    text-align: center;
+    color: #ef4444;
+    font-size: 13px;
+    padding: 20px 0;
+}
+
+/* ── Gráfico de barras ── */
+.tb-chart-wrap {
+    position: relative;
+    height: 260px;
+}
+
+/* ── Tarjetas resumen ── */
+.tb-tarjetas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+}
+
+.tb-tarjeta {
+    background: #F9FAFB;
+    border: 1px solid var(--an-borde, #E5E7EB);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.tb-tarjeta-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--an-texto-sec, #6B7280);
+    text-transform: uppercase;
+    letter-spacing: .03em;
+    line-height: 1.3;
+}
+
+.tb-tarjeta-valor {
+    font-family: 'Sora', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--an-texto, #111827);
+    line-height: 1.1;
+}
+
+.tb-tarjeta-pct {
+    font-size: 11px;
+    color: var(--naranja, #FFAF33);
+    font-weight: 600;
+}
+
+/* ── Modal ── */
+.tb-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+}
+
+.tb-modal {
+    background: #fff;
+    border-radius: 16px;
+    padding: 0;
+    max-width: 460px;
+    width: 92%;
+    max-height: 90vh;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+}
+
+.tb-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 22px 16px;
+    border-bottom: 1px solid var(--an-borde, #E5E7EB);
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 1;
+}
+
+.tb-modal-header h3 {
+    font-family: 'Sora', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.tb-modal-cerrar {
+    background: none;
+    border: none;
+    font-size: 16px;
+    color: var(--an-texto-sec, #6B7280);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    line-height: 1;
+}
+
+.tb-modal-cerrar:hover { background: #F3F4F6; }
+
+.tb-modal-paso {
+    padding: 18px 22px;
+    flex: 1;
+}
+
+.tb-modal-footer {
+    display: flex;
+    gap: 10px;
+    padding: 16px 22px;
+    border-top: 1px solid var(--an-borde, #E5E7EB);
+    position: sticky;
+    bottom: 0;
+    background: #fff;
+}
+
+/* ── Inputs del modal ── */
+.tb-label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--an-texto-sec, #6B7280);
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin-bottom: 6px;
+}
+
+.tb-input {
+    width: 100%;
+    padding: 9px 11px;
+    border: 1px solid var(--an-borde, #E5E7EB);
+    border-radius: 9px;
+    font-size: 13.5px;
+    font-family: inherit;
+    color: var(--an-texto, #111827);
+    background: #fff;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color .15s;
+}
+
+.tb-input:focus { border-color: var(--naranja, #FFAF33); }
+
+/* ── Selector de tipo de gráfico ── */
+.tb-tipo-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.tb-tipo-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px 12px;
+    border: 2px solid var(--an-borde, #E5E7EB);
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 13px;
+    font-family: inherit;
+    font-weight: 600;
+    color: var(--an-texto-sec, #6B7280);
+    transition: border-color .15s, color .15s, background .15s;
+}
+
+.tb-tipo-btn i {
+    font-size: 22px;
+}
+
+.tb-tipo-btn:hover {
+    border-color: var(--naranja, #FFAF33);
+    color: var(--an-texto, #111827);
+}
+
+.tb-tipo-btn.activo {
+    border-color: var(--naranja, #FFAF33);
+    background: #fff8ee;
+    color: var(--an-texto, #111827);
+}
+
+/* ── Botones del modal ── */
+.tb-btn-primario {
+    flex: 1;
+    padding: 10px;
+    border-radius: 9px;
+    border: none;
+    background: var(--naranja, #FFAF33);
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: filter .15s;
+}
+
+.tb-btn-primario:hover { filter: brightness(.92); }
+
+.tb-btn-secundario {
+    flex: 1;
+    padding: 10px;
+    border-radius: 9px;
+    border: 1px solid var(--an-borde, #E5E7EB);
+    background: #fff;
+    color: var(--an-texto, #111827);
+    font-weight: 600;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background .15s;
+}
+
+.tb-btn-secundario:hover { background: #F9FAFB; }
+
+/* ── Responsive ── */
+@media (max-width: 900px) {
+    .tb-grid { grid-template-columns: 1fr; }
+    .tb-filtros { gap: 6px; }
+    .tb-filtro-input { width: 110px; }
+}
+
+@media (max-width: 640px) {
+    .an-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .tb-filtros { width: 100%; }
+    .tb-filtro-select,
+    .tb-filtro-input { flex: 1; width: auto; }
+}

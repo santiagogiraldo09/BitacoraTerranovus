@@ -1,6 +1,619 @@
-<header class="an-header">
-    <div>
-        <h1 class="an-title">Analítica</h1>
-        <p class="an-subtitle">Causas de paro ordenadas por impacto — principio de Pareto (80/20)</p>
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tablero — Bitácora IAC</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='registros.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='analitica.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='analitica_tablero.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+    <script>
+        (function() {
+            const p = "{{ color_primario | default('#FFAF33') }}";
+            document.documentElement.style.setProperty('--naranja', p);
+        })();
+    </script>
+</head>
+<body>
+
+<div class="app-layout">
+
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="{{ logo_actual or url_for('static', filename='logo.png') }}" alt="IAC Logo" class="sidebar-logo-img">
+        </div>
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('registros') }}" class="nav-item">
+                <i class="fas fa-folder-open"></i>
+                <span>Proyectos</span>
+            </a>
+            {% if session.get('user_rol') == 'admin' %}
+            <a href="{{ url_for('configuracion') }}" class="nav-item">
+                <i class="fas fa-cog"></i>
+                <span>Configuración</span>
+            </a>
+            <a href="{{ url_for('analitica') }}" class="nav-item active">
+                <i class="fas fa-chart-bar"></i>
+                <span>Analítica</span>
+            </a>
+            {% endif %}
+        </nav>
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <div class="user-avatar"><i class="fas fa-user"></i></div>
+                <div class="user-info">
+                    <span class="user-name">{{ session.get('user_name', 'Usuario') }}</span>
+                    <span class="user-role">{{ session.get('user_rol', '') }}</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ===== CONTENIDO PRINCIPAL ===== -->
+    <main class="an-main main-content">
+
+        <div class="mobile-header">
+            <img src="{{ logo_actual or url_for('static', filename='logo.png') }}" alt="IAC" class="mobile-logo">
+            <span class="mobile-title">Tablero</span>
+        </div>
+
+        <!-- Header -->
+        <header class="an-header">
+            <div>
+                <a href="{{ url_for('analitica') }}"
+                   style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--an-texto-sec);text-decoration:none;margin-bottom:8px;">
+                    <i class="fas fa-arrow-left"></i> Analítica
+                </a>
+                <h1 class="an-title" id="tablero-nombre">Cargando...</h1>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;">
+                <!-- Filtros globales -->
+                <div class="tb-filtros">
+                    <select id="f-proyecto" class="tb-filtro-select">
+                        <option value="">Todos los proyectos</option>
+                    </select>
+                    <input type="date" id="f-desde" class="tb-filtro-input" title="Desde">
+                    <input type="date" id="f-hasta" class="tb-filtro-input" title="Hasta">
+                    <button class="tb-btn-aplicar" onclick="aplicarFiltros()">
+                        <i class="fas fa-filter"></i> Filtrar
+                    </button>
+                </div>
+                {% if user_rol == 'admin' %}
+                <button class="an-btn-generar" onclick="abrirModalViz()">
+                    <i class="fas fa-plus"></i> Agregar
+                </button>
+                {% endif %}
+            </div>
+        </header>
+
+        <!-- Grid de visualizaciones -->
+        <div class="tb-grid" id="tb-grid">
+            <div class="tb-vacio" id="tb-vacio" style="display:none;">
+                <i class="fas fa-chart-pie"></i>
+                <p>Este tablero no tiene visualizaciones aún.<br>
+                {% if user_rol == 'admin' %}
+                Usa <strong>Agregar</strong> para crear la primera.
+                {% endif %}
+                </p>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<!-- Nav inferior móvil -->
+<nav class="bottom-nav">
+    <a href="{{ url_for('registros') }}" class="bottom-nav-item">
+        <i class="fas fa-folder-open"></i>
+        <span>Proyectos</span>
+    </a>
+    {% if session.get('user_rol') == 'admin' %}
+    <a href="{{ url_for('configuracion') }}" class="bottom-nav-item">
+        <i class="fas fa-cog"></i>
+        <span>Configuración</span>
+    </a>
+    <a href="{{ url_for('analitica') }}" class="bottom-nav-item active">
+        <i class="fas fa-chart-bar"></i>
+        <span>Analítica</span>
+    </a>
+    {% endif %}
+</nav>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- ===== MODAL: Agregar visualización ===== -->
+<div id="modal-viz" class="tb-modal-overlay" style="display:none;">
+    <div class="tb-modal">
+
+        <div class="tb-modal-header">
+            <h3 id="modal-viz-titulo">Nueva visualización</h3>
+            <button class="tb-modal-cerrar" onclick="cerrarModalViz()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <!-- Paso 1: tipo y título -->
+        <div class="tb-modal-paso" id="paso-1">
+            <label class="tb-label">TÍTULO</label>
+            <input type="text" id="viz-titulo" class="tb-input"
+                   placeholder="Ej: Producción por línea">
+
+            <label class="tb-label" style="margin-top:14px;">TIPO DE VISUALIZACIÓN</label>
+            <div class="tb-tipo-grid">
+                <button class="tb-tipo-btn" data-tipo="barras" onclick="seleccionarTipo('barras')">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Barras</span>
+                </button>
+                <button class="tb-tipo-btn" data-tipo="tarjetas" onclick="seleccionarTipo('tarjetas')">
+                    <i class="fas fa-th-large"></i>
+                    <span>Tarjetas resumen</span>
+                </button>
+            </div>
+
+            <label class="tb-label" style="margin-top:14px;">FORMULARIO FUENTE</label>
+            <select id="viz-formulario" class="tb-input" onchange="cargarCampos(this.value)">
+                <option value="">Selecciona un formulario...</option>
+            </select>
+
+            <div id="viz-campos-wrap" style="display:none;">
+
+                <label class="tb-label" style="margin-top:14px;" id="label-campo-valor">CAMPO A MEDIR (numérico)</label>
+                <select id="viz-campo-valor" class="tb-input">
+                    <option value="">Selecciona un campo...</option>
+                </select>
+
+                <label class="tb-label" style="margin-top:14px;" id="label-campo-agrupa">AGRUPAR POR</label>
+                <select id="viz-campo-agrupacion" class="tb-input">
+                    <option value="">Selecciona un campo...</option>
+                </select>
+
+                <label class="tb-label" style="margin-top:14px;">AGREGACIÓN</label>
+                <select id="viz-agregacion" class="tb-input">
+                    <option value="suma">Suma</option>
+                    <option value="promedio">Promedio</option>
+                    <option value="conteo">Conteo</option>
+                </select>
+
+                <label class="tb-label" style="margin-top:14px;">CAMPO DE FECHA (para filtros)</label>
+                <select id="viz-campo-fecha" class="tb-input">
+                    <option value="">Sin filtro de fecha</option>
+                </select>
+
+            </div>
+        </div>
+
+        <div class="tb-modal-footer">
+            <button class="tb-btn-secundario" onclick="cerrarModalViz()">Cancelar</button>
+            <button class="tb-btn-primario" onclick="guardarViz()">Guardar</button>
+        </div>
+
     </div>
-</header>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.min.js"></script>
+<script>
+    const TABLERO_ID  = {{ tablero_id }};
+    const SESSION_ROL = "{{ user_rol }}";
+    const COLOR_ACENTO = getComputedStyle(document.documentElement)
+                            .getPropertyValue('--naranja').trim() || '#FFAF33';
+
+    // Estado de filtros globales
+    let filtrosActivos = { proyecto_id: '', desde: '', hasta: '' };
+
+    // Caché de visualizaciones guardadas
+    let vizGuardadas = [];
+
+    // Chart.js instances
+    const chartsInstancias = {};
+
+    // Campos disponibles por formulario (caché)
+    const camposCache = {};
+
+    // Tipo seleccionado en el modal
+    let tipoSeleccionado = '';
+
+    // Viz en edición (null = nueva)
+    let vizEnEdicion = null;
+
+    // ── Toast ──────────────────────────────────────────────────────────
+    function mostrarToast(msg) {
+        const t = document.getElementById('toast');
+        if (!t) return;
+        t.textContent = msg;
+        t.className = 'toast show';
+        setTimeout(() => t.classList.remove('show'), 2500);
+    }
+
+    // ── Inicialización ─────────────────────────────────────────────────
+    document.addEventListener('DOMContentLoaded', async () => {
+        await cargarProyectos();
+        await cargarFormularios();
+        await cargarTablero();
+    });
+
+    async function cargarProyectos() {
+        try {
+            const res  = await fetch('/api/proyectos-usuario');
+            const data = await res.json();
+            const sel  = document.getElementById('f-proyecto');
+            (data.proyectos || data || []).forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = p.nombre || p.nombre_proyecto;
+                sel.appendChild(opt);
+            });
+        } catch(e) { console.error('Error cargando proyectos:', e); }
+    }
+
+    async function cargarFormularios() {
+        try {
+            const res  = await fetch('/api/formularios');
+            const data = await res.json();
+            const sel  = document.getElementById('viz-formulario');
+            (data.formularios || data || []).forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f.id;
+                opt.textContent = f.nombre;
+                sel.appendChild(opt);
+            });
+        } catch(e) { console.error('Error cargando formularios:', e); }
+    }
+
+    async function cargarTablero() {
+        try {
+            // Obtener nombre del tablero
+            const resList = await fetch('/api/bi/tableros');
+            const lista   = await resList.json();
+            const tablero = (lista.tableros || []).find(t => t.id === TABLERO_ID);
+            if (tablero) document.getElementById('tablero-nombre').textContent = tablero.nombre;
+
+            // Obtener visualizaciones
+            const resViz = await fetch(`/api/bi/tableros/${TABLERO_ID}/visualizaciones`);
+            const dataViz = await resViz.json();
+            vizGuardadas = dataViz.visualizaciones || [];
+
+            if (!vizGuardadas.length) {
+                document.getElementById('tb-vacio').style.display = 'flex';
+                return;
+            }
+
+            // Renderizar cada visualización
+            for (const viz of vizGuardadas) {
+                await renderizarViz(viz);
+            }
+        } catch(e) {
+            console.error('Error cargando tablero:', e);
+            mostrarToast('❌ Error al cargar el tablero');
+        }
+    }
+
+    // ── Filtros globales ───────────────────────────────────────────────
+    async function aplicarFiltros() {
+        filtrosActivos = {
+            proyecto_id: document.getElementById('f-proyecto').value,
+            desde:       document.getElementById('f-desde').value,
+            hasta:       document.getElementById('f-hasta').value,
+        };
+        // Re-renderizar todas las visualizaciones con los nuevos filtros
+        const grid = document.getElementById('tb-grid');
+        // Eliminar solo las cards de visualización (no el div vacío)
+        grid.querySelectorAll('.tb-viz-card').forEach(c => c.remove());
+        for (const viz of vizGuardadas) {
+            await renderizarViz(viz);
+        }
+    }
+
+    // ── Renderizado de visualizaciones ─────────────────────────────────
+    async function renderizarViz(viz) {
+        document.getElementById('tb-vacio').style.display = 'none';
+
+        // Crear la card
+        const card = document.createElement('div');
+        card.className = 'tb-viz-card';
+        card.dataset.vizId = viz.id;
+        card.innerHTML = `
+            <div class="tb-viz-header">
+                <h3 class="tb-viz-titulo">${viz.titulo}</h3>
+                ${SESSION_ROL === 'admin' ? `
+                <button class="tb-viz-eliminar" title="Eliminar"
+                        onclick="eliminarViz(${viz.id})">
+                    <i class="fas fa-trash"></i>
+                </button>` : ''}
+            </div>
+            <div class="tb-viz-body" id="viz-body-${viz.id}">
+                <div class="tb-viz-cargando"><div class="an-spinner"></div></div>
+            </div>
+        `;
+        document.getElementById('tb-grid').appendChild(card);
+
+        // Obtener datos del backend
+        try {
+            const body = {
+                datasets: viz.config.datasets || [],
+                filtros:  filtrosActivos
+            };
+            const res  = await fetch('/api/bi/datos', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const data = await res.json();
+
+            if (data.error) {
+                document.getElementById(`viz-body-${viz.id}`).innerHTML =
+                    `<p class="tb-viz-error"><i class="fas fa-exclamation-circle"></i> ${data.error}</p>`;
+                return;
+            }
+
+            if (viz.tipo === 'barras') {
+                renderVizBarras(viz, data);
+            } else if (viz.tipo === 'tarjetas') {
+                renderVizTarjetas(viz, data);
+            }
+        } catch(e) {
+            console.error(e);
+            document.getElementById(`viz-body-${viz.id}`).innerHTML =
+                `<p class="tb-viz-error"><i class="fas fa-exclamation-circle"></i> Error al cargar datos</p>`;
+        }
+    }
+
+    function renderVizBarras(viz, data) {
+        const body = document.getElementById(`viz-body-${viz.id}`);
+        body.innerHTML = `<div class="tb-chart-wrap"><canvas id="chart-${viz.id}"></canvas></div>`;
+
+        if (chartsInstancias[viz.id]) chartsInstancias[viz.id].destroy();
+
+        chartsInstancias[viz.id] = new Chart(
+            document.getElementById(`chart-${viz.id}`).getContext('2d'),
+            {
+                type: 'bar',
+                data: {
+                    labels:   data.labels,
+                    datasets: [{
+                        label:           viz.titulo,
+                        data:            data.valores,
+                        backgroundColor: COLOR_ACENTO + 'CC',
+                        borderColor:     COLOR_ACENTO,
+                        borderWidth:     1,
+                        borderRadius:    4,
+                    }]
+                },
+                options: {
+                    responsive:          true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#F0F0F0' } },
+                        x: { ticks: { maxRotation: 45, minRotation: 0 } }
+                    }
+                }
+            }
+        );
+    }
+
+    function renderVizTarjetas(viz, data) {
+        const body = document.getElementById(`viz-body-${viz.id}`);
+
+        if (!data.labels?.length) {
+            body.innerHTML = '<p style="text-align:center;color:#9ca3af;font-size:13px;padding:20px 0;">Sin datos para mostrar</p>';
+            return;
+        }
+
+        let html = '<div class="tb-tarjetas-grid">';
+        // Total general
+        html += `
+            <div class="tb-tarjeta">
+                <span class="tb-tarjeta-label">Total</span>
+                <span class="tb-tarjeta-valor">${data.total.toLocaleString('es-CO', {maximumFractionDigits: 2})}</span>
+            </div>`;
+        // Top 5 categorías
+        data.labels.slice(0, 5).forEach((label, i) => {
+            const pct = data.total > 0 ? ((data.valores[i] / data.total) * 100).toFixed(0) : 0;
+            html += `
+                <div class="tb-tarjeta">
+                    <span class="tb-tarjeta-label">${label}</span>
+                    <span class="tb-tarjeta-valor">${data.valores[i].toLocaleString('es-CO', {maximumFractionDigits: 2})}</span>
+                    <span class="tb-tarjeta-pct">${pct}%</span>
+                </div>`;
+        });
+        html += '</div>';
+        body.innerHTML = html;
+    }
+
+    // ── Modal: agregar visualización ───────────────────────────────────
+    function abrirModalViz() {
+        vizEnEdicion = null;
+        tipoSeleccionado = '';
+        document.getElementById('viz-titulo').value = '';
+        document.getElementById('viz-formulario').value = '';
+        document.getElementById('viz-campos-wrap').style.display = 'none';
+        document.querySelectorAll('.tb-tipo-btn').forEach(b => b.classList.remove('activo'));
+        document.getElementById('modal-viz-titulo').textContent = 'Nueva visualización';
+        document.getElementById('modal-viz').style.display = 'flex';
+    }
+
+    function cerrarModalViz() {
+        document.getElementById('modal-viz').style.display = 'none';
+    }
+
+    function seleccionarTipo(tipo) {
+        tipoSeleccionado = tipo;
+        document.querySelectorAll('.tb-tipo-btn').forEach(b => {
+            b.classList.toggle('activo', b.dataset.tipo === tipo);
+        });
+        // Ajustar labels según tipo
+        const esTarjetas = tipo === 'tarjetas';
+        document.getElementById('label-campo-agrupa').textContent =
+            esTarjetas ? 'AGRUPAR POR (categorías de las tarjetas)' : 'AGRUPAR POR (eje X)';
+        document.getElementById('label-campo-valor').textContent =
+            esTarjetas ? 'CAMPO A MEDIR (numérico)' : 'CAMPO A MEDIR (eje Y, numérico)';
+    }
+
+    async function cargarCampos(formularioId) {
+        const wrap = document.getElementById('viz-campos-wrap');
+        if (!formularioId) { wrap.style.display = 'none'; return; }
+
+        // Usar caché si ya lo cargamos
+        if (!camposCache[formularioId]) {
+            try {
+                const res  = await fetch(`/api/bi/campos?formulario_id=${formularioId}`);
+                camposCache[formularioId] = await res.json();
+            } catch(e) {
+                mostrarToast('❌ Error al cargar campos');
+                return;
+            }
+        }
+
+        const { sueltos = [], grupos = [] } = camposCache[formularioId];
+
+        // Construir opciones para el selector de valor (solo numéricos)
+        const selValor  = document.getElementById('viz-campo-valor');
+        const selAgrupa = document.getElementById('viz-campo-agrupacion');
+        const selFecha  = document.getElementById('viz-campo-fecha');
+
+        selValor.innerHTML  = '<option value="">Selecciona un campo...</option>';
+        selAgrupa.innerHTML = '<option value="">Selecciona un campo...</option>';
+        selFecha.innerHTML  = '<option value="">Sin filtro de fecha</option>';
+
+        const TIPOS_NUMERICOS = ['numero', 'moneda', 'porcentaje'];
+        const TIPOS_FECHA     = ['fecha'];
+
+        // Campos sueltos
+        sueltos.forEach(c => {
+            if (TIPOS_NUMERICOS.includes(c.tipo)) {
+                selValor.innerHTML += `<option value="${c.id}|suelto||">${c.nombre}</option>`;
+            }
+            if (TIPOS_FECHA.includes(c.tipo)) {
+                selFecha.innerHTML += `<option value="${c.id}">${c.nombre}</option>`;
+            }
+            selAgrupa.innerHTML += `<option value="${c.id}|suelto||">${c.nombre}</option>`;
+        });
+
+        // Campos de grupos
+        grupos.forEach(g => {
+            g.campos.forEach(c => {
+                const val = `${c.id}|grupo|${g.gid}`;
+                if (TIPOS_NUMERICOS.includes(c.tipo)) {
+                    selValor.innerHTML += `<option value="${val}">${g.nombre} → ${c.nombre}</option>`;
+                }
+                selAgrupa.innerHTML += `<option value="${val}">${g.nombre} → ${c.nombre}</option>`;
+            });
+        });
+
+        wrap.style.display = 'block';
+    }
+
+    // Parsear el valor del selector de campo: "id|tipo|gid"
+    function parsearCampo(val) {
+        if (!val) return null;
+        const [id, origen, gid] = val.split('|');
+        return {
+            campo_id: id,
+            es_grupo: origen === 'grupo',
+            gid:      gid || ''
+        };
+    }
+
+    async function guardarViz() {
+        const titulo       = document.getElementById('viz-titulo').value.trim();
+        const formularioId = document.getElementById('viz-formulario').value;
+        const campoValorRaw    = document.getElementById('viz-campo-valor').value;
+        const campoAgrupaRaw   = document.getElementById('viz-campo-agrupacion').value;
+        const agregacion       = document.getElementById('viz-agregacion').value;
+        const campoFechaId     = document.getElementById('viz-campo-fecha').value;
+
+        if (!titulo)           { mostrarToast('⚠️ Ingresa un título'); return; }
+        if (!tipoSeleccionado) { mostrarToast('⚠️ Selecciona un tipo de gráfico'); return; }
+        if (!formularioId)     { mostrarToast('⚠️ Selecciona un formulario'); return; }
+        if (!campoValorRaw)    { mostrarToast('⚠️ Selecciona el campo a medir'); return; }
+        if (!campoAgrupaRaw)   { mostrarToast('⚠️ Selecciona el campo para agrupar'); return; }
+
+        const campoValor  = parsearCampo(campoValorRaw);
+        const campoAgrupa = parsearCampo(campoAgrupaRaw);
+
+        const nuevaViz = {
+            tipo:   tipoSeleccionado,
+            titulo: titulo,
+            config: {
+                datasets: [{
+                    formulario_id:    parseInt(formularioId),
+                    campo_valor:      campoValor.campo_id,
+                    campo_agrupacion: campoAgrupa.campo_id,
+                    agregacion:       agregacion,
+                    es_grupo:         campoValor.es_grupo,
+                    gid:              campoValor.gid,
+                    campo_fecha_id:   campoFechaId
+                }]
+            }
+        };
+
+        // Agregar a la lista y guardar en backend
+        vizGuardadas.push(nuevaViz);
+
+        try {
+            const res  = await fetch(`/api/bi/tableros/${TABLERO_ID}/visualizaciones`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ visualizaciones: vizGuardadas })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error);
+
+            cerrarModalViz();
+
+            // Recargar para obtener IDs asignados por el backend
+            document.getElementById('tb-grid').querySelectorAll('.tb-viz-card').forEach(c => c.remove());
+            const resViz  = await fetch(`/api/bi/tableros/${TABLERO_ID}/visualizaciones`);
+            const dataViz = await resViz.json();
+            vizGuardadas  = dataViz.visualizaciones || [];
+            document.getElementById('tb-vacio').style.display = 'none';
+            for (const viz of vizGuardadas) await renderizarViz(viz);
+            mostrarToast('✅ Visualización guardada');
+
+        } catch(e) {
+            console.error(e);
+            vizGuardadas.pop(); // revertir si falló
+            mostrarToast('❌ Error al guardar');
+        }
+    }
+
+    async function eliminarViz(vizId) {
+        if (!confirm('¿Eliminar esta visualización?')) return;
+
+        vizGuardadas = vizGuardadas.filter(v => v.id !== vizId);
+
+        try {
+            const res  = await fetch(`/api/bi/tableros/${TABLERO_ID}/visualizaciones`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ visualizaciones: vizGuardadas })
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error);
+
+            document.querySelector(`.tb-viz-card[data-viz-id="${vizId}"]`)?.remove();
+            if (!document.querySelectorAll('.tb-viz-card').length) {
+                document.getElementById('tb-vacio').style.display = 'flex';
+            }
+            mostrarToast('Visualización eliminada');
+        } catch(e) {
+            mostrarToast('❌ Error al eliminar');
+        }
+    }
+
+    // Cerrar modal al hacer clic fuera
+    document.getElementById('modal-viz').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalViz();
+    });
+</script>
+
+</body>
+</html>
