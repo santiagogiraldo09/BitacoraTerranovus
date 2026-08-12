@@ -4727,6 +4727,13 @@ def bi_datos():
         import traceback; traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/proyectos-usuario')
+def api_proyectos_usuario():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    proyectos = get_user_projects(session['user_id'])
+    return jsonify({'proyectos': proyectos})
+
 @app.route('/transcribe-audio', methods=['POST'])
 def transcribe_audio():
     try:
