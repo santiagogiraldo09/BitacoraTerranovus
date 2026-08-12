@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analítica — Bitácora IAC</title>
+    <link rel="icon" href="{{ url_for('static', filename='logo.png') }}" type="image/x-icon">
+    <link rel="stylesheet" href="{{ url_for('static', filename='registros.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='analitica.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
+    <script>
+        (function() {
+            const p = "{{ color_primario | default('#FFAF33') }}";
+            document.documentElement.style.setProperty('--naranja', p);
+        })();
+    </script>
+</head>
+<body>
+
+<div class="app-layout">
+
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar">
+        <div class="sidebar-logo">
+            <img src="{{ logo_actual or url_for('static', filename='logo.png') }}" alt="IAC Logo" class="sidebar-logo-img">
+        </div>
+        <nav class="sidebar-nav">
+            <a href="{{ url_for('registros') }}" class="nav-item">
+                <i class="fas fa-folder-open"></i>
+                <span>Proyectos</span>
+            </a>
+            {% if session.get('user_rol') == 'admin' %}
+            <a href="{{ url_for('configuracion') }}" class="nav-item">
+                <i class="fas fa-cog"></i>
+                <span>Configuración</span>
+            </a>
+            <a href="{{ url_for('analitica') }}" class="nav-item active">
+                <i class="fas fa-chart-bar"></i>
+                <span>Analítica</span>
+            </a>
+            {% if session.get('empresa_id') == 1 %}
+            <a href="#" class="nav-item" onclick="event.preventDefault(); abrirModalEmpresa()">
+                <i class="fas fa-building"></i>
+                <span>Nueva Empresa</span>
+            </a>
+            {% endif %}
+            {% endif %}
+        </nav>
+        <div class="sidebar-footer">
+            <div class="sidebar-user">
+                <div class="user-avatar"><i class="fas fa-user"></i></div>
+                <div class="user-info">
+                    <span class="user-name">{{ session.get('user_name', 'Usuario') }}</span>
+                    <span class="user-role">{{ session.get('user_rol', '') }}</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- ===== CONTENIDO PRINCIPAL ===== -->
+    <main class="an-main main-content">
+
+        <div class="mobile-header">
+            <img src="{{ logo_actual or url_for('static', filename='logo.png') }}" alt="IAC" class="mobile-logo">
+            <span class="mobile-title">Analítica</span>
+        </div>
+
+        <!-- Header -->
+        <header class="an-header">
+            <div>
+                <h1 class="an-title">Analítica</h1>
+                <p class="an-subtitle">Selecciona un tablero para explorar los datos</p>
+            </div>
+            {% if session.get('user_rol') == 'admin' %}
+            <button class="an-btn-generar" onclick="abrirModalNuevoTablero()">
+                <i class="fas fa-plus"></i> Nuevo tablero
+            </button>
+            {% endif %}
+        </header>
+
+        <!-- Grid de tableros -->
+        <section class="bi-tableros-grid" id="bi-tableros-grid">
+
+            <!-- Tarjeta Pareto (solo empresa 13) -->
+            {% if empresa_id == 13 %}
+            <a href="{{ url_for('analitica_paros') }}" class="bi-tablero-card">
+                <div class="bi-tablero-icono">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+                <div class="bi-tablero-info">
+                    <h3>Análisis de Paros</h3>
+                    <p>Diagrama de Pareto PP y PNP · Formulario de producción</p>
+                </div>
+                <i class="fas fa-chevron-right bi-tablero-arrow"></i>
+            </a>
+            {% endif %}
+
+            <!-- Tableros BI dinámicos -->
+            <div id="bi-tableros-dinamicos">
+                <div class="bi-cargando">
+                    <div class="an-spinner"></div>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+</div>
+
+<!-- Nav inferior móvil -->
+<nav class="bottom-nav">
+    <a href="{{ url_for('registros') }}" class="bottom-nav-item">
+        <i class="fas fa-folder-open"></i>
+        <span>Proyectos</span>
+    </a>
+    {% if session.get('user_rol') == 'admin' %}
+    <a href="{{ url_for('configuracion') }}" class="bottom-nav-item">
+        <i class="fas fa-cog"></i>
+        <span>Configuración</span>
+    </a>
+    <a href="{{ url_for('analitica') }}" class="bottom-nav-item active">
+        <i class="fas fa-chart-bar"></i>
+        <span>Analítica</span>
+    </a>
+    {% endif %}
+</nav>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- Modal nuevo tablero -->
+<div id="modal-nuevo-tablero" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:9999; align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:14px; padding:28px; max-width:380px; width:90%;">
+        <h3 style="margin:0 0 16px; font-family:'Sora',sans-serif; font-size:17px;">Nuevo tablero</h3>
+        <label style="font-size:12px; font-weight:600; color:#6b7280; display:block; margin-bottom:6px;">NOMBRE DEL TABLERO</label>
+        <input type="text" id="input-nombre-tablero"
+               placeholder="Ej: Producción Q3 2026"
+               style="width:100%; padding:10px 12px; border:1px solid #e5e7eb; border-radius:9px; font-size:14px; font-family:inherit; box-sizing:border-box; outline:none;">
+        <div style="display:flex; gap:10px; margin-top:20px;">
+            <button onclick="cerrarModalNuevoTablero()"
+                    style="flex:1; padding:10px; border-radius:8px; border:1px solid #d1d5db; background:#fff; font-weight:600; cursor:pointer; font-family:inherit;">
+                Cancelar
+            </button>
+            <button onclick="crearTablero()"
+                    style="flex:1; padding:10px; border-radius:8px; border:none; background:var(--naranja,#FFAF33); color:#fff; font-weight:600; cursor:pointer; font-family:inherit;">
+                Crear
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SESSION_ROL = "{{ session.get('user_rol', '') }}";
+
+    function mostrarToast(msg) {
+        const t = document.getElementById('toast');
+        if (!t) return;
+        t.textContent = msg;
+        t.className = 'toast show';
+        setTimeout(() => t.classList.remove('show'), 2500);
+    }
+
+    async function cargarTableros() {
+        try {
+            const res  = await fetch('/api/bi/tableros');
+            const data = await res.json();
+            const cont = document.getElementById('bi-tableros-dinamicos');
+            cont.innerHTML = '';
+
+            if (!data.tableros?.length) {
+                cont.innerHTML = `
+                    <p style="color:#9ca3af;font-size:13px;text-align:center;padding:24px 0;">
+                        Aún no hay tableros creados.
+                        ${SESSION_ROL === 'admin' ? 'Usa el botón <strong>Nuevo tablero</strong> para crear uno.' : ''}
+                    </p>`;
+                return;
+            }
+
+            data.tableros.forEach(t => {
+                const card = document.createElement('div');
+                card.className = 'bi-tablero-card';
+                card.innerHTML = `
+                    <div class="bi-tablero-icono">
+                        <i class="fas fa-th-large"></i>
+                    </div>
+                    <div class="bi-tablero-info" onclick="window.location='/analitica/tablero/${t.id}'" style="cursor:pointer; flex:1;">
+                        <h3>${t.nombre}</h3>
+                        <p>Tablero personalizado</p>
+                    </div>
+                    ${SESSION_ROL === 'admin' ? `
+                    <button class="bi-tablero-card--eliminar"
+                            title="Eliminar tablero"
+                            onclick="event.stopPropagation(); eliminarTablero(${t.id}, '${t.nombre.replace(/'/g, "\\'")}')">
+                        <i class="fas fa-trash"></i>
+                    </button>` : ''}
+                `;
+                cont.appendChild(card);
+            });
+
+        } catch(e) {
+            console.error(e);
+            document.getElementById('bi-tableros-dinamicos').innerHTML =
+                '<p style="color:#ef4444;font-size:13px;text-align:center;padding:16px 0;">Error al cargar los tableros.</p>';
+        }
+    }
+
+    function abrirModalNuevoTablero() {
+        document.getElementById('input-nombre-tablero').value = '';
+        document.getElementById('modal-nuevo-tablero').style.display = 'flex';
+        setTimeout(() => document.getElementById('input-nombre-tablero').focus(), 100);
+    }
+
+    function cerrarModalNuevoTablero() {
+        document.getElementById('modal-nuevo-tablero').style.display = 'none';
+    }
+
+    // Crear con Enter
+    document.addEventListener('DOMContentLoaded', () => {
+        document.getElementById('input-nombre-tablero').addEventListener('keydown', e => {
+            if (e.key === 'Enter') crearTablero();
+            if (e.key === 'Escape') cerrarModalNuevoTablero();
+        });
+        cargarTableros();
+    });
+
+    async function crearTablero() {
+        const nombre = document.getElementById('input-nombre-tablero').value.trim();
+        if (!nombre) { mostrarToast('⚠️ Ingresa un nombre para el tablero'); return; }
+
+        try {
+            const res  = await fetch('/api/bi/tableros', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nombre })
+            });
+            const data = await res.json();
+            if (data.success) {
+                cerrarModalNuevoTablero();
+                window.location = `/analitica/tablero/${data.id}`;
+            } else {
+                mostrarToast('❌ ' + (data.error || 'Error al crear el tablero'));
+            }
+        } catch(e) {
+            mostrarToast('❌ Error de conexión');
+        }
+    }
+
+    async function eliminarTablero(id, nombre) {
+        if (!confirm(`¿Eliminar el tablero "${nombre}"?\nEsta acción no se puede deshacer.`)) return;
+        try {
+            const res  = await fetch(`/api/bi/tableros/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                mostrarToast('Tablero eliminado');
+                cargarTableros();
+            } else {
+                mostrarToast('❌ ' + (data.error || 'Error al eliminar'));
+            }
+        } catch(e) {
+            mostrarToast('❌ Error de conexión');
+        }
+    }
+
+    // Cerrar modal al hacer clic fuera
+    document.getElementById('modal-nuevo-tablero').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalNuevoTablero();
+    });
+</script>
+
+</body>
+</html>
