@@ -4718,7 +4718,23 @@ def analitica_pareto():
 def analitica():
     if 'user_id' not in session or session.get('user_rol') != 'admin':
         return redirect(url_for('registros'))
-    return render_template('analitica.html')
+    return render_template('analitica.html',
+                           empresa_id=session.get('empresa_id'))
+
+@app.route('/analitica/paros')
+def analitica_paros():
+    if 'user_id' not in session or session.get('user_rol') != 'admin':
+        return redirect(url_for('registros'))
+    return render_template('analitica_paros.html')
+
+@app.route('/analitica/tablero/<int:tablero_id>')
+def analitica_tablero(tablero_id):
+    if 'user_id' not in session or session.get('user_rol') != 'admin':
+        return redirect(url_for('registros'))
+    return render_template('analitica_tablero.html',
+                           tablero_id=tablero_id,
+                           empresa_id=session.get('empresa_id'),
+                           user_rol=session.get('user_rol'))
 
 @app.route('/transcribe-audio', methods=['POST'])
 def transcribe_audio():
