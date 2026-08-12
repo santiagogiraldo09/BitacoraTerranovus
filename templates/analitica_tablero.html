@@ -266,6 +266,7 @@
     }
 
     async function cargarTablero() {
+        console.log('[BI] Cargando tablero ID:', TABLERO_ID);
         try {
             // Obtener nombre del tablero
             const resList = await fetch('/api/bi/tableros');
