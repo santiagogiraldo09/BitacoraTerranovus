@@ -606,11 +606,18 @@
         document.getElementById('label-campo-agrupa').style.display   = esLinea ? 'none' : '';
 
         // Ajustar labels
-        document.getElementById('label-campo-valor').textContent = esTarjetas
-            ? 'CAMPO A MEDIR (numérico)'
-            : esLinea ? 'CAMPO A MEDIR (eje Y, numérico)' : 'CAMPO A MEDIR (eje Y, numérico)';
-        document.getElementById('label-campo-agrupa').textContent = esTarjetas
-            ? 'AGRUPAR POR (categorías de las tarjetas)' : 'AGRUPAR POR (eje X)';
+        const esDona = tipo === 'dona';
+
+        document.getElementById('label-campo-valor').textContent =
+            esTarjetas ? 'CAMPO A MEDIR (numérico)' :
+            esLinea    ? 'CAMPO A MEDIR (eje Y, numérico)' :
+            esDona     ? 'VALORES (tamaño de cada segmento)' :
+                        'CAMPO A MEDIR (eje Y, numérico)';
+
+        document.getElementById('label-campo-agrupa').textContent =
+            esTarjetas ? 'AGRUPAR POR (categorías de las tarjetas)' :
+            esDona     ? 'LEYENDA (qué representa cada segmento)' :
+                        'AGRUPAR POR (eje X)';
     }
 
     async function cargarCampos(formularioId) {
