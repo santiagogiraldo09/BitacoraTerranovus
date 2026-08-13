@@ -888,6 +888,8 @@ def bi_datos():
                             print(f"[BI-DEBUG] bloque: {bloque}")
                             print(f"[BI-DEBUG] campo_agrupacion: {campo_agrupacion}")
                             print(f"[BI-DEBUG] label_raiz: {label_raiz}")
+                            print(f"[BI-DEBUG] valor campo 104: {bloque.get('104')}")
+                            print(f"[BI-DEBUG] valor campo 93: {bloque.get('93')}")
                             # Usar label de raíz si existe, si no buscar dentro del bloque
                             label = label_raiz or str(bloque.get(campo_agrupacion)
                                                     or bloque.get(campo_agrupacion + '_codigo')
