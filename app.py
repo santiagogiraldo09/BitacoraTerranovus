@@ -4817,23 +4817,77 @@ def analitica_pareto():
 def analitica():
     if 'user_id' not in session or session.get('user_rol') != 'admin':
         return redirect(url_for('registros'))
+
+    logo_actual    = None
+    color_primario = '#FFAF33'
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT logo_url, color_primario FROM empresas
+                WHERE id = %s
+            """, (session.get('empresa_id'),))
+            emp = cursor.fetchone()
+            if emp:
+                logo_actual    = emp[0]
+                color_primario = emp[1] or '#FFAF33'
+    except Exception as e:
+        print(f"Error cargando empresa en analitica: {e}")
+
     return render_template('analitica.html',
-                           empresa_id=session.get('empresa_id'))
+                           empresa_id=session.get('empresa_id'),
+                           logo_actual=logo_actual,
+                           color_primario=color_primario)
 
 @app.route('/analitica/paros')
 def analitica_paros():
     if 'user_id' not in session or session.get('user_rol') != 'admin':
         return redirect(url_for('registros'))
-    return render_template('analitica_paros.html')
+
+    logo_actual    = None
+    color_primario = '#FFAF33'
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT logo_url, color_primario FROM empresas
+                WHERE id = %s
+            """, (session.get('empresa_id'),))
+            emp = cursor.fetchone()
+            if emp:
+                logo_actual    = emp[0]
+                color_primario = emp[1] or '#FFAF33'
+    except Exception as e:
+        print(f"Error cargando empresa en analitica_paros: {e}")
+
+    return render_template('analitica_paros.html',
+                           logo_actual=logo_actual,
+                           color_primario=color_primario)
 
 @app.route('/analitica/tablero/<int:tablero_id>')
 def analitica_tablero(tablero_id):
     if 'user_id' not in session or session.get('user_rol') != 'admin':
         return redirect(url_for('registros'))
+
+    logo_actual    = None
+    color_primario = '#FFAF33'
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT logo_url, color_primario FROM empresas
+                WHERE id = %s
+            """, (session.get('empresa_id'),))
+            emp = cursor.fetchone()
+            if emp:
+                logo_actual    = emp[0]
+                color_primario = emp[1] or '#FFAF33'
+    except Exception as e:
+        print(f"Error cargando empresa en analitica_tablero: {e}")
+
     return render_template('analitica_tablero.html',
                            tablero_id=tablero_id,
                            empresa_id=session.get('empresa_id'),
-                           user_rol=session.get('user_rol'))
+                           user_rol=session.get('user_rol'),
+                           logo_actual=logo_actual,
+                           color_primario=color_primario)
 
 @app.route('/api/proyectos-usuario')
 def api_proyectos_usuario():
