@@ -809,21 +809,32 @@ def bi_datos():
         empresa_id = session.get('empresa_id')
         acumulado  = {}
 
+        def buscar_en_bloque(bloque, ids_posibles):
+            """Busca el valor de un campo en un bloque probando todos sus IDs posibles."""
+            for cid in ids_posibles:
+                val = bloque.get(cid) or bloque.get(cid + '_codigo')
+                if val is not None:
+                    return val
+            return None
+
         for ds in datasets:
-            formulario_id    = ds.get('formulario_id')
-            campo_valor      = str(ds.get('campo_valor', ''))
-            campo_agrupacion = str(ds.get('campo_agrupacion', ''))
-            agregacion       = ds.get('agregacion', 'suma')
-            es_grupo         = ds.get('es_grupo', False)
-            gid              = ds.get('gid', '')
-            campo_fecha_id   = str(ds.get('campo_fecha_id', ''))
-            es_temporal      = ds.get('es_temporal', False)
-            granularidad     = ds.get('granularidad', 'dia')  # dia | semana | mes
+            formulario_id           = ds.get('formulario_id')
+            campo_valor             = str(ds.get('campo_valor', ''))
+            campo_valor_nombre      = ds.get('campo_valor_nombre', '')
+            campo_agrupacion        = str(ds.get('campo_agrupacion', ''))
+            campo_agrupacion_nombre = ds.get('campo_agrupacion_nombre', '')
+            agregacion              = ds.get('agregacion', 'suma')
+            es_grupo                = ds.get('es_grupo', False)
+            gid                     = ds.get('gid', '')
+            campo_fecha_id          = str(ds.get('campo_fecha_id', ''))
+            es_temporal             = ds.get('es_temporal', False)
+            granularidad            = ds.get('granularidad', 'dia')
 
             if not formulario_id or not campo_valor:
                 continue
 
             with db_connection() as (conn, cursor):
+                # Verificar que el formulario pertenece a la empresa
                 cursor.execute("""
                     SELECT id FROM formularios
                     WHERE id = %s AND empresa_id = %s
@@ -831,6 +842,7 @@ def bi_datos():
                 if not cursor.fetchone():
                     continue
 
+                # Obtener registros
                 query  = "SELECT rf.respuestas FROM respuestas_formulario rf WHERE rf.formulario_id = %s"
                 params = [formulario_id]
 
@@ -847,8 +859,38 @@ def bi_datos():
                 cursor.execute(query, params)
                 registros = [r[0] for r in cursor.fetchall() if isinstance(r[0], dict)]
 
+                # Resolver todos los IDs posibles para campo de agrupación
+                # (por si el campo fue eliminado y recreado con otro ID)
+                ids_posibles_agrupacion = [campo_agrupacion]
+                if campo_agrupacion_nombre:
+                    cursor.execute("""
+                        SELECT id FROM campos_globales
+                        WHERE nombre = %s ORDER BY id DESC
+                    """, (campo_agrupacion_nombre,))
+                    ids_encontrados = [str(r[0]) for r in cursor.fetchall()]
+                    if ids_encontrados:
+                        # Poner el ID actual primero, luego los históricos
+                        ids_posibles_agrupacion = list(dict.fromkeys(
+                            [campo_agrupacion] + ids_encontrados
+                        ))
+
+                # Resolver todos los IDs posibles para campo de valor
+                ids_posibles_valor = [campo_valor]
+                if campo_valor_nombre:
+                    cursor.execute("""
+                        SELECT id FROM campos_globales
+                        WHERE nombre = %s ORDER BY id DESC
+                    """, (campo_valor_nombre,))
+                    ids_encontrados = [str(r[0]) for r in cursor.fetchall()]
+                    if ids_encontrados:
+                        ids_posibles_valor = list(dict.fromkeys(
+                            [campo_valor] + ids_encontrados
+                        ))
+
+            # Procesar cada registro
             for resp in registros:
-                # ── Modo temporal: agrupar por fecha ──────────────────
+
+                # ── Modo temporal: agrupar por fecha (gráfico de línea) ──
                 if es_temporal and campo_fecha_id:
                     fecha_raw = resp.get(campo_fecha_id, '')
                     if not fecha_raw:
@@ -860,41 +902,43 @@ def bi_datos():
                             label = fecha.strftime('%Y-%m')
                         elif granularidad == 'semana':
                             label = f"{fecha.isocalendar()[0]}-S{fecha.isocalendar()[1]:02d}"
-                        else:  # dia
+                        else:
                             label = fecha.strftime('%Y-%m-%d')
                     except:
                         continue
 
                     if es_grupo and gid:
                         for bloque in (resp.get('__repeticiones') or {}).get(gid, []):
-                            try:    val = float(bloque.get(campo_valor) or 0)
+                            val_raw = buscar_en_bloque(bloque, ids_posibles_valor)
+                            try:    val = float(val_raw or 0)
                             except: continue
                             acumulado[label] = acumulado.get(label, 0) + val
                     else:
-                        try:    val = float(resp.get(campo_valor) or 0)
+                        val_raw = resp.get(campo_valor)
+                        try:    val = float(val_raw or 0)
                         except: continue
                         acumulado[label] = acumulado.get(label, 0) + val
 
-                # ── Modo normal: agrupar por categoría ────────────────
+                # ── Modo normal: agrupar por categoría ──
                 else:
                     if es_grupo and gid:
-                        # Intentar obtener el label desde el nivel raíz primero,
-                        # luego desde dentro del bloque si no está en raíz
-                        label_raiz = str(resp.get(campo_agrupacion)
-                                    or resp.get(campo_agrupacion + '_codigo')
-                                    or '')
+                        # Buscar el label de agrupación en nivel raíz primero
+                        label_raiz = ''
+                        for cid in ids_posibles_agrupacion:
+                            label_raiz = str(resp.get(cid) or resp.get(cid + '_codigo') or '')
+                            if label_raiz:
+                                break
 
                         for bloque in (resp.get('__repeticiones') or {}).get(gid, []):
-                            print(f"[BI-DEBUG] bloque: {bloque}")
-                            print(f"[BI-DEBUG] campo_agrupacion: {campo_agrupacion}")
-                            print(f"[BI-DEBUG] label_raiz: {label_raiz}")
-                            print(f"[BI-DEBUG] valor campo 104: {bloque.get('104')}")
-                            print(f"[BI-DEBUG] valor campo 93: {bloque.get('93')}")
-                            # Usar label de raíz si existe, si no buscar dentro del bloque
-                            label = label_raiz or str(bloque.get(campo_agrupacion)
-                                                    or bloque.get(campo_agrupacion + '_codigo')
-                                                    or 'Sin dato')
-                            try:    val = float(bloque.get(campo_valor) or 0)
+                            # Si no está en raíz, buscar dentro del bloque
+                            if label_raiz:
+                                label = label_raiz
+                            else:
+                                label_bloque = buscar_en_bloque(bloque, ids_posibles_agrupacion)
+                                label = str(label_bloque or 'Sin dato')
+
+                            val_raw = buscar_en_bloque(bloque, ids_posibles_valor)
+                            try:    val = float(val_raw or 0)
                             except: continue
 
                             if agregacion == 'promedio':
@@ -904,12 +948,17 @@ def bi_datos():
                                 acumulado[label]['n']    += 1
                             else:
                                 acumulado[label] = acumulado.get(label, 0) + val
+
                     else:
+                        # Campo de nivel raíz
                         label = str(resp.get(campo_agrupacion)
                                  or resp.get(campo_agrupacion + '_codigo')
                                  or 'Sin dato')
-                        try:    val = float(resp.get(campo_valor) or 0)
+
+                        val_raw = resp.get(campo_valor)
+                        try:    val = float(val_raw or 0)
                         except: continue
+
                         if agregacion == 'conteo':
                             acumulado[label] = acumulado.get(label, 0) + 1
                         elif agregacion == 'promedio':
@@ -920,11 +969,15 @@ def bi_datos():
                         else:
                             acumulado[label] = acumulado.get(label, 0) + val
 
+        # Calcular promedios finales
         if any(isinstance(v, dict) for v in acumulado.values()):
-            acumulado = {k: round(v['suma'] / v['n'], 2)
-                         for k, v in acumulado.items() if isinstance(v, dict) and v['n']}
+            acumulado = {
+                k: round(v['suma'] / v['n'], 2)
+                for k, v in acumulado.items()
+                if isinstance(v, dict) and v['n']
+            }
 
-        # Para modo temporal, ordenar cronológicamente
+        # Ordenar: cronológico para temporal, por valor descendente para el resto
         if any(ds.get('es_temporal') for ds in datasets):
             ordenado = sorted(acumulado.items(), key=lambda x: x[0])
         else:
@@ -933,8 +986,6 @@ def bi_datos():
         labels  = [x[0] for x in ordenado]
         valores = [round(x[1], 2) for x in ordenado]
         return jsonify({'labels': labels, 'valores': valores, 'total': round(sum(valores), 2)})
-
-    
 
     except Exception as e:
         print(f"Error en bi_datos: {e}")

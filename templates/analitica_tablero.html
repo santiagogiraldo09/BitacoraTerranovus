@@ -708,17 +708,26 @@
         const campoValor  = parsearCampo(campoValorRaw);
         const campoAgrupa = esLinea ? null : parsearCampo(campoAgrupaRaw);
 
+        // Obtener textos visibles de los selectores para guardar nombre semántico
+        const selValorEl  = document.getElementById('viz-campo-valor');
+        const selAgrupaEl = document.getElementById('viz-campo-agrupacion');
+
+        const campoValorNombre   = selValorEl.options[selValorEl.selectedIndex]?.text || '';
+        const campoAgrupaNombre  = selAgrupaEl.options[selAgrupaEl.selectedIndex]?.text || '';
+
         const dataset = {
-            formulario_id:    parseInt(formularioId),
-            campo_valor:      campoValor.campo_id,
-            campo_agrupacion: esLinea ? '' : campoAgrupa.campo_id,
-            agregacion:       agregacion,
-            es_grupo:         campoValor.es_grupo,
-            gid:              campoValor.gid,
-            campo_fecha_id:   campoFechaId,
-            es_temporal:      esLinea,
-            granularidad:     esLinea ? granularidad : '',
-            campo_fecha_eje:  esLinea ? campoFechaEjeId : ''
+            formulario_id:           parseInt(formularioId),
+            campo_valor:             campoValor.campo_id,
+            campo_valor_nombre:      campoValorNombre,
+            campo_agrupacion:        esLinea ? '' : campoAgrupa.campo_id,
+            campo_agrupacion_nombre: esLinea ? '' : campoAgrupaNombre,
+            agregacion:              agregacion,
+            es_grupo:                campoValor.es_grupo,
+            gid:                     campoValor.gid,
+            campo_fecha_id:          campoFechaId,
+            es_temporal:             esLinea,
+            granularidad:            esLinea ? granularidad : '',
+            campo_fecha_eje:         esLinea ? campoFechaEjeId : ''
         };
 
         const nuevaViz = { tipo: tipoSeleccionado, titulo, config: { datasets: [dataset] } };
