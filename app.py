@@ -744,47 +744,57 @@ def bi_campos():
             if not row:
                 return jsonify({'error': 'Formulario no encontrado'}), 404
 
-            campos_config = row[0] or []
+            campos_raw = row[0] or []
 
-            def es_grupo(item):
-                return isinstance(item, dict) and item.get('tipo') == 'grupo'
-
-            campo_ids     = [
-                (item['id'] if isinstance(item, dict) else item)
-                for item in campos_config if not es_grupo(item)
+            # Recoger todos los campo_ids para consultarlos de una vez
+            todos_ids = [
+                item['id'] for item in campos_raw
+                if isinstance(item, dict) and 'id' in item
             ]
-            grupos_config = [item for item in campos_config if es_grupo(item)]
 
-            campos_map = {}
-            if campo_ids:
+            campos_info = {}
+            if todos_ids:
                 cursor.execute("""
                     SELECT id, nombre, tipo FROM campos_globales WHERE id = ANY(%s)
-                """, (campo_ids,))
+                """, (todos_ids,))
                 for r in cursor.fetchall():
-                    campos_map[str(r[0])] = {'nombre': r[1], 'tipo': r[2]}
+                    campos_info[str(r[0])] = {'nombre': r[1], 'tipo': r[2]}
 
-        sueltos = [
-            {'id': cid, 'nombre': info['nombre'], 'tipo': info['tipo']}
-            for cid, info in campos_map.items()
-        ]
+        # Recorrer el array plano e inferir pertenencia a grupos por posición
+        sueltos = []
+        grupos  = []
+        grupo_actual = None
 
-        grupos = []
-        for g in grupos_config:
-            campos_grupo = []
-            for c in g.get('campos', []):
-                cid = str(c['id']) if isinstance(c, dict) else str(c)
-                if cid in campos_map:
-                    campos_grupo.append({
-                        'id':     cid,
-                        'nombre': campos_map[cid]['nombre'],
-                        'tipo':   campos_map[cid]['tipo']
-                    })
-            if campos_grupo:
-                grupos.append({
-                    'gid':    g.get('gid'),
-                    'nombre': g.get('nombre'),
-                    'campos': campos_grupo
-                })
+        for item in campos_raw:
+            if not isinstance(item, dict):
+                continue
+
+            if item.get('tipo') == 'grupo':
+                # Nuevo grupo — guardar el anterior si tenía campos
+                if grupo_actual and grupo_actual['campos']:
+                    grupos.append(grupo_actual)
+                grupo_actual = {
+                    'gid':    item.get('gid'),
+                    'nombre': item.get('nombre'),
+                    'campos': []
+                }
+            elif 'id' in item:
+                cid  = str(item['id'])
+                info = campos_info.get(cid)
+                if not info:
+                    continue
+                campo = {'id': cid, 'nombre': info['nombre'], 'tipo': info['tipo']}
+
+                if grupo_actual is not None:
+                    # Este campo pertenece al grupo actual
+                    grupo_actual['campos'].append(campo)
+                else:
+                    # Antes de cualquier grupo → campo suelto
+                    sueltos.append(campo)
+
+        # Guardar el último grupo si quedó pendiente
+        if grupo_actual and grupo_actual['campos']:
+            grupos.append(grupo_actual)
 
         return jsonify({'sueltos': sueltos, 'grupos': grupos})
 
