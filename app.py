@@ -629,6 +629,76 @@ def bi_listar_tableros():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/bi/campos')
+def bi_campos():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    formulario_id = request.args.get('formulario_id', '')
+    if not formulario_id:
+        return jsonify({'error': 'Falta formulario_id'}), 400
+
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT campos FROM formularios
+                WHERE id = %s AND empresa_id = %s
+            """, (formulario_id, session.get('empresa_id')))
+            row = cursor.fetchone()
+            if not row:
+                return jsonify({'error': 'Formulario no encontrado'}), 404
+
+            campos_raw = row[0] or []
+
+            todos_ids = [
+                item['id'] for item in campos_raw
+                if isinstance(item, dict) and 'id' in item
+            ]
+
+            campos_info = {}
+            if todos_ids:
+                cursor.execute("""
+                    SELECT id, nombre, tipo FROM campos_globales WHERE id = ANY(%s)
+                """, (todos_ids,))
+                for r in cursor.fetchall():
+                    campos_info[str(r[0])] = {'nombre': r[1], 'tipo': r[2]}
+
+        sueltos = []
+        grupos  = []
+        grupo_actual = None
+
+        for item in campos_raw:
+            if not isinstance(item, dict):
+                continue
+
+            if item.get('tipo') == 'grupo':
+                if grupo_actual and grupo_actual['campos']:
+                    grupos.append(grupo_actual)
+                grupo_actual = {
+                    'gid':    item.get('gid'),
+                    'nombre': item.get('nombre'),
+                    'campos': []
+                }
+            elif 'id' in item:
+                cid  = str(item['id'])
+                info = campos_info.get(cid)
+                if not info:
+                    continue
+                campo = {'id': cid, 'nombre': info['nombre'], 'tipo': info['tipo']}
+
+                if grupo_actual is not None:
+                    grupo_actual['campos'].append(campo)
+                else:
+                    sueltos.append(campo)
+
+        if grupo_actual and grupo_actual['campos']:
+            grupos.append(grupo_actual)
+
+        return jsonify({'sueltos': sueltos, 'grupos': grupos})
+
+    except Exception as e:
+        print(f"Error en bi_campos: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/bi/tableros', methods=['POST'])
 def bi_crear_tablero():
