@@ -878,13 +878,27 @@ def bi_datos():
                 # ── Modo normal: agrupar por categoría ────────────────
                 else:
                     if es_grupo and gid:
+                        # Intentar obtener el label desde el nivel raíz primero,
+                        # luego desde dentro del bloque si no está en raíz
+                        label_raiz = str(resp.get(campo_agrupacion)
+                                    or resp.get(campo_agrupacion + '_codigo')
+                                    or '')
+
                         for bloque in (resp.get('__repeticiones') or {}).get(gid, []):
-                            label = str(bloque.get(campo_agrupacion)
-                                     or bloque.get(campo_agrupacion + '_codigo')
-                                     or 'Sin dato')
+                            # Usar label de raíz si existe, si no buscar dentro del bloque
+                            label = label_raiz or str(bloque.get(campo_agrupacion)
+                                                    or bloque.get(campo_agrupacion + '_codigo')
+                                                    or 'Sin dato')
                             try:    val = float(bloque.get(campo_valor) or 0)
                             except: continue
-                            acumulado[label] = acumulado.get(label, 0) + val
+
+                            if agregacion == 'promedio':
+                                if label not in acumulado:
+                                    acumulado[label] = {'suma': 0, 'n': 0}
+                                acumulado[label]['suma'] += val
+                                acumulado[label]['n']    += 1
+                            else:
+                                acumulado[label] = acumulado.get(label, 0) + val
                     else:
                         label = str(resp.get(campo_agrupacion)
                                  or resp.get(campo_agrupacion + '_codigo')
