@@ -725,81 +725,129 @@ def bi_guardar_visualizaciones(tablero_id):
 
 
 # ── BI: datos para una visualización ─────────────────────────────────
-@app.route('/api/bi/campos')
-def bi_campos():
+@app.route('/api/bi/datos', methods=['POST'])
+def bi_datos():
     if 'user_id' not in session:
         return jsonify({'error': 'No autorizado'}), 401
-
-    formulario_id = request.args.get('formulario_id', '')
-    if not formulario_id:
-        return jsonify({'error': 'Falta formulario_id'}), 400
-
     try:
-        with db_connection() as (conn, cursor):
-            cursor.execute("""
-                SELECT campos FROM formularios
-                WHERE id = %s AND empresa_id = %s
-            """, (formulario_id, session.get('empresa_id')))
-            row = cursor.fetchone()
-            if not row:
-                return jsonify({'error': 'Formulario no encontrado'}), 404
+        data       = request.get_json()
+        datasets   = data.get('datasets', [])
+        filtros    = data.get('filtros', {})
+        desde      = filtros.get('desde', '')
+        hasta      = filtros.get('hasta', '')
+        proyecto   = filtros.get('proyecto_id', '')
+        empresa_id = session.get('empresa_id')
+        acumulado  = {}
 
-            campos_raw = row[0] or []
+        for ds in datasets:
+            formulario_id    = ds.get('formulario_id')
+            campo_valor      = str(ds.get('campo_valor', ''))
+            campo_agrupacion = str(ds.get('campo_agrupacion', ''))
+            agregacion       = ds.get('agregacion', 'suma')
+            es_grupo         = ds.get('es_grupo', False)
+            gid              = ds.get('gid', '')
+            campo_fecha_id   = str(ds.get('campo_fecha_id', ''))
+            es_temporal      = ds.get('es_temporal', False)
+            granularidad     = ds.get('granularidad', 'dia')  # dia | semana | mes
 
-            # Recoger todos los campo_ids para consultarlos de una vez
-            todos_ids = [
-                item['id'] for item in campos_raw
-                if isinstance(item, dict) and 'id' in item
-            ]
-
-            campos_info = {}
-            if todos_ids:
-                cursor.execute("""
-                    SELECT id, nombre, tipo FROM campos_globales WHERE id = ANY(%s)
-                """, (todos_ids,))
-                for r in cursor.fetchall():
-                    campos_info[str(r[0])] = {'nombre': r[1], 'tipo': r[2]}
-
-        # Recorrer el array plano e inferir pertenencia a grupos por posición
-        sueltos = []
-        grupos  = []
-        grupo_actual = None
-
-        for item in campos_raw:
-            if not isinstance(item, dict):
+            if not formulario_id or not campo_valor:
                 continue
 
-            if item.get('tipo') == 'grupo':
-                # Nuevo grupo — guardar el anterior si tenía campos
-                if grupo_actual and grupo_actual['campos']:
-                    grupos.append(grupo_actual)
-                grupo_actual = {
-                    'gid':    item.get('gid'),
-                    'nombre': item.get('nombre'),
-                    'campos': []
-                }
-            elif 'id' in item:
-                cid  = str(item['id'])
-                info = campos_info.get(cid)
-                if not info:
+            with db_connection() as (conn, cursor):
+                cursor.execute("""
+                    SELECT id FROM formularios
+                    WHERE id = %s AND empresa_id = %s
+                """, (formulario_id, empresa_id))
+                if not cursor.fetchone():
                     continue
-                campo = {'id': cid, 'nombre': info['nombre'], 'tipo': info['tipo']}
 
-                if grupo_actual is not None:
-                    # Este campo pertenece al grupo actual
-                    grupo_actual['campos'].append(campo)
+                query  = "SELECT rf.respuestas FROM respuestas_formulario rf WHERE rf.formulario_id = %s"
+                params = [formulario_id]
+
+                if proyecto:
+                    query += " AND rf.id_proyecto = %s"
+                    params.append(proyecto)
+                if desde and campo_fecha_id:
+                    query += f" AND NULLIF(rf.respuestas->>'{campo_fecha_id}', '')::date >= %s"
+                    params.append(desde)
+                if hasta and campo_fecha_id:
+                    query += f" AND NULLIF(rf.respuestas->>'{campo_fecha_id}', '')::date <= %s"
+                    params.append(hasta)
+
+                cursor.execute(query, params)
+                registros = [r[0] for r in cursor.fetchall() if isinstance(r[0], dict)]
+
+            for resp in registros:
+                # ── Modo temporal: agrupar por fecha ──────────────────
+                if es_temporal and campo_fecha_id:
+                    fecha_raw = resp.get(campo_fecha_id, '')
+                    if not fecha_raw:
+                        continue
+                    try:
+                        from datetime import datetime
+                        fecha = datetime.strptime(fecha_raw[:10], '%Y-%m-%d')
+                        if granularidad == 'mes':
+                            label = fecha.strftime('%Y-%m')
+                        elif granularidad == 'semana':
+                            label = f"{fecha.isocalendar()[0]}-S{fecha.isocalendar()[1]:02d}"
+                        else:  # dia
+                            label = fecha.strftime('%Y-%m-%d')
+                    except:
+                        continue
+
+                    if es_grupo and gid:
+                        for bloque in (resp.get('__repeticiones') or {}).get(gid, []):
+                            try:    val = float(bloque.get(campo_valor) or 0)
+                            except: continue
+                            acumulado[label] = acumulado.get(label, 0) + val
+                    else:
+                        try:    val = float(resp.get(campo_valor) or 0)
+                        except: continue
+                        acumulado[label] = acumulado.get(label, 0) + val
+
+                # ── Modo normal: agrupar por categoría ────────────────
                 else:
-                    # Antes de cualquier grupo → campo suelto
-                    sueltos.append(campo)
+                    if es_grupo and gid:
+                        for bloque in (resp.get('__repeticiones') or {}).get(gid, []):
+                            label = str(bloque.get(campo_agrupacion)
+                                     or bloque.get(campo_agrupacion + '_codigo')
+                                     or 'Sin dato')
+                            try:    val = float(bloque.get(campo_valor) or 0)
+                            except: continue
+                            acumulado[label] = acumulado.get(label, 0) + val
+                    else:
+                        label = str(resp.get(campo_agrupacion)
+                                 or resp.get(campo_agrupacion + '_codigo')
+                                 or 'Sin dato')
+                        try:    val = float(resp.get(campo_valor) or 0)
+                        except: continue
+                        if agregacion == 'conteo':
+                            acumulado[label] = acumulado.get(label, 0) + 1
+                        elif agregacion == 'promedio':
+                            if label not in acumulado:
+                                acumulado[label] = {'suma': 0, 'n': 0}
+                            acumulado[label]['suma'] += val
+                            acumulado[label]['n']    += 1
+                        else:
+                            acumulado[label] = acumulado.get(label, 0) + val
 
-        # Guardar el último grupo si quedó pendiente
-        if grupo_actual and grupo_actual['campos']:
-            grupos.append(grupo_actual)
+        if any(isinstance(v, dict) for v in acumulado.values()):
+            acumulado = {k: round(v['suma'] / v['n'], 2)
+                         for k, v in acumulado.items() if isinstance(v, dict) and v['n']}
 
-        return jsonify({'sueltos': sueltos, 'grupos': grupos})
+        # Para modo temporal, ordenar cronológicamente
+        if any(ds.get('es_temporal') for ds in datasets):
+            ordenado = sorted(acumulado.items(), key=lambda x: x[0])
+        else:
+            ordenado = sorted(acumulado.items(), key=lambda x: x[1], reverse=True)
+
+        labels  = [x[0] for x in ordenado]
+        valores = [round(x[1], 2) for x in ordenado]
+        return jsonify({'labels': labels, 'valores': valores, 'total': round(sum(valores), 2)})
 
     except Exception as e:
-        print(f"Error en bi_campos: {e}")
+        print(f"Error en bi_datos: {e}")
+        import traceback; traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 

@@ -154,6 +154,14 @@
                     <i class="fas fa-th-large"></i>
                     <span>Tarjetas resumen</span>
                 </button>
+                <button class="tb-tipo-btn" data-tipo="linea" onclick="seleccionarTipo('linea')">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Línea (temporal)</span>
+                </button>
+                <button class="tb-tipo-btn" data-tipo="dona" onclick="seleccionarTipo('dona')">
+                    <i class="fas fa-chart-pie"></i>
+                    <span>Dona / Anillo</span>
+                </button>
             </div>
 
             <label class="tb-label" style="margin-top:14px;">FORMULARIO FUENTE</label>
@@ -184,6 +192,20 @@
                 <select id="viz-campo-fecha" class="tb-input">
                     <option value="">Sin filtro de fecha</option>
                 </select>
+
+                <div id="viz-campos-temporal" style="display:none;">
+                    <label class="tb-label" style="margin-top:14px;">CAMPO DE FECHA (eje X)</label>
+                    <select id="viz-campo-fecha-eje" class="tb-input">
+                        <option value="">Selecciona un campo de fecha...</option>
+                    </select>
+
+                    <label class="tb-label" style="margin-top:14px;">GRANULARIDAD</label>
+                    <select id="viz-granularidad" class="tb-input">
+                        <option value="dia">Por día</option>
+                        <option value="semana">Por semana</option>
+                        <option value="mes">Por mes</option>
+                    </select>
+                </div>
 
             </div>
         </div>
@@ -356,6 +378,10 @@
                 renderVizBarras(viz, data);
             } else if (viz.tipo === 'tarjetas') {
                 renderVizTarjetas(viz, data);
+            } else if (viz.tipo === 'linea') {
+                renderVizLinea(viz, data);
+            } else if (viz.tipo === 'dona') {
+                renderVizDona(viz, data);
             }
         } catch(e) {
             console.error(e);
@@ -429,6 +455,122 @@
         body.innerHTML = html;
     }
 
+    function renderVizLinea(viz, data) {
+        const body = document.getElementById(`viz-body-${viz.id}`);
+        body.innerHTML = `<div class="tb-chart-wrap"><canvas id="chart-${viz.id}"></canvas></div>`;
+
+        if (chartsInstancias[viz.id]) chartsInstancias[viz.id].destroy();
+
+        chartsInstancias[viz.id] = new Chart(
+            document.getElementById(`chart-${viz.id}`).getContext('2d'),
+            {
+                type: 'line',
+                data: {
+                    labels:   data.labels,
+                    datasets: [{
+                        label:           viz.titulo,
+                        data:            data.valores,
+                        borderColor:     COLOR_ACENTO,
+                        backgroundColor: COLOR_ACENTO + '22',
+                        borderWidth:     2,
+                        pointRadius:     4,
+                        pointBackgroundColor: COLOR_ACENTO,
+                        tension:         0.3,
+                        fill:            true
+                    }]
+                },
+                options: {
+                    responsive:          true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#F0F0F0' } },
+                        x: { ticks: { maxRotation: 45, minRotation: 0 } }
+                    }
+                }
+            }
+        );
+    }
+
+    function renderVizDona(viz, data) {
+        const body = document.getElementById(`viz-body-${viz.id}`);
+
+        if (!data.labels?.length) {
+            body.innerHTML = '<p style="text-align:center;color:#9ca3af;font-size:13px;padding:20px 0;">Sin datos para mostrar</p>';
+            return;
+        }
+
+        // Colores para los segmentos
+        const COLORES = [
+            COLOR_ACENTO, '#5B8DEF', '#34D399', '#F87171',
+            '#A78BFA', '#FBBF24', '#60A5FA', '#F472B6'
+        ];
+
+        body.innerHTML = `
+            <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
+                <div style="position:relative;width:200px;height:200px;flex-shrink:0;">
+                    <canvas id="chart-${viz.id}"></canvas>
+                    <div style="position:absolute;inset:0;display:flex;flex-direction:column;
+                                align-items:center;justify-content:center;pointer-events:none;">
+                        <span style="font-size:11px;color:#6b7280;font-weight:600;">TOTAL</span>
+                        <span style="font-family:'Sora',sans-serif;font-size:20px;font-weight:700;">
+                            ${data.total.toLocaleString('es-CO', {maximumFractionDigits:1})}
+                        </span>
+                    </div>
+                </div>
+                <div class="tb-dona-leyenda" id="leyenda-${viz.id}"></div>
+            </div>`;
+
+        // Leyenda con valor + porcentaje
+        const leyenda = document.getElementById(`leyenda-${viz.id}`);
+        data.labels.slice(0, 8).forEach((label, i) => {
+            const pct = data.total > 0 ? ((data.valores[i] / data.total) * 100).toFixed(1) : 0;
+            leyenda.innerHTML += `
+                <div class="tb-dona-item">
+                    <span class="tb-dona-dot" style="background:${COLORES[i % COLORES.length]}"></span>
+                    <span class="tb-dona-label">${label}</span>
+                    <span class="tb-dona-val">${data.valores[i].toLocaleString('es-CO', {maximumFractionDigits:1})}</span>
+                    <span class="tb-dona-pct">${pct}%</span>
+                </div>`;
+        });
+
+        if (chartsInstancias[viz.id]) chartsInstancias[viz.id].destroy();
+
+        chartsInstancias[viz.id] = new Chart(
+            document.getElementById(`chart-${viz.id}`).getContext('2d'),
+            {
+                type: 'doughnut',
+                data: {
+                    labels:   data.labels,
+                    datasets: [{
+                        data:            data.valores,
+                        backgroundColor: data.labels.map((_, i) => COLORES[i % COLORES.length]),
+                        borderWidth:     2,
+                        borderColor:     '#fff',
+                        hoverOffset:     6
+                    }]
+                },
+                options: {
+                    responsive:          true,
+                    maintainAspectRatio: false,
+                    cutout:              '65%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => {
+                                    const pct = data.total > 0
+                                        ? ((ctx.parsed / data.total) * 100).toFixed(1) : 0;
+                                    return ` ${ctx.label}: ${ctx.parsed.toLocaleString('es-CO')} (${pct}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        );
+    }
+
     // ── Modal: agregar visualización ───────────────────────────────────
     function abrirModalViz() {
         vizEnEdicion = null;
@@ -450,12 +592,25 @@
         document.querySelectorAll('.tb-tipo-btn').forEach(b => {
             b.classList.toggle('activo', b.dataset.tipo === tipo);
         });
-        // Ajustar labels según tipo
+        const esLinea    = tipo === 'linea';
         const esTarjetas = tipo === 'tarjetas';
-        document.getElementById('label-campo-agrupa').textContent =
-            esTarjetas ? 'AGRUPAR POR (categorías de las tarjetas)' : 'AGRUPAR POR (eje X)';
-        document.getElementById('label-campo-valor').textContent =
-            esTarjetas ? 'CAMPO A MEDIR (numérico)' : 'CAMPO A MEDIR (eje Y, numérico)';
+        // Mostrar/ocultar campos de línea temporal
+        document.getElementById('viz-campos-temporal').style.display = esLinea ? 'block' : 'none';
+        // Ocultar "agrupar por" en línea (el eje X es la fecha)
+        document.getElementById('label-campo-agrupa').closest('div') ||
+        document.getElementById('viz-campo-agrupacion').parentElement;
+        const wrapAgrupa = document.getElementById('viz-campo-agrupacion').closest('label') ||
+                        document.getElementById('viz-campo-agrupacion');
+
+        document.getElementById('viz-campo-agrupacion').style.display = esLinea ? 'none' : '';
+        document.getElementById('label-campo-agrupa').style.display   = esLinea ? 'none' : '';
+
+        // Ajustar labels
+        document.getElementById('label-campo-valor').textContent = esTarjetas
+            ? 'CAMPO A MEDIR (numérico)'
+            : esLinea ? 'CAMPO A MEDIR (eje Y, numérico)' : 'CAMPO A MEDIR (eje Y, numérico)';
+        document.getElementById('label-campo-agrupa').textContent = esTarjetas
+            ? 'AGRUPAR POR (categorías de las tarjetas)' : 'AGRUPAR POR (eje X)';
     }
 
     async function cargarCampos(formularioId) {
@@ -479,6 +634,14 @@
         const selValor  = document.getElementById('viz-campo-valor');
         const selAgrupa = document.getElementById('viz-campo-agrupacion');
         const selFecha  = document.getElementById('viz-campo-fecha');
+        // Selector de fecha para eje X del gráfico de línea
+        const selFechaEje = document.getElementById('viz-campo-fecha-eje');
+        selFechaEje.innerHTML = '<option value="">Selecciona un campo de fecha...</option>';
+        sueltos.forEach(c => {
+            if (TIPOS_FECHA.includes(c.tipo)) {
+                selFechaEje.innerHTML += `<option value="${c.id}">${c.nombre}</option>`;
+            }
+        });
 
         selValor.innerHTML  = '<option value="">Selecciona un campo...</option>';
         selAgrupa.innerHTML = '<option value="">Selecciona un campo...</option>';
@@ -524,39 +687,40 @@
     }
 
     async function guardarViz() {
-        const titulo       = document.getElementById('viz-titulo').value.trim();
-        const formularioId = document.getElementById('viz-formulario').value;
+        const titulo           = document.getElementById('viz-titulo').value.trim();
+        const formularioId     = document.getElementById('viz-formulario').value;
         const campoValorRaw    = document.getElementById('viz-campo-valor').value;
         const campoAgrupaRaw   = document.getElementById('viz-campo-agrupacion').value;
         const agregacion       = document.getElementById('viz-agregacion').value;
         const campoFechaId     = document.getElementById('viz-campo-fecha').value;
+        const campoFechaEjeId  = document.getElementById('viz-campo-fecha-eje').value;
+        const granularidad     = document.getElementById('viz-granularidad').value;
+        const esLinea          = tipoSeleccionado === 'linea';
 
         if (!titulo)           { mostrarToast('⚠️ Ingresa un título'); return; }
         if (!tipoSeleccionado) { mostrarToast('⚠️ Selecciona un tipo de gráfico'); return; }
         if (!formularioId)     { mostrarToast('⚠️ Selecciona un formulario'); return; }
         if (!campoValorRaw)    { mostrarToast('⚠️ Selecciona el campo a medir'); return; }
-        if (!campoAgrupaRaw)   { mostrarToast('⚠️ Selecciona el campo para agrupar'); return; }
+        if (!esLinea && !campoAgrupaRaw) { mostrarToast('⚠️ Selecciona el campo para agrupar'); return; }
+        if (esLinea && !campoFechaEjeId) { mostrarToast('⚠️ Selecciona el campo de fecha para el eje X'); return; }
 
         const campoValor  = parsearCampo(campoValorRaw);
-        const campoAgrupa = parsearCampo(campoAgrupaRaw);
+        const campoAgrupa = esLinea ? null : parsearCampo(campoAgrupaRaw);
 
-        const nuevaViz = {
-            tipo:   tipoSeleccionado,
-            titulo: titulo,
-            config: {
-                datasets: [{
-                    formulario_id:    parseInt(formularioId),
-                    campo_valor:      campoValor.campo_id,
-                    campo_agrupacion: campoAgrupa.campo_id,
-                    agregacion:       agregacion,
-                    es_grupo:         campoValor.es_grupo,
-                    gid:              campoValor.gid,
-                    campo_fecha_id:   campoFechaId
-                }]
-            }
+        const dataset = {
+            formulario_id:    parseInt(formularioId),
+            campo_valor:      campoValor.campo_id,
+            campo_agrupacion: esLinea ? '' : campoAgrupa.campo_id,
+            agregacion:       agregacion,
+            es_grupo:         campoValor.es_grupo,
+            gid:              campoValor.gid,
+            campo_fecha_id:   campoFechaId,
+            es_temporal:      esLinea,
+            granularidad:     esLinea ? granularidad : '',
+            campo_fecha_eje:  esLinea ? campoFechaEjeId : ''
         };
 
-        // Agregar a la lista y guardar en backend
+        const nuevaViz = { tipo: tipoSeleccionado, titulo, config: { datasets: [dataset] } };
         vizGuardadas.push(nuevaViz);
 
         try {
@@ -569,8 +733,6 @@
             if (!data.success) throw new Error(data.error);
 
             cerrarModalViz();
-
-            // Recargar para obtener IDs asignados por el backend
             document.getElementById('tb-grid').querySelectorAll('.tb-viz-card').forEach(c => c.remove());
             const resViz  = await fetch(`/api/bi/tableros/${TABLERO_ID}/visualizaciones`);
             const dataViz = await resViz.json();
@@ -578,10 +740,9 @@
             document.getElementById('tb-vacio').style.display = 'none';
             for (const viz of vizGuardadas) await renderizarViz(viz);
             mostrarToast('✅ Visualización guardada');
-
         } catch(e) {
             console.error(e);
-            vizGuardadas.pop(); // revertir si falló
+            vizGuardadas.pop();
             mostrarToast('❌ Error al guardar');
         }
     }
