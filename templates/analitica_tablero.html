@@ -617,7 +617,6 @@
         const wrap = document.getElementById('viz-campos-wrap');
         if (!formularioId) { wrap.style.display = 'none'; return; }
 
-        // Usar caché si ya lo cargamos
         if (!camposCache[formularioId]) {
             try {
                 const res  = await fetch(`/api/bi/campos?formulario_id=${formularioId}`);
@@ -630,25 +629,19 @@
 
         const { sueltos = [], grupos = [] } = camposCache[formularioId];
 
-        // Construir opciones para el selector de valor (solo numéricos)
         const selValor  = document.getElementById('viz-campo-valor');
         const selAgrupa = document.getElementById('viz-campo-agrupacion');
         const selFecha  = document.getElementById('viz-campo-fecha');
-        // Selector de fecha para eje X del gráfico de línea
         const selFechaEje = document.getElementById('viz-campo-fecha-eje');
-        selFechaEje.innerHTML = '<option value="">Selecciona un campo de fecha...</option>';
-        sueltos.forEach(c => {
-            if (TIPOS_FECHA.includes(c.tipo)) {
-                selFechaEje.innerHTML += `<option value="${c.id}">${c.nombre}</option>`;
-            }
-        });
 
-        selValor.innerHTML  = '<option value="">Selecciona un campo...</option>';
-        selAgrupa.innerHTML = '<option value="">Selecciona un campo...</option>';
-        selFecha.innerHTML  = '<option value="">Sin filtro de fecha</option>';
-
+        // ← Declararlas aquí, antes de cualquier uso
         const TIPOS_NUMERICOS = ['numero', 'moneda', 'porcentaje'];
         const TIPOS_FECHA     = ['fecha'];
+
+        selValor.innerHTML    = '<option value="">Selecciona un campo...</option>';
+        selAgrupa.innerHTML   = '<option value="">Selecciona un campo...</option>';
+        selFecha.innerHTML    = '<option value="">Sin filtro de fecha</option>';
+        selFechaEje.innerHTML = '<option value="">Selecciona un campo de fecha...</option>';
 
         // Campos sueltos
         sueltos.forEach(c => {
@@ -656,7 +649,8 @@
                 selValor.innerHTML += `<option value="${c.id}|suelto||">${c.nombre}</option>`;
             }
             if (TIPOS_FECHA.includes(c.tipo)) {
-                selFecha.innerHTML += `<option value="${c.id}">${c.nombre}</option>`;
+                selFecha.innerHTML    += `<option value="${c.id}">${c.nombre}</option>`;
+                selFechaEje.innerHTML += `<option value="${c.id}">${c.nombre}</option>`;
             }
             selAgrupa.innerHTML += `<option value="${c.id}|suelto||">${c.nombre}</option>`;
         });
