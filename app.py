@@ -885,6 +885,9 @@ def bi_datos():
                                     or '')
 
                         for bloque in (resp.get('__repeticiones') or {}).get(gid, []):
+                            print(f"[BI-DEBUG] bloque: {bloque}")
+                            print(f"[BI-DEBUG] campo_agrupacion: {campo_agrupacion}")
+                            print(f"[BI-DEBUG] label_raiz: {label_raiz}")
                             # Usar label de raíz si existe, si no buscar dentro del bloque
                             label = label_raiz or str(bloque.get(campo_agrupacion)
                                                     or bloque.get(campo_agrupacion + '_codigo')
@@ -928,6 +931,8 @@ def bi_datos():
         labels  = [x[0] for x in ordenado]
         valores = [round(x[1], 2) for x in ordenado]
         return jsonify({'labels': labels, 'valores': valores, 'total': round(sum(valores), 2)})
+
+    
 
     except Exception as e:
         print(f"Error en bi_datos: {e}")
