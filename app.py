@@ -4647,6 +4647,9 @@ def bi_datos():
         hasta    = filtros.get('hasta', '')
         proyecto = filtros.get('proyecto_id', '')
 
+        print(f"[BI-DATOS] datasets recibidos: {datasets}")
+        print(f"[BI-DATOS] filtros: {filtros}")  
+
         empresa_id = session.get('empresa_id')
         acumulado  = {}
 
