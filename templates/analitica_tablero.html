@@ -662,7 +662,8 @@
                 selFechaEje.innerHTML += `<option value="${c.id}">${c.nombre}</option>`;
             }
 
-            if (TIPOS_SELECCION.includes(c.tipo)) {
+            if (TIPOS_SELECCION.includes(c.tipo) && c.con_valor) {
+                // Tiene código + causa → dos opciones separadas
                 selAgrupa.innerHTML += `<option value="${c.id}|suelto|||codigo">${c.nombre} (código)</option>`;
                 selAgrupa.innerHTML += `<option value="${c.id}|suelto|||causa">${c.nombre} (causa)</option>`;
             } else {
@@ -680,11 +681,12 @@
                     selValor.innerHTML += `<option value="${val}|valor">${g.nombre} → ${c.nombre}</option>`;
                 }
 
-                if (TIPOS_SELECCION.includes(c.tipo)) {
-                    // Dos opciones separadas para campos con valor asociado
+                if (TIPOS_SELECCION.includes(c.tipo) && c.con_valor) {
+                    // Tiene código + causa → dos opciones separadas
                     selAgrupa.innerHTML += `<option value="${val}|codigo">${g.nombre} → ${c.nombre} (código)</option>`;
                     selAgrupa.innerHTML += `<option value="${val}|causa">${g.nombre} → ${c.nombre} (causa)</option>`;
                 } else {
+                    // Opción simple o no es selección → una sola opción
                     selAgrupa.innerHTML += `<option value="${val}|valor">${g.nombre} → ${c.nombre}</option>`;
                 }
             });

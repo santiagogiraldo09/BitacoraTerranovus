@@ -658,10 +658,21 @@ def bi_campos():
             campos_info = {}
             if todos_ids:
                 cursor.execute("""
-                    SELECT id, nombre, tipo FROM campos_globales WHERE id = ANY(%s)
+                    SELECT id, nombre, tipo, opciones FROM campos_globales WHERE id = ANY(%s)
                 """, (todos_ids,))
                 for r in cursor.fetchall():
-                    campos_info[str(r[0])] = {'nombre': r[1], 'tipo': r[2]}
+                    opciones = r[3] or []
+                    # Detectar si tiene valor asociado (opciones con izquierda/derecha)
+                    con_valor = (
+                        len(opciones) > 0 and
+                        isinstance(opciones[0], dict) and
+                        'izquierda' in opciones[0]
+                    )
+                    campos_info[str(r[0])] = {
+                        'nombre':    r[1],
+                        'tipo':      r[2],
+                        'con_valor': con_valor
+                    }
 
         sueltos = []
         grupos  = []
@@ -684,8 +695,12 @@ def bi_campos():
                 info = campos_info.get(cid)
                 if not info:
                     continue
-                campo = {'id': cid, 'nombre': info['nombre'], 'tipo': info['tipo']}
-
+                campo = {
+                    'id':        cid,
+                    'nombre':    info['nombre'],
+                    'tipo':      info['tipo'],
+                    'con_valor': info['con_valor']   # ← nuevo
+                }
                 if grupo_actual is not None:
                     grupo_actual['campos'].append(campo)
                 else:
@@ -699,6 +714,7 @@ def bi_campos():
     except Exception as e:
         print(f"Error en bi_campos: {e}")
         return jsonify({'error': str(e)}), 500
+
 
 @app.route('/api/bi/tableros', methods=['POST'])
 def bi_crear_tablero():
