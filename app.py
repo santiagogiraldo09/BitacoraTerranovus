@@ -809,12 +809,29 @@ def bi_datos():
         empresa_id = session.get('empresa_id')
         acumulado  = {}
 
-        def buscar_en_bloque(bloque, ids_posibles):
-            """Busca el valor de un campo en un bloque probando todos sus IDs posibles."""
+        def buscar_valor_en_bloque(bloque, ids_posibles):
+            """Para campos numéricos — devuelve el valor crudo."""
             for cid in ids_posibles:
-                val = bloque.get(cid) or bloque.get(cid + '_codigo')
+                val = bloque.get(cid)
                 if val is not None:
                     return val
+            return None
+
+        def buscar_label_en_bloque(bloque, ids_posibles, parte='valor'):
+            """Para campos de agrupación — respeta si el admin eligió código o causa."""
+            for cid in ids_posibles:
+                if parte == 'causa':
+                    texto = bloque.get(cid + '_codigo')
+                    if texto:
+                        return texto
+                elif parte == 'codigo':
+                    val = bloque.get(cid)
+                    if val is not None:
+                        return val
+                else:  # 'valor' — preferir texto si existe
+                    texto = bloque.get(cid + '_codigo') or bloque.get(cid)
+                    if texto is not None:
+                        return texto
             return None
 
         for ds in datasets:
@@ -823,6 +840,7 @@ def bi_datos():
             campo_valor_nombre      = ds.get('campo_valor_nombre', '')
             campo_agrupacion        = str(ds.get('campo_agrupacion', ''))
             campo_agrupacion_nombre = ds.get('campo_agrupacion_nombre', '')
+            parte_agrupacion        = ds.get('parte_agrupacion', 'valor')  # 'valor' | 'codigo' | 'causa'
             agregacion              = ds.get('agregacion', 'suma')
             es_grupo                = ds.get('es_grupo', False)
             gid                     = ds.get('gid', '')
@@ -859,8 +877,7 @@ def bi_datos():
                 cursor.execute(query, params)
                 registros = [r[0] for r in cursor.fetchall() if isinstance(r[0], dict)]
 
-                # Resolver todos los IDs posibles para campo de agrupación
-                # (por si el campo fue eliminado y recreado con otro ID)
+                # Resolver IDs posibles para campo de agrupación
                 ids_posibles_agrupacion = [campo_agrupacion]
                 if campo_agrupacion_nombre:
                     cursor.execute("""
@@ -869,12 +886,11 @@ def bi_datos():
                     """, (campo_agrupacion_nombre,))
                     ids_encontrados = [str(r[0]) for r in cursor.fetchall()]
                     if ids_encontrados:
-                        # Poner el ID actual primero, luego los históricos
                         ids_posibles_agrupacion = list(dict.fromkeys(
                             [campo_agrupacion] + ids_encontrados
                         ))
 
-                # Resolver todos los IDs posibles para campo de valor
+                # Resolver IDs posibles para campo de valor
                 ids_posibles_valor = [campo_valor]
                 if campo_valor_nombre:
                     cursor.execute("""
@@ -909,7 +925,7 @@ def bi_datos():
 
                     if es_grupo and gid:
                         for bloque in (resp.get('__repeticiones') or {}).get(gid, []):
-                            val_raw = buscar_en_bloque(bloque, ids_posibles_valor)
+                            val_raw = buscar_valor_en_bloque(bloque, ids_posibles_valor)
                             try:    val = float(val_raw or 0)
                             except: continue
                             acumulado[label] = acumulado.get(label, 0) + val
@@ -925,19 +941,25 @@ def bi_datos():
                         # Buscar el label de agrupación en nivel raíz primero
                         label_raiz = ''
                         for cid in ids_posibles_agrupacion:
-                            label_raiz = str(resp.get(cid) or resp.get(cid + '_codigo') or '')
+                            if parte_agrupacion == 'causa':
+                                label_raiz = str(resp.get(cid + '_codigo') or '')
+                            elif parte_agrupacion == 'codigo':
+                                label_raiz = str(resp.get(cid) or '')
+                            else:
+                                label_raiz = str(resp.get(cid + '_codigo') or resp.get(cid) or '')
                             if label_raiz:
                                 break
 
                         for bloque in (resp.get('__repeticiones') or {}).get(gid, []):
-                            # Si no está en raíz, buscar dentro del bloque
                             if label_raiz:
                                 label = label_raiz
                             else:
-                                label_bloque = buscar_en_bloque(bloque, ids_posibles_agrupacion)
+                                label_bloque = buscar_label_en_bloque(
+                                    bloque, ids_posibles_agrupacion, parte_agrupacion
+                                )
                                 label = str(label_bloque or 'Sin dato')
 
-                            val_raw = buscar_en_bloque(bloque, ids_posibles_valor)
+                            val_raw = buscar_valor_en_bloque(bloque, ids_posibles_valor)
                             try:    val = float(val_raw or 0)
                             except: continue
 
@@ -951,9 +973,17 @@ def bi_datos():
 
                     else:
                         # Campo de nivel raíz
-                        label = str(resp.get(campo_agrupacion)
-                                 or resp.get(campo_agrupacion + '_codigo')
-                                 or 'Sin dato')
+                        if parte_agrupacion == 'causa':
+                            label = str(resp.get(campo_agrupacion + '_codigo')
+                                     or resp.get(campo_agrupacion)
+                                     or 'Sin dato')
+                        elif parte_agrupacion == 'codigo':
+                            label = str(resp.get(campo_agrupacion)
+                                     or 'Sin dato')
+                        else:
+                            label = str(resp.get(campo_agrupacion + '_codigo')
+                                     or resp.get(campo_agrupacion)
+                                     or 'Sin dato')
 
                         val_raw = resp.get(campo_valor)
                         try:    val = float(val_raw or 0)

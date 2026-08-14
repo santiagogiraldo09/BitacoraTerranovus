@@ -652,24 +652,41 @@
 
         // Campos sueltos
         sueltos.forEach(c => {
+            const TIPOS_SELECCION = ['seleccion_unica', 'seleccion'];
+
             if (TIPOS_NUMERICOS.includes(c.tipo)) {
-                selValor.innerHTML += `<option value="${c.id}|suelto||">${c.nombre}</option>`;
+                selValor.innerHTML += `<option value="${c.id}|suelto|||valor">${c.nombre}</option>`;
             }
             if (TIPOS_FECHA.includes(c.tipo)) {
                 selFecha.innerHTML    += `<option value="${c.id}">${c.nombre}</option>`;
                 selFechaEje.innerHTML += `<option value="${c.id}">${c.nombre}</option>`;
             }
-            selAgrupa.innerHTML += `<option value="${c.id}|suelto||">${c.nombre}</option>`;
+
+            if (TIPOS_SELECCION.includes(c.tipo)) {
+                selAgrupa.innerHTML += `<option value="${c.id}|suelto|||codigo">${c.nombre} (código)</option>`;
+                selAgrupa.innerHTML += `<option value="${c.id}|suelto|||causa">${c.nombre} (causa)</option>`;
+            } else {
+                selAgrupa.innerHTML += `<option value="${c.id}|suelto|||valor">${c.nombre}</option>`;
+            }
         });
 
         // Campos de grupos
         grupos.forEach(g => {
             g.campos.forEach(c => {
                 const val = `${c.id}|grupo|${g.gid}`;
+                const TIPOS_SELECCION = ['seleccion_unica', 'seleccion'];
+
                 if (TIPOS_NUMERICOS.includes(c.tipo)) {
-                    selValor.innerHTML += `<option value="${val}">${g.nombre} → ${c.nombre}</option>`;
+                    selValor.innerHTML += `<option value="${val}|valor">${g.nombre} → ${c.nombre}</option>`;
                 }
-                selAgrupa.innerHTML += `<option value="${val}">${g.nombre} → ${c.nombre}</option>`;
+
+                if (TIPOS_SELECCION.includes(c.tipo)) {
+                    // Dos opciones separadas para campos con valor asociado
+                    selAgrupa.innerHTML += `<option value="${val}|codigo">${g.nombre} → ${c.nombre} (código)</option>`;
+                    selAgrupa.innerHTML += `<option value="${val}|causa">${g.nombre} → ${c.nombre} (causa)</option>`;
+                } else {
+                    selAgrupa.innerHTML += `<option value="${val}|valor">${g.nombre} → ${c.nombre}</option>`;
+                }
             });
         });
 
@@ -679,11 +696,14 @@
     // Parsear el valor del selector de campo: "id|tipo|gid"
     function parsearCampo(val) {
         if (!val) return null;
-        const [id, origen, gid] = val.split('|');
+        const partes = val.split('|');
+        // formato: "campo_id|origen|gid|parte"
+        // parte puede ser: 'valor', 'codigo', 'causa'
         return {
-            campo_id: id,
-            es_grupo: origen === 'grupo',
-            gid:      gid || ''
+            campo_id: partes[0],
+            es_grupo: partes[1] === 'grupo',
+            gid:      partes[2] || '',
+            parte:    partes[3] || 'valor'  // ← nuevo
         };
     }
 
@@ -721,6 +741,7 @@
             campo_valor_nombre:      campoValorNombre,
             campo_agrupacion:        esLinea ? '' : campoAgrupa.campo_id,
             campo_agrupacion_nombre: esLinea ? '' : campoAgrupaNombre,
+            parte_agrupacion:        esLinea ? 'valor' : (campoAgrupa?.parte || 'valor'),
             agregacion:              agregacion,
             es_grupo:                campoValor.es_grupo,
             gid:                     campoValor.gid,
