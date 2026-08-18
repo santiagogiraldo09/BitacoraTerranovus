@@ -928,43 +928,24 @@
     }
 
     async function moverViz(vizId, direccion) {
-        const idx = vizGuardadas.findIndex(v => v.id === vizId);
-        if (idx === -1) return;
+        const grid  = document.getElementById('tb-grid');
+        const cards = Array.from(grid.querySelectorAll('.tb-viz-card'));
+        const card  = cards.find(c => parseInt(c.dataset.vizId) === vizId);
+        if (!card) return;
 
+        const idx      = cards.indexOf(card);
         const nuevoIdx = idx + direccion;
-        if (nuevoIdx < 0 || nuevoIdx >= vizGuardadas.length) return;
+        if (nuevoIdx < 0 || nuevoIdx >= cards.length) return;
 
-        [vizGuardadas[idx], vizGuardadas[nuevoIdx]] = [vizGuardadas[nuevoIdx], vizGuardadas[idx]];
-
-        try {
-            await fetch(`/api/bi/tableros/${TABLERO_ID}/visualizaciones`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ visualizaciones: vizGuardadas })
-            });
-        } catch(e) {
-            console.error('Error guardando orden:', e);
-            mostrarToast('❌ Error al guardar el orden');
-            return;
+        // Mover solo el nodo en el DOM, sin re-renderizar nada
+        if (direccion === -1) {
+            grid.insertBefore(card, cards[nuevoIdx]);
+        } else {
+            grid.insertBefore(card, cards[nuevoIdx].nextSibling);
         }
 
-        // Limpiar TODAS las cards del grid primero
-        const grid = document.getElementById('tb-grid');
-        Array.from(grid.querySelectorAll('.tb-viz-card')).forEach(c => c.remove());
-
-        // Destruir instancias de Chart.js para evitar duplicados
-        Object.keys(chartsInstancias).forEach(key => {
-            if (chartsInstancias[key]) {
-                chartsInstancias[key].destroy();
-                delete chartsInstancias[key];
-            }
-        });
-
-        // Re-renderizar en el nuevo orden
-        for (const viz of vizGuardadas) {
-            await renderizarViz(viz);
-        }
-        inicializarDragDrop();
+        // Guardar el nuevo orden en el backend
+        await guardarOrden();
     }
 
     // Cerrar modal al hacer clic fuera
