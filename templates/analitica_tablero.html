@@ -181,7 +181,7 @@
                     <option value="">Selecciona un campo...</option>
                 </select>
 
-                <label class="tb-label" style="margin-top:14px;">AGREGACIÓN</label>
+                <label class="tb-label" style="margin-top:14px;">TIPO DE CÁLCULO</label>
                 <select id="viz-agregacion" class="tb-input">
                     <option value="suma">Suma</option>
                     <option value="promedio">Promedio</option>
@@ -448,7 +448,6 @@
                 <div class="tb-tarjeta">
                     <span class="tb-tarjeta-label">${label}</span>
                     <span class="tb-tarjeta-valor">${data.valores[i].toLocaleString('es-CO', {maximumFractionDigits: 2})}</span>
-                    <span class="tb-tarjeta-pct">${pct}%</span>
                 </div>`;
         });
         html += '</div>';
@@ -529,8 +528,6 @@
                 <div class="tb-dona-item">
                     <span class="tb-dona-dot" style="background:${COLORES[i % COLORES.length]}"></span>
                     <span class="tb-dona-label">${label}</span>
-                    <span class="tb-dona-val">${data.valores[i].toLocaleString('es-CO', {maximumFractionDigits:1})}</span>
-                    <span class="tb-dona-pct">${pct}%</span>
                 </div>`;
         });
 
