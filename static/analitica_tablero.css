@@ -93,7 +93,7 @@
     border: 1px solid var(--an-borde, #E5E7EB);
     border-radius: var(--an-radio, 14px);
     box-shadow: var(--an-sombra);
-    overflow: visible;   /* ← permite que el tooltip salga de los bordes */
+    overflow: hidden;
 }
 
 .tb-viz-header {
@@ -101,15 +101,6 @@
     align-items: center;
     justify-content: space-between;
     padding: 16px 18px 0;
-}
-
-.tb-viz-header {
-    border-radius: var(--an-radio, 14px) var(--an-radio, 14px) 0 0;
-    background: var(--an-card-bg, #fff);   /* ← necesario para que no se vea transparente */
-}
-
-.tb-viz-body {
-    border-radius: 0 0 var(--an-radio, 14px) var(--an-radio, 14px);
 }
 
 .tb-viz-titulo {
@@ -389,7 +380,6 @@
     flex-direction: column;
     gap: 6px;
     min-width: 0;
-    padding-left: 12px;   /* ← separación respecto al gráfico */
 }
 
 .tb-dona-item {
