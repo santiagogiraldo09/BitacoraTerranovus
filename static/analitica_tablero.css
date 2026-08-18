@@ -423,3 +423,27 @@
 .tb-viz-card:has(canvas[id^="chart-"]) .tb-chart-wrap {
     height: 260px;
 }
+
+.tb-viz-editar {
+    opacity: 0;
+    transition: opacity .15s;
+    background: none;
+    border: none;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 4px 6px;
+    font-size: 12px;
+    border-radius: 6px;
+}
+
+.tb-viz-card:hover .tb-viz-editar {
+    opacity: 1;
+}
+
+.tb-viz-card[draggable="true"] {
+    cursor: grab;
+}
+
+.tb-viz-card[draggable="true"]:active {
+    cursor: grabbing;
+}

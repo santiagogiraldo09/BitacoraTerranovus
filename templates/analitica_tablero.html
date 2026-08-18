@@ -310,6 +310,9 @@
             for (const viz of vizGuardadas) {
                 await renderizarViz(viz);
             }
+
+            inicializarDragDrop();
+
         } catch(e) {
             console.error('Error cargando tablero:', e);
             mostrarToast('❌ Error al cargar el tablero');
@@ -344,15 +347,24 @@
             <div class="tb-viz-header">
                 <h3 class="tb-viz-titulo">${viz.titulo}</h3>
                 ${SESSION_ROL === 'admin' ? `
-                <button class="tb-viz-eliminar" title="Eliminar"
-                        onclick="eliminarViz(${viz.id})">
-                    <i class="fas fa-trash"></i>
-                </button>` : ''}
+                <div style="display:flex;gap:6px;align-items:center;">
+                    <button class="tb-viz-editar" title="Editar"
+                            onclick="editarViz(${viz.id})">
+                        <i class="fas fa-pencil-alt"></i>
+                    </button>
+                    <button class="tb-viz-eliminar" title="Eliminar"
+                            onclick="eliminarViz(${viz.id})">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>` : ''}
             </div>
             <div class="tb-viz-body" id="viz-body-${viz.id}">
                 <div class="tb-viz-cargando"><div class="an-spinner"></div></div>
             </div>
         `;
+        if (SESSION_ROL === 'admin') {
+            card.draggable = true;
+        }
         document.getElementById('tb-grid').appendChild(card);
 
         // Obtener datos del backend
@@ -751,7 +763,17 @@
         };
 
         const nuevaViz = { tipo: tipoSeleccionado, titulo, config: { datasets: [dataset] } };
-        vizGuardadas.push(nuevaViz);
+        //vizGuardadas.push(nuevaViz);
+        if (vizEnEdicion !== null) {
+            // Edición — reemplazar la viz existente
+            const idx = vizGuardadas.findIndex(v => v.id === vizEnEdicion);
+            if (idx !== -1) {
+                vizGuardadas[idx] = { ...vizGuardadas[idx], tipo: tipoSeleccionado, titulo, config: { datasets: [dataset] } };
+            }
+        } else {
+            // Nueva visualización
+            vizGuardadas.push(nuevaViz);
+        }
 
         try {
             const res  = await fetch(`/api/bi/tableros/${TABLERO_ID}/visualizaciones`, {
@@ -777,6 +799,48 @@
         }
     }
 
+    async function editarViz(vizId) {
+        const viz = vizGuardadas.find(v => v.id === vizId);
+        if (!viz) return;
+
+        vizEnEdicion = vizId;
+        const ds = viz.config.datasets?.[0] || {};
+
+        // Llenar el modal con los valores actuales
+        document.getElementById('viz-titulo').value = viz.titulo;
+        document.getElementById('modal-viz-titulo').textContent = 'Editar visualización';
+
+        // Seleccionar el tipo
+        seleccionarTipo(viz.tipo);
+
+        // Seleccionar el formulario y cargar campos
+        const selForm = document.getElementById('viz-formulario');
+        selForm.value = ds.formulario_id || '';
+        if (ds.formulario_id) {
+            await cargarCampos(String(ds.formulario_id));
+        }
+
+        // Restaurar selecciones de campos
+        // Construir el valor del option para campo valor
+        const esGrupo  = ds.es_grupo ? 'grupo' : 'suelto';
+        const gidVal   = ds.gid || '';
+        const parteVal = ds.parte_agrupacion || 'valor';
+
+        document.getElementById('viz-campo-valor').value =
+            `${ds.campo_valor}|${esGrupo}|${gidVal}|valor`;
+        document.getElementById('viz-campo-agrupacion').value =
+            `${ds.campo_agrupacion}|${esGrupo}|${gidVal}|${parteVal}`;
+        document.getElementById('viz-agregacion').value = ds.agregacion || 'suma';
+        document.getElementById('viz-campo-fecha').value = ds.campo_fecha_id || '';
+
+        if (viz.tipo === 'linea') {
+            document.getElementById('viz-campo-fecha-eje').value = ds.campo_fecha_eje || '';
+            document.getElementById('viz-granularidad').value    = ds.granularidad || 'dia';
+        }
+
+        document.getElementById('modal-viz').style.display = 'flex';
+    }
+
     async function eliminarViz(vizId) {
         if (!confirm('¿Eliminar esta visualización?')) return;
 
@@ -798,6 +862,59 @@
             mostrarToast('Visualización eliminada');
         } catch(e) {
             mostrarToast('❌ Error al eliminar');
+        }
+    }
+
+    // ── Drag & Drop para reordenar visualizaciones ────────────────
+    function inicializarDragDrop() {
+        if (SESSION_ROL !== 'admin') return;
+        const grid = document.getElementById('tb-grid');
+        let dragging = null;
+
+        grid.addEventListener('dragstart', e => {
+            dragging = e.target.closest('.tb-viz-card');
+            if (dragging) dragging.style.opacity = '0.5';
+        });
+
+        grid.addEventListener('dragend', e => {
+            if (dragging) dragging.style.opacity = '';
+            dragging = null;
+            guardarOrden();
+        });
+
+        grid.addEventListener('dragover', e => {
+            e.preventDefault();
+            const card = e.target.closest('.tb-viz-card');
+            if (card && card !== dragging) {
+                const rect   = card.getBoundingClientRect();
+                const mitad  = rect.top + rect.height / 2;
+                if (e.clientY < mitad) {
+                    grid.insertBefore(dragging, card);
+                } else {
+                    grid.insertBefore(dragging, card.nextSibling);
+                }
+            }
+        });
+    }
+
+    async function guardarOrden() {
+        // Reordenar vizGuardadas según el orden visual actual del DOM
+        const cards     = document.querySelectorAll('.tb-viz-card');
+        const nuevoOrden = Array.from(cards).map(c => {
+            const id = parseInt(c.dataset.vizId);
+            return vizGuardadas.find(v => v.id === id);
+        }).filter(Boolean);
+
+        vizGuardadas = nuevoOrden;
+
+        try {
+            await fetch(`/api/bi/tableros/${TABLERO_ID}/visualizaciones`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ visualizaciones: vizGuardadas })
+            });
+        } catch(e) {
+            console.error('Error guardando orden:', e);
         }
     }
 
