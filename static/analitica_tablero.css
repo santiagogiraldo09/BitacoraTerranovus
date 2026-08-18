@@ -447,3 +447,25 @@
 .tb-viz-card[draggable="true"]:active {
     cursor: grabbing;
 }
+
+.tb-viz-mover {
+    opacity: 0;
+    transition: opacity .15s;
+    background: none;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    padding: 4px 5px;
+    font-size: 11px;
+    border-radius: 6px;
+    line-height: 1;
+}
+
+.tb-viz-card:hover .tb-viz-mover {
+    opacity: 1;
+}
+
+.tb-viz-mover:hover {
+    color: var(--naranja, #FFAF33);
+    background: #fff8ee;
+}

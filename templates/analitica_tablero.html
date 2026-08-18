@@ -347,7 +347,15 @@
             <div class="tb-viz-header">
                 <h3 class="tb-viz-titulo">${viz.titulo}</h3>
                 ${SESSION_ROL === 'admin' ? `
-                <div style="display:flex;gap:6px;align-items:center;">
+                <div style="display:flex;gap:4px;align-items:center;">
+                    <button class="tb-viz-mover" title="Mover izquierda"
+                            onclick="moverViz(${viz.id}, -1)">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button class="tb-viz-mover" title="Mover derecha"
+                            onclick="moverViz(${viz.id}, 1)">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
                     <button class="tb-viz-editar" title="Editar"
                             onclick="editarViz(${viz.id})">
                         <i class="fas fa-pencil-alt"></i>
@@ -916,6 +924,36 @@
         } catch(e) {
             console.error('Error guardando orden:', e);
         }
+    }
+
+    async function moverViz(vizId, direccion) {
+        const idx = vizGuardadas.findIndex(v => v.id === vizId);
+        if (idx === -1) return;
+
+        const nuevoIdx = idx + direccion;
+        if (nuevoIdx < 0 || nuevoIdx >= vizGuardadas.length) return;
+
+        // Intercambiar posiciones en el array
+        [vizGuardadas[idx], vizGuardadas[nuevoIdx]] = [vizGuardadas[nuevoIdx], vizGuardadas[idx]];
+
+        // Guardar nuevo orden en backend
+        try {
+            await fetch(`/api/bi/tableros/${TABLERO_ID}/visualizaciones`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ visualizaciones: vizGuardadas })
+            });
+        } catch(e) {
+            console.error('Error guardando orden:', e);
+            mostrarToast('❌ Error al guardar el orden');
+            return;
+        }
+
+        // Re-renderizar el grid con el nuevo orden
+        document.getElementById('tb-grid').querySelectorAll('.tb-viz-card').forEach(c => c.remove());
+        document.getElementById('tb-vacio').style.display = 'none';
+        for (const viz of vizGuardadas) await renderizarViz(viz);
+        inicializarDragDrop();
     }
 
     // Cerrar modal al hacer clic fuera
