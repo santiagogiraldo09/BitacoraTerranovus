@@ -101,6 +101,8 @@
     align-items: center;
     justify-content: space-between;
     padding: 16px 18px 0;
+    border-radius: var(--an-radio, 14px) var(--an-radio, 14px) 0 0;
+    background: var(--an-card-bg, #fff);
 }
 
 .tb-viz-titulo {
@@ -420,8 +422,10 @@
 }
 
 /* Ajustar altura del chart de dona */
-.tb-viz-card:has(canvas[id^="chart-"]) .tb-chart-wrap {
+.tb-chart-wrap {
+    position: relative;
     height: 260px;
+    overflow: visible;   /* ← permite que el tooltip del canvas salga */
 }
 
 .tb-viz-editar {
