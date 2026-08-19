@@ -844,11 +844,29 @@ def bi_datos():
                     val = bloque.get(cid)
                     if val is not None:
                         return val
-                else:  # 'valor' — preferir texto si existe
+                else:
                     texto = bloque.get(cid + '_codigo') or bloque.get(cid)
                     if texto is not None:
                         return texto
             return None
+
+        def obtener_label(resp, bloque, ids_posibles, parte, label_raiz=''):
+            """Obtiene el label de agrupación desde raíz o desde el bloque."""
+            if label_raiz:
+                return label_raiz
+            if bloque:
+                return str(buscar_label_en_bloque(bloque, ids_posibles, parte) or 'Sin dato')
+            # Nivel raíz sin bloque
+            for cid in ids_posibles:
+                if parte == 'causa':
+                    v = resp.get(cid + '_codigo')
+                elif parte == 'codigo':
+                    v = resp.get(cid)
+                else:
+                    v = resp.get(cid + '_codigo') or resp.get(cid)
+                if v:
+                    return str(v)
+            return 'Sin dato'
 
         for ds in datasets:
             formulario_id           = ds.get('formulario_id')
@@ -856,19 +874,21 @@ def bi_datos():
             campo_valor_nombre      = ds.get('campo_valor_nombre', '')
             campo_agrupacion        = str(ds.get('campo_agrupacion', ''))
             campo_agrupacion_nombre = ds.get('campo_agrupacion_nombre', '')
-            parte_agrupacion        = ds.get('parte_agrupacion', 'valor')  # 'valor' | 'codigo' | 'causa'
+            parte_agrupacion        = ds.get('parte_agrupacion', 'valor')
             agregacion              = ds.get('agregacion', 'suma')
             es_grupo                = ds.get('es_grupo', False)
             gid                     = ds.get('gid', '')
             campo_fecha_id          = str(ds.get('campo_fecha_id', ''))
             es_temporal             = ds.get('es_temporal', False)
             granularidad            = ds.get('granularidad', 'dia')
+            es_agrupado             = ds.get('es_agrupado', False)
+            campo_serie             = str(ds.get('campo_serie', ''))
+            campo_serie_nombre      = ds.get('campo_serie_nombre', '')
 
             if not formulario_id or not campo_valor:
                 continue
 
             with db_connection() as (conn, cursor):
-                # Verificar que el formulario pertenece a la empresa
                 cursor.execute("""
                     SELECT id FROM formularios
                     WHERE id = %s AND empresa_id = %s
@@ -876,7 +896,6 @@ def bi_datos():
                 if not cursor.fetchone():
                     continue
 
-                # Obtener registros
                 query  = "SELECT rf.respuestas FROM respuestas_formulario rf WHERE rf.formulario_id = %s"
                 params = [formulario_id]
 
@@ -919,6 +938,19 @@ def bi_datos():
                             [campo_valor] + ids_encontrados
                         ))
 
+                # Resolver IDs posibles para campo de serie (barras agrupadas)
+                ids_posibles_serie = [campo_serie] if campo_serie else []
+                if campo_serie_nombre and es_agrupado:
+                    cursor.execute("""
+                        SELECT id FROM campos_globales
+                        WHERE nombre = %s ORDER BY id DESC
+                    """, (campo_serie_nombre,))
+                    ids_encontrados = [str(r[0]) for r in cursor.fetchall()]
+                    if ids_encontrados:
+                        ids_posibles_serie = list(dict.fromkeys(
+                            ([campo_serie] if campo_serie else []) + ids_encontrados
+                        ))
+
             # Procesar cada registro
             for resp in registros:
 
@@ -951,10 +983,9 @@ def bi_datos():
                         except: continue
                         acumulado[label] = acumulado.get(label, 0) + val
 
-                # ── Modo normal: agrupar por categoría ──
-                else:
+                # ── Modo agrupado: barras con múltiples series ──
+                elif es_agrupado and ids_posibles_serie:
                     if es_grupo and gid:
-                        # Buscar el label de agrupación en nivel raíz primero
                         label_raiz = ''
                         for cid in ids_posibles_agrupacion:
                             if parte_agrupacion == 'causa':
@@ -967,14 +998,53 @@ def bi_datos():
                                 break
 
                         for bloque in (resp.get('__repeticiones') or {}).get(gid, []):
-                            if label_raiz:
-                                label = label_raiz
-                            else:
-                                label_bloque = buscar_label_en_bloque(
-                                    bloque, ids_posibles_agrupacion, parte_agrupacion
-                                )
-                                label = str(label_bloque or 'Sin dato')
+                            label = obtener_label(resp, bloque, ids_posibles_agrupacion,
+                                                  parte_agrupacion, label_raiz)
+                            serie = str(
+                                buscar_label_en_bloque(bloque, ids_posibles_serie, 'valor')
+                                or resp.get(campo_serie + '_codigo')
+                                or resp.get(campo_serie)
+                                or 'Sin dato'
+                            )
+                            val_raw = buscar_valor_en_bloque(bloque, ids_posibles_valor)
+                            try:    val = float(val_raw or 0)
+                            except: continue
 
+                            if label not in acumulado:
+                                acumulado[label] = {}
+                            acumulado[label][serie] = acumulado[label].get(serie, 0) + val
+                    else:
+                        label = obtener_label(resp, None, ids_posibles_agrupacion, parte_agrupacion)
+                        serie = str(
+                            resp.get(campo_serie + '_codigo')
+                            or resp.get(campo_serie)
+                            or 'Sin dato'
+                        )
+                        val_raw = resp.get(campo_valor)
+                        try:    val = float(val_raw or 0)
+                        except: continue
+
+                        if label not in acumulado:
+                            acumulado[label] = {}
+                        acumulado[label][serie] = acumulado[label].get(serie, 0) + val
+
+                # ── Modo normal: una sola serie ──
+                else:
+                    if es_grupo and gid:
+                        label_raiz = ''
+                        for cid in ids_posibles_agrupacion:
+                            if parte_agrupacion == 'causa':
+                                label_raiz = str(resp.get(cid + '_codigo') or '')
+                            elif parte_agrupacion == 'codigo':
+                                label_raiz = str(resp.get(cid) or '')
+                            else:
+                                label_raiz = str(resp.get(cid + '_codigo') or resp.get(cid) or '')
+                            if label_raiz:
+                                break
+
+                        for bloque in (resp.get('__repeticiones') or {}).get(gid, []):
+                            label = obtener_label(resp, bloque, ids_posibles_agrupacion,
+                                                  parte_agrupacion, label_raiz)
                             val_raw = buscar_valor_en_bloque(bloque, ids_posibles_valor)
                             try:    val = float(val_raw or 0)
                             except: continue
@@ -986,21 +1056,8 @@ def bi_datos():
                                 acumulado[label]['n']    += 1
                             else:
                                 acumulado[label] = acumulado.get(label, 0) + val
-
                     else:
-                        # Campo de nivel raíz
-                        if parte_agrupacion == 'causa':
-                            label = str(resp.get(campo_agrupacion + '_codigo')
-                                     or resp.get(campo_agrupacion)
-                                     or 'Sin dato')
-                        elif parte_agrupacion == 'codigo':
-                            label = str(resp.get(campo_agrupacion)
-                                     or 'Sin dato')
-                        else:
-                            label = str(resp.get(campo_agrupacion + '_codigo')
-                                     or resp.get(campo_agrupacion)
-                                     or 'Sin dato')
-
+                        label = obtener_label(resp, None, ids_posibles_agrupacion, parte_agrupacion)
                         val_raw = resp.get(campo_valor)
                         try:    val = float(val_raw or 0)
                         except: continue
@@ -1015,15 +1072,35 @@ def bi_datos():
                         else:
                             acumulado[label] = acumulado.get(label, 0) + val
 
-        # Calcular promedios finales
-        if any(isinstance(v, dict) for v in acumulado.values()):
+        # ── Calcular promedios finales (modo normal) ──
+        if any(isinstance(v, dict) and 'suma' in v for v in acumulado.values()):
             acumulado = {
                 k: round(v['suma'] / v['n'], 2)
                 for k, v in acumulado.items()
-                if isinstance(v, dict) and v['n']
+                if isinstance(v, dict) and 'suma' in v and v['n']
             }
 
-        # Ordenar: cronológico para temporal, por valor descendente para el resto
+        # ── Respuesta para modo agrupado ──
+        if any(ds.get('es_agrupado') for ds in datasets):
+            labels = sorted(acumulado.keys())
+            series_nombres = []
+            for v in acumulado.values():
+                if isinstance(v, dict):
+                    for s in v.keys():
+                        if s not in series_nombres:
+                            series_nombres.append(s)
+
+            series = [
+                {
+                    'nombre':  s,
+                    'valores': [round(acumulado.get(label, {}).get(s, 0), 2) for label in labels]
+                }
+                for s in series_nombres
+            ]
+            total = round(sum(v for serie in series for v in serie['valores']), 2)
+            return jsonify({'labels': labels, 'series': series, 'total': total})
+
+        # ── Respuesta para modo normal y temporal ──
         if any(ds.get('es_temporal') for ds in datasets):
             ordenado = sorted(acumulado.items(), key=lambda x: x[0])
         else:
