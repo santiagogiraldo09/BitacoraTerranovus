@@ -892,7 +892,7 @@ def bi_datos():
             print(f"[BI-TABLA] formulario_id: {formulario_id}")
             print(f"[BI-TABLA] registros encontrados: {len(registros) if 'registros' in dir() else 'aún no consultado'}")
 
-            if not formulario_id or not campo_valor:
+            if not formulario_id or (not campo_valor and not es_tabla):
                 continue
 
             with db_connection() as (conn, cursor):
@@ -958,49 +958,48 @@ def bi_datos():
                             ([campo_serie] if campo_serie else []) + ids_encontrados
                         ))
 
+            # ── Modo tabla: devuelve filas completas ──
+            if es_tabla and columnas:
+                filas = []
+                for resp in registros:
+                    fila = {}
+                    tiene_datos = False
+                    for col in columnas:
+                        cid      = str(col.get('campo_id', ''))
+                        es_grupo = col.get('es_grupo', False)
+                        gid_col  = col.get('gid', '')
+                        tipo_col = col.get('campo_tipo', '')
+
+                        if es_grupo and gid_col:
+                            # Para campos de grupo toma el primer bloque
+                            bloques = (resp.get('__repeticiones') or {}).get(gid_col, [])
+                            if bloques:
+                                val = bloques[0].get(cid + '_codigo') or bloques[0].get(cid) or ''
+                                fila[cid] = str(val) if val else '—'
+                                tiene_datos = True
+                            else:
+                                fila[cid] = '—'
+                        else:
+                            val = resp.get(cid + '_codigo') or resp.get(cid) or ''
+                            fila[cid] = str(val) if val else '—'
+                            if val:
+                                tiene_datos = True
+
+                    if tiene_datos:
+                        filas.append(fila)
+
+                return jsonify({
+                    'filas':    filas,
+                    'columnas': [{'campo_id': str(c.get('campo_id','')),
+                                'nombre':   c.get('campo_nombre',''),
+                                'tipo':     c.get('campo_tipo','')} for c in columnas],
+                    'total':    len(filas)
+                })
+
             # Procesar cada registro
             for resp in registros:
-
-                # ── Modo tabla: devuelve filas completas ──
-                if es_tabla and columnas:
-                    filas = []
-                    for resp in registros:
-                        fila = {}
-                        tiene_datos = False
-                        for col in columnas:
-                            cid      = str(col.get('campo_id', ''))
-                            es_grupo = col.get('es_grupo', False)
-                            gid_col  = col.get('gid', '')
-                            tipo_col = col.get('campo_tipo', '')
-
-                            if es_grupo and gid_col:
-                                # Para campos de grupo toma el primer bloque
-                                bloques = (resp.get('__repeticiones') or {}).get(gid_col, [])
-                                if bloques:
-                                    val = bloques[0].get(cid + '_codigo') or bloques[0].get(cid) or ''
-                                    fila[cid] = str(val) if val else '—'
-                                    tiene_datos = True
-                                else:
-                                    fila[cid] = '—'
-                            else:
-                                val = resp.get(cid + '_codigo') or resp.get(cid) or ''
-                                fila[cid] = str(val) if val else '—'
-                                if val:
-                                    tiene_datos = True
-
-                        if tiene_datos:
-                            filas.append(fila)
-
-                    return jsonify({
-                        'filas':    filas,
-                        'columnas': [{'campo_id': str(c.get('campo_id','')),
-                                    'nombre':   c.get('campo_nombre',''),
-                                    'tipo':     c.get('campo_tipo','')} for c in columnas],
-                        'total':    len(filas)
-                    })
-
                 # ── Modo temporal: agrupar por fecha (gráfico de línea) ──
-                elif es_temporal and campo_fecha_id:
+                if es_temporal and campo_fecha_id:
                     fecha_raw = resp.get(campo_fecha_id, '')
                     if not fecha_raw:
                         continue
