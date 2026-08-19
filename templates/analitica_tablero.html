@@ -1058,12 +1058,12 @@
         if (!titulo)           { mostrarToast('⚠️ Ingresa un título'); return; }
         if (!tipoSeleccionado) { mostrarToast('⚠️ Selecciona un tipo de gráfico'); return; }
         if (!formularioId)     { mostrarToast('⚠️ Selecciona un formulario'); return; }
-        if (!campoValorRaw)    { mostrarToast('⚠️ Selecciona el campo a medir'); return; }
-        if (!esLinea && !campoAgrupaRaw) { mostrarToast('⚠️ Selecciona el campo para agrupar'); return; }
+        if (!esTabla && !campoValorRaw) { mostrarToast('⚠️ Selecciona el campo a medir'); return; }
+        if (!esLinea && !esTabla && !campoAgrupaRaw) { mostrarToast('⚠️ Selecciona el campo para agrupar'); return; }
         if (esLinea && !campoFechaEjeId) { mostrarToast('⚠️ Selecciona el campo de fecha para el eje X'); return; }
 
-        const campoValor  = parsearCampo(campoValorRaw);
-        const campoAgrupa = esLinea ? null : parsearCampo(campoAgrupaRaw);
+        const campoValor  = !esTabla ? parsearCampo(campoValorRaw) : null;
+        const campoAgrupa = (!esLinea && !esTabla) ? parsearCampo(campoAgrupaRaw) : null;
 
         // Obtener textos visibles de los selectores para guardar nombre semántico
         const selValorEl  = document.getElementById('viz-campo-valor');
