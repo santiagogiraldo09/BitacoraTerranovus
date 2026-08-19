@@ -887,6 +887,11 @@ def bi_datos():
             campo_serie             = str(ds.get('campo_serie', ''))
             campo_serie_nombre      = ds.get('campo_serie_nombre', '')
 
+            print(f"[BI-TABLA] es_tabla: {es_tabla}")
+            print(f"[BI-TABLA] columnas: {columnas}")
+            print(f"[BI-TABLA] formulario_id: {formulario_id}")
+            print(f"[BI-TABLA] registros encontrados: {len(registros) if 'registros' in dir() else 'aún no consultado'}")
+
             if not formulario_id or not campo_valor:
                 continue
 
