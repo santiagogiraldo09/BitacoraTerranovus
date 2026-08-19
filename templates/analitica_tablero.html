@@ -1020,23 +1020,23 @@
     }
 
     async function guardarViz() {
-        const titulo           = document.getElementById('viz-titulo').value.trim();
-        const formularioId     = document.getElementById('viz-formulario').value;
-        const campoValorRaw    = document.getElementById('viz-campo-valor').value;
-        const campoAgrupaRaw   = document.getElementById('viz-campo-agrupacion').value;
-        const agregacion       = document.getElementById('viz-agregacion').value;
-        const campoFechaId     = document.getElementById('viz-campo-fecha').value;
-        const campoSerieRaw    = document.getElementById('viz-campo-serie').value;
-        const selSerieEl       = document.getElementById('viz-campo-serie');
+        const titulo          = document.getElementById('viz-titulo').value.trim();
+        const formularioId    = document.getElementById('viz-formulario').value;
+        const campoValorRaw   = document.getElementById('viz-campo-valor').value;
+        const campoAgrupaRaw  = document.getElementById('viz-campo-agrupacion').value;
+        const agregacion      = document.getElementById('viz-agregacion').value;
+        const campoFechaId    = document.getElementById('viz-campo-fecha').value;
+        const campoSerieRaw   = document.getElementById('viz-campo-serie').value;
+        const selSerieEl      = document.getElementById('viz-campo-serie');
         const campoSerieNombre = campoSerieRaw
             ? (selSerieEl.options[selSerieEl.selectedIndex]?.text || '')
             : '';
-        const campoSerie       = campoSerieRaw ? parsearCampo(campoSerieRaw) : null;
-        const esAgrupado       = tipoSeleccionado === 'barras' && !!campoSerieRaw;
-        const campoFechaEjeId  = document.getElementById('viz-campo-fecha-eje').value;
-        const granularidad     = document.getElementById('viz-granularidad').value;
-        const esLinea          = tipoSeleccionado === 'linea';
-        const esTabla = tipoSeleccionado === 'tabla';
+        const campoSerie      = campoSerieRaw ? parsearCampo(campoSerieRaw) : null;
+        const esAgrupado      = tipoSeleccionado === 'barras' && !!campoSerieRaw;
+        const campoFechaEjeId = document.getElementById('viz-campo-fecha-eje').value;
+        const granularidad    = document.getElementById('viz-granularidad').value;
+        const esLinea         = tipoSeleccionado === 'linea';
+        const esTabla         = tipoSeleccionado === 'tabla';
 
         // Recoger columnas seleccionadas para tipo tabla
         const columnasSeleccionadas = esTabla
@@ -1050,62 +1050,72 @@
                 }))
             : [];
 
-        if (esTabla && columnasSeleccionadas.length === 0) {
-            mostrarToast('⚠️ Selecciona al menos una columna');
-            return;
-        }
-
+        // ── Validaciones ──
         if (!titulo)           { mostrarToast('⚠️ Ingresa un título'); return; }
         if (!tipoSeleccionado) { mostrarToast('⚠️ Selecciona un tipo de gráfico'); return; }
         if (!formularioId)     { mostrarToast('⚠️ Selecciona un formulario'); return; }
-        if (!campoValorRaw)    { mostrarToast('⚠️ Selecciona el campo a medir'); return; }
-        if (!esLinea && !campoAgrupaRaw) { mostrarToast('⚠️ Selecciona el campo para agrupar'); return; }
-        if (esLinea && !campoFechaEjeId) { mostrarToast('⚠️ Selecciona el campo de fecha para el eje X'); return; }
 
-        const campoValor  = parsearCampo(campoValorRaw);
-        const campoAgrupa = esLinea ? null : parsearCampo(campoAgrupaRaw);
+        if (esTabla) {
+            if (columnasSeleccionadas.length === 0) {
+                mostrarToast('⚠️ Selecciona al menos una columna');
+                return;
+            }
+        } else {
+            if (!campoValorRaw) { mostrarToast('⚠️ Selecciona el campo a medir'); return; }
+            if (!esLinea && !campoAgrupaRaw) { mostrarToast('⚠️ Selecciona el campo para agrupar'); return; }
+            if (esLinea && !campoFechaEjeId) { mostrarToast('⚠️ Selecciona el campo de fecha para el eje X'); return; }
+        }
 
-        // Obtener textos visibles de los selectores para guardar nombre semántico
+        // ── Parsear campos (solo si no es tabla) ──
+        const campoValor  = !esTabla ? parsearCampo(campoValorRaw) : null;
+        const campoAgrupa = (!esLinea && !esTabla) ? parsearCampo(campoAgrupaRaw) : null;
+
+        // ── Nombres semánticos ──
         const selValorEl  = document.getElementById('viz-campo-valor');
         const selAgrupaEl = document.getElementById('viz-campo-agrupacion');
+        const campoValorNombre  = !esTabla ? (selValorEl.options[selValorEl.selectedIndex]?.text || '') : '';
+        const campoAgrupaNombre = !esTabla ? (selAgrupaEl.options[selAgrupaEl.selectedIndex]?.text || '') : '';
 
-        const campoValorNombre   = selValorEl.options[selValorEl.selectedIndex]?.text || '';
-        const campoAgrupaNombre  = selAgrupaEl.options[selAgrupaEl.selectedIndex]?.text || '';
-
+        // ── Construir dataset ──
         const dataset = {
             formulario_id:           parseInt(formularioId),
-            campo_valor:             campoValor.campo_id,
+            campo_valor:             esTabla ? '' : campoValor.campo_id,
             campo_valor_nombre:      campoValorNombre,
-            campo_agrupacion:        esLinea ? '' : campoAgrupa.campo_id,
-            campo_agrupacion_nombre: esLinea ? '' : campoAgrupaNombre,
-            parte_agrupacion:        esLinea ? 'valor' : (campoAgrupa?.parte || 'valor'),
-            es_agrupado:             esAgrupado,                                              // ← nuevo
-            campo_serie:             esAgrupado ? campoSerie.campo_id : '',                   // ← nuevo
-            campo_serie_nombre:      campoSerieNombre,                                        // ← nuevo
-            es_tabla:                esTabla,                    // ← nuevo
-            columnas:                columnasSeleccionadas,      // ← nuevo
+            campo_agrupacion:        (esLinea || esTabla) ? '' : campoAgrupa.campo_id,
+            campo_agrupacion_nombre: (esLinea || esTabla) ? '' : campoAgrupaNombre,
+            parte_agrupacion:        (esLinea || esTabla) ? 'valor' : (campoAgrupa?.parte || 'valor'),
+            es_agrupado:             esAgrupado,
+            campo_serie:             esAgrupado ? campoSerie.campo_id : '',
+            campo_serie_nombre:      campoSerieNombre,
+            es_tabla:                esTabla,
+            columnas:                columnasSeleccionadas,
             agregacion:              agregacion,
-            es_grupo:                campoValor.es_grupo,
-            gid:                     campoValor.gid,
+            es_grupo:                esTabla ? false : campoValor.es_grupo,
+            gid:                     esTabla ? '' : campoValor.gid,
             campo_fecha_id:          campoFechaId,
             es_temporal:             esLinea,
             granularidad:            esLinea ? granularidad : '',
             campo_fecha_eje:         esLinea ? campoFechaEjeId : ''
         };
 
+        // ── Guardar en lista local ──
         const nuevaViz = { tipo: tipoSeleccionado, titulo, config: { datasets: [dataset] } };
-        //vizGuardadas.push(nuevaViz);
+
         if (vizEnEdicion !== null) {
-            // Edición — reemplazar la viz existente
             const idx = vizGuardadas.findIndex(v => v.id === vizEnEdicion);
             if (idx !== -1) {
-                vizGuardadas[idx] = { ...vizGuardadas[idx], tipo: tipoSeleccionado, titulo, config: { datasets: [dataset] } };
+                vizGuardadas[idx] = {
+                    ...vizGuardadas[idx],
+                    tipo:   tipoSeleccionado,
+                    titulo: titulo,
+                    config: { datasets: [dataset] }
+                };
             }
         } else {
-            // Nueva visualización
             vizGuardadas.push(nuevaViz);
         }
 
+        // ── Persistir en backend ──
         try {
             const res  = await fetch(`/api/bi/tableros/${TABLERO_ID}/visualizaciones`, {
                 method: 'POST',
@@ -1116,6 +1126,8 @@
             if (!data.success) throw new Error(data.error);
 
             cerrarModalViz();
+
+            // Recargar todas las visualizaciones
             document.getElementById('tb-grid').querySelectorAll('.tb-viz-card').forEach(c => c.remove());
             const resViz  = await fetch(`/api/bi/tableros/${TABLERO_ID}/visualizaciones`);
             const dataViz = await resViz.json();
@@ -1123,9 +1135,11 @@
             document.getElementById('tb-vacio').style.display = 'none';
             for (const viz of vizGuardadas) await renderizarViz(viz);
             mostrarToast('✅ Visualización guardada');
+
         } catch(e) {
             console.error(e);
-            vizGuardadas.pop();
+            // Revertir si falló
+            if (vizEnEdicion === null) vizGuardadas.pop();
             mostrarToast('❌ Error al guardar');
         }
     }
