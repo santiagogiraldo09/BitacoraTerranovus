@@ -188,6 +188,14 @@
                     <option value="conteo">Conteo</option>
                 </select>
 
+                <div id="viz-campo-serie-wrap" style="display:none;">
+                    <label class="tb-label" style="margin-top:14px;">AGRUPAR BARRAS POR: <span style="font-weight:400;text-transform:none;color:#9ca3af;">(opcional)</span></label>
+                    <select id="viz-campo-serie" class="tb-input">
+                        <option value="">Sin agrupación adicional</option>
+                    </select>
+                </div>
+
+
                 <label class="tb-label" style="margin-top:14px;">CAMPO DE FECHA (para filtros)</label>
                 <select id="viz-campo-fecha" class="tb-input">
                     <option value="">Sin filtro de fecha</option>
@@ -395,7 +403,11 @@
             }
 
             if (viz.tipo === 'barras') {
-                renderVizBarras(viz, data);
+                if (data.series && data.series.length > 0) {
+                    renderVizBarrasAgrupadas(viz, data);
+                } else {
+                    renderVizBarras(viz, data);
+                }
             } else if (viz.tipo === 'tarjetas') {
                 renderVizTarjetas(viz, data);
             } else if (viz.tipo === 'linea') {
@@ -408,6 +420,46 @@
             document.getElementById(`viz-body-${viz.id}`).innerHTML =
                 `<p class="tb-viz-error"><i class="fas fa-exclamation-circle"></i> Error al cargar datos</p>`;
         }
+    }
+
+    function renderVizBarrasAgrupadas(viz, data) {
+        const body = document.getElementById(`viz-body-${viz.id}`);
+        body.innerHTML = `<div class="tb-chart-wrap"><canvas id="chart-${viz.id}"></canvas></div>`;
+
+        if (chartsInstancias[viz.id]) chartsInstancias[viz.id].destroy();
+
+        const COLORES = [
+            COLOR_ACENTO, '#5B8DEF', '#34D399', '#F87171',
+            '#A78BFA', '#FBBF24', '#60A5FA', '#F472B6'
+        ];
+
+        const datasets = (data.series || []).map((serie, i) => ({
+            label:           serie.nombre,
+            data:            serie.valores,
+            backgroundColor: COLORES[i % COLORES.length] + 'CC',
+            borderColor:     COLORES[i % COLORES.length],
+            borderWidth:     1,
+            borderRadius:    4,
+        }));
+
+        chartsInstancias[viz.id] = new Chart(
+            document.getElementById(`chart-${viz.id}`).getContext('2d'),
+            {
+                type: 'bar',
+                data: { labels: data.labels, datasets },
+                options: {
+                    responsive:          true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#F0F0F0' } },
+                        x: { ticks: { maxRotation: 45 } }
+                    }
+                }
+            }
+        );
     }
 
     function renderVizBarras(viz, data) {
@@ -612,19 +664,14 @@
         });
         const esLinea    = tipo === 'linea';
         const esTarjetas = tipo === 'tarjetas';
-        // Mostrar/ocultar campos de línea temporal
-        document.getElementById('viz-campos-temporal').style.display = esLinea ? 'block' : 'none';
-        // Ocultar "agrupar por" en línea (el eje X es la fecha)
-        document.getElementById('label-campo-agrupa').closest('div') ||
-        document.getElementById('viz-campo-agrupacion').parentElement;
-        const wrapAgrupa = document.getElementById('viz-campo-agrupacion').closest('label') ||
-                        document.getElementById('viz-campo-agrupacion');
+        const esDona     = tipo === 'dona';
+        const esBarras   = tipo === 'barras';
+
+        document.getElementById('viz-campos-temporal').style.display  = esLinea  ? 'block' : 'none';
+        document.getElementById('viz-campo-serie-wrap').style.display = esBarras ? 'block' : 'none';
 
         document.getElementById('viz-campo-agrupacion').style.display = esLinea ? 'none' : '';
         document.getElementById('label-campo-agrupa').style.display   = esLinea ? 'none' : '';
-
-        // Ajustar labels
-        const esDona = tipo === 'dona';
 
         document.getElementById('label-campo-valor').textContent =
             esTarjetas ? 'CAMPO A MEDIR (numérico)' :
@@ -658,6 +705,7 @@
         const selAgrupa = document.getElementById('viz-campo-agrupacion');
         const selFecha  = document.getElementById('viz-campo-fecha');
         const selFechaEje = document.getElementById('viz-campo-fecha-eje');
+        const selSerie    = document.getElementById('viz-campo-serie');
 
         // ← Declararlas aquí, antes de cualquier uso
         const TIPOS_NUMERICOS = ['numero', 'moneda', 'porcentaje'];
@@ -667,6 +715,7 @@
         selAgrupa.innerHTML   = '<option value="">Selecciona un campo...</option>';
         selFecha.innerHTML    = '<option value="">Sin filtro de fecha</option>';
         selFechaEje.innerHTML = '<option value="">Selecciona un campo de fecha...</option>';
+        selSerie.innerHTML    = '<option value="">Sin agrupación adicional</option>';
 
         // Campos sueltos
         sueltos.forEach(c => {
@@ -687,6 +736,14 @@
             } else {
                 selAgrupa.innerHTML += `<option value="${c.id}|suelto|||valor">${c.nombre}</option>`;
             }
+
+            // Llenar selSerie igual que selAgrupa
+            if (TIPOS_SELECCION.includes(c.tipo) && c.con_valor) {
+                selSerie.innerHTML += `<option value="${c.id}|suelto|||codigo">${c.nombre} (código)</option>`;
+                selSerie.innerHTML += `<option value="${c.id}|suelto|||causa">${c.nombre} (causa)</option>`;
+            } else {
+                selSerie.innerHTML += `<option value="${c.id}|suelto|||valor">${c.nombre}</option>`;
+            }
         });
 
         // Campos de grupos
@@ -706,6 +763,14 @@
                 } else {
                     // Opción simple o no es selección → una sola opción
                     selAgrupa.innerHTML += `<option value="${val}|valor">${g.nombre} → ${c.nombre}</option>`;
+                }
+
+                // Llenar selSerie igual que selAgrupa
+                if (TIPOS_SELECCION.includes(c.tipo) && c.con_valor) {
+                    selSerie.innerHTML += `<option value="${val}|codigo">${g.nombre} → ${c.nombre} (código)</option>`;
+                    selSerie.innerHTML += `<option value="${val}|causa">${g.nombre} → ${c.nombre} (causa)</option>`;
+                } else {
+                    selSerie.innerHTML += `<option value="${val}|valor">${g.nombre} → ${c.nombre}</option>`;
                 }
             });
         });
@@ -734,6 +799,13 @@
         const campoAgrupaRaw   = document.getElementById('viz-campo-agrupacion').value;
         const agregacion       = document.getElementById('viz-agregacion').value;
         const campoFechaId     = document.getElementById('viz-campo-fecha').value;
+        const campoSerieRaw    = document.getElementById('viz-campo-serie').value;
+        const selSerieEl       = document.getElementById('viz-campo-serie');
+        const campoSerieNombre = campoSerieRaw
+            ? (selSerieEl.options[selSerieEl.selectedIndex]?.text || '')
+            : '';
+        const campoSerie       = campoSerieRaw ? parsearCampo(campoSerieRaw) : null;
+        const esAgrupado       = tipoSeleccionado === 'barras' && !!campoSerieRaw;
         const campoFechaEjeId  = document.getElementById('viz-campo-fecha-eje').value;
         const granularidad     = document.getElementById('viz-granularidad').value;
         const esLinea          = tipoSeleccionado === 'linea';
@@ -762,6 +834,9 @@
             campo_agrupacion:        esLinea ? '' : campoAgrupa.campo_id,
             campo_agrupacion_nombre: esLinea ? '' : campoAgrupaNombre,
             parte_agrupacion:        esLinea ? 'valor' : (campoAgrupa?.parte || 'valor'),
+            es_agrupado:             esAgrupado,                                              // ← nuevo
+            campo_serie:             esAgrupado ? campoSerie.campo_id : '',                   // ← nuevo
+            campo_serie_nombre:      campoSerieNombre,                                        // ← nuevo
             agregacion:              agregacion,
             es_grupo:                campoValor.es_grupo,
             gid:                     campoValor.gid,
