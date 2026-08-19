@@ -879,6 +879,8 @@ def bi_datos():
             es_grupo                = ds.get('es_grupo', False)
             gid                     = ds.get('gid', '')
             campo_fecha_id          = str(ds.get('campo_fecha_id', ''))
+            es_tabla  = ds.get('es_tabla', False)
+            columnas  = ds.get('columnas', [])
             es_temporal             = ds.get('es_temporal', False)
             granularidad            = ds.get('granularidad', 'dia')
             es_agrupado             = ds.get('es_agrupado', False)
@@ -954,8 +956,46 @@ def bi_datos():
             # Procesar cada registro
             for resp in registros:
 
+                # ── Modo tabla: devuelve filas completas ──
+                if es_tabla and columnas:
+                    filas = []
+                    for resp in registros:
+                        fila = {}
+                        tiene_datos = False
+                        for col in columnas:
+                            cid      = str(col.get('campo_id', ''))
+                            es_grupo = col.get('es_grupo', False)
+                            gid_col  = col.get('gid', '')
+                            tipo_col = col.get('campo_tipo', '')
+
+                            if es_grupo and gid_col:
+                                # Para campos de grupo toma el primer bloque
+                                bloques = (resp.get('__repeticiones') or {}).get(gid_col, [])
+                                if bloques:
+                                    val = bloques[0].get(cid + '_codigo') or bloques[0].get(cid) or ''
+                                    fila[cid] = str(val) if val else '—'
+                                    tiene_datos = True
+                                else:
+                                    fila[cid] = '—'
+                            else:
+                                val = resp.get(cid + '_codigo') or resp.get(cid) or ''
+                                fila[cid] = str(val) if val else '—'
+                                if val:
+                                    tiene_datos = True
+
+                        if tiene_datos:
+                            filas.append(fila)
+
+                    return jsonify({
+                        'filas':    filas,
+                        'columnas': [{'campo_id': str(c.get('campo_id','')),
+                                    'nombre':   c.get('campo_nombre',''),
+                                    'tipo':     c.get('campo_tipo','')} for c in columnas],
+                        'total':    len(filas)
+                    })
+
                 # ── Modo temporal: agrupar por fecha (gráfico de línea) ──
-                if es_temporal and campo_fecha_id:
+                elif es_temporal and campo_fecha_id:
                     fecha_raw = resp.get(campo_fecha_id, '')
                     if not fecha_raw:
                         continue

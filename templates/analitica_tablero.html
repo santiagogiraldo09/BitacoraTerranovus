@@ -162,6 +162,10 @@
                     <i class="fas fa-chart-pie"></i>
                     <span>Dona / Anillo</span>
                 </button>
+                <button class="tb-tipo-btn" data-tipo="tabla" onclick="seleccionarTipo('tabla')">
+                    <i class="fas fa-table"></i>
+                    <span>Tabla de datos</span>
+                </button>
             </div>
 
             <label class="tb-label" style="margin-top:14px;">FORMULARIO FUENTE</label>
@@ -213,6 +217,13 @@
                         <option value="semana">Por semana</option>
                         <option value="mes">Por mes</option>
                     </select>
+                </div>
+
+                <div id="viz-columnas-wrap" style="display:none;">
+                    <label class="tb-label" style="margin-top:14px;">COLUMNAS A MOSTRAR</label>
+                    <div id="viz-columnas-lista"
+                        style="display:flex;flex-direction:column;gap:6px;margin-top:6px;max-height:220px;overflow-y:auto;">
+                    </div>
                 </div>
 
             </div>
@@ -414,6 +425,8 @@
                 renderVizLinea(viz, data);
             } else if (viz.tipo === 'dona') {
                 renderVizDona(viz, data);
+            } else if (viz.tipo === 'tabla') {
+                renderVizTabla(viz, data);
             }
         } catch(e) {
             console.error(e);
@@ -421,6 +434,181 @@
                 `<p class="tb-viz-error"><i class="fas fa-exclamation-circle"></i> Error al cargar datos</p>`;
         }
     }
+
+    function renderVizTabla(viz, data) {
+        const body = document.getElementById(`viz-body-${viz.id}`);
+
+        if (!data.filas || !data.filas.length) {
+            body.innerHTML = '<p style="text-align:center;color:#9ca3af;font-size:13px;padding:20px 0;">Sin datos para mostrar</p>';
+            return;
+        }
+
+        const columnas  = data.columnas || [];
+        const todasFilas = data.filas;
+        let paginaActual = 1;
+        const porPagina  = 7;
+        let filasFiltradas = [...todasFilas];
+
+        // Estado de ordenamiento
+        let colOrden = null;
+        let dirOrden = 1; // 1 asc, -1 desc
+
+        function renderTabla() {
+            const inicio = (paginaActual - 1) * porPagina;
+            const fin    = inicio + porPagina;
+            const filasP = filasFiltradas.slice(inicio, fin);
+            const total  = filasFiltradas.length;
+            const totalPags = Math.ceil(total / porPagina);
+
+            // Calcular totales de columnas numéricas
+            const totales = {};
+            columnas.forEach(col => {
+                if (col.tipo === 'numero') {
+                    totales[col.campo_id] = filasFiltradas.reduce((sum, fila) => {
+                        return sum + (parseFloat(fila[col.campo_id]) || 0);
+                    }, 0);
+                }
+            });
+
+            // Filtros dinámicos — solo columnas de selección
+            const colsFiltro = columnas.filter(c =>
+                ['seleccion_unica', 'seleccion', 'texto_corto'].includes(c.tipo)
+            );
+
+            let htmlFiltros = '<div class="tb-tabla-filtros">';
+            htmlFiltros += `<input type="text" placeholder="🔍 Buscar..." class="tb-tabla-buscar"
+                                id="buscar-${viz.id}" oninput="filtrarTabla_${viz.id}()">`;
+            colsFiltro.forEach(col => {
+                const valoresUnicos = [...new Set(todasFilas.map(f => f[col.campo_id]).filter(Boolean))].sort();
+                htmlFiltros += `<select class="tb-tabla-filtro-sel" data-campo="${col.campo_id}"
+                                        onchange="filtrarTabla_${viz.id}()">
+                    <option value="">Todos: ${col.nombre}</option>
+                    ${valoresUnicos.map(v => `<option value="${v}">${v}</option>`).join('')}
+                </select>`;
+            });
+            if (colsFiltro.length > 0) {
+                htmlFiltros += `<button class="tb-tabla-limpiar" onclick="limpiarFiltros_${viz.id}()">
+                    ✕ Limpiar</button>`;
+            }
+            htmlFiltros += '</div>';
+
+            // Tabla
+            let htmlTabla = '<div class="tb-tabla-scroll"><table class="tb-tabla-datos">';
+            htmlTabla += '<thead><tr>';
+            columnas.forEach(col => {
+                const icono = colOrden === col.campo_id
+                    ? (dirOrden === 1 ? ' ↑' : ' ↓') : ' ↕';
+                htmlTabla += `<th onclick="ordenarTabla_${viz.id}('${col.campo_id}')"
+                                style="cursor:pointer;user-select:none;">
+                    ${col.nombre}<span style="color:#9ca3af;font-size:10px;">${icono}</span>
+                </th>`;
+            });
+            htmlTabla += '</tr></thead><tbody>';
+
+            filasP.forEach(fila => {
+                htmlTabla += '<tr>';
+                columnas.forEach(col => {
+                    htmlTabla += `<td>${fila[col.campo_id] ?? '—'}</td>`;
+                });
+                htmlTabla += '</tr>';
+            });
+
+            htmlTabla += '</tbody>';
+
+            // Fila de totales
+            const hayTotales = Object.keys(totales).length > 0;
+            if (hayTotales) {
+                htmlTabla += '<tfoot><tr>';
+                columnas.forEach(col => {
+                    if (totales[col.campo_id] !== undefined) {
+                        htmlTabla += `<td><strong>${totales[col.campo_id].toLocaleString('es-CO', {maximumFractionDigits:2})}</strong></td>`;
+                    } else {
+                        htmlTabla += `<td style="color:#9ca3af;font-size:11px;">Total</td>`;
+                    }
+                });
+                htmlTabla += '</tr></tfoot>';
+            }
+
+            htmlTabla += '</table></div>';
+
+            // Paginación
+            let htmlPag = `<div class="tb-tabla-paginacion">
+                <span style="font-size:12px;color:#6b7280;">
+                    Mostrando ${Math.min(inicio+1, total)}–${Math.min(fin, total)} de ${total}
+                </span>
+                <div style="display:flex;gap:4px;">`;
+
+            if (paginaActual > 1) {
+                htmlPag += `<button class="tb-tabla-pag-btn" onclick="cambiarPag_${viz.id}(${paginaActual-1})">←</button>`;
+            }
+            for (let p = Math.max(1, paginaActual-2); p <= Math.min(totalPags, paginaActual+2); p++) {
+                htmlPag += `<button class="tb-tabla-pag-btn ${p === paginaActual ? 'activo' : ''}"
+                                    onclick="cambiarPag_${viz.id}(${p})">${p}</button>`;
+            }
+            if (paginaActual < totalPags) {
+                htmlPag += `<button class="tb-tabla-pag-btn" onclick="cambiarPag_${viz.id}(${paginaActual+1})">→</button>`;
+            }
+            htmlPag += '</div></div>';
+
+            body.innerHTML = htmlFiltros + htmlTabla + htmlPag;
+        }
+
+        // Funciones de control — con ID de viz para no colisionar entre tablas
+        window[`filtrarTabla_${viz.id}`] = function() {
+            const buscar = (document.getElementById(`buscar-${viz.id}`)?.value || '').toLowerCase();
+            const filtrosAct = {};
+            document.querySelectorAll(`#viz-body-${viz.id} .tb-tabla-filtro-sel`).forEach(sel => {
+                if (sel.value) filtrosAct[sel.dataset.campo] = sel.value;
+            });
+
+            filasFiltradas = todasFilas.filter(fila => {
+                const pasaFiltros = Object.entries(filtrosAct).every(([campo, val]) =>
+                    String(fila[campo] || '').toLowerCase() === val.toLowerCase()
+                );
+                const pasaBuscar = !buscar || columnas.some(col =>
+                    String(fila[col.campo_id] || '').toLowerCase().includes(buscar)
+                );
+                return pasaFiltros && pasaBuscar;
+            });
+            paginaActual = 1;
+            renderTabla();
+        };
+
+        window[`ordenarTabla_${viz.id}`] = function(campoId) {
+            if (colOrden === campoId) {
+                dirOrden *= -1;
+            } else {
+                colOrden = campoId;
+                dirOrden = 1;
+            }
+            filasFiltradas.sort((a, b) => {
+                const va = a[campoId] ?? '';
+                const vb = b[campoId] ?? '';
+                const na = parseFloat(va);
+                const nb = parseFloat(vb);
+                if (!isNaN(na) && !isNaN(nb)) return (na - nb) * dirOrden;
+                return String(va).localeCompare(String(vb)) * dirOrden;
+            });
+            renderTabla();
+        };
+
+        window[`cambiarPag_${viz.id}`] = function(pag) {
+            paginaActual = pag;
+            renderTabla();
+        };
+
+        window[`limpiarFiltros_${viz.id}`] = function() {
+            document.getElementById(`buscar-${viz.id}`).value = '';
+            document.querySelectorAll(`#viz-body-${viz.id} .tb-tabla-filtro-sel`)
+                .forEach(sel => sel.value = '');
+            filasFiltradas = [...todasFilas];
+            paginaActual = 1;
+            renderTabla();
+        };
+
+        renderTabla();
+    }
+
 
     function renderVizBarrasAgrupadas(viz, data) {
         const body = document.getElementById(`viz-body-${viz.id}`);
@@ -666,12 +854,26 @@
         const esTarjetas = tipo === 'tarjetas';
         const esDona     = tipo === 'dona';
         const esBarras   = tipo === 'barras';
+        const esTabla    = tipo === 'tabla';
 
         document.getElementById('viz-campos-temporal').style.display  = esLinea  ? 'block' : 'none';
         document.getElementById('viz-campo-serie-wrap').style.display = esBarras ? 'block' : 'none';
+        document.getElementById('viz-columnas-wrap').style.display    = esTabla  ? 'block' : 'none';
 
-        document.getElementById('viz-campo-agrupacion').style.display = esLinea ? 'none' : '';
-        document.getElementById('label-campo-agrupa').style.display   = esLinea ? 'none' : '';
+        // Ocultar campos que no aplican para tabla
+        document.getElementById('viz-campo-valor').style.display      = esTabla ? 'none' : '';
+        document.getElementById('label-campo-valor').style.display    = esTabla ? 'none' : '';
+        document.getElementById('viz-campo-agrupacion').style.display = esLinea || esTabla ? 'none' : '';
+        document.getElementById('label-campo-agrupa').style.display   = esLinea || esTabla ? 'none' : '';
+        document.getElementById('viz-agregacion').style.display       = esTabla ? 'none' : '';
+        document.getElementById('label-campo-valor').closest('label') ||
+        document.querySelector('label[for="viz-agregacion"]');
+        document.querySelector('[for="viz-agregacion"], #viz-agregacion')
+            ?.closest('div')?.previousElementSibling;
+
+        // Ocultar label de agregación
+        const labelAgregacion = document.getElementById('viz-agregacion').previousElementSibling;
+        if (labelAgregacion) labelAgregacion.style.display = esTabla ? 'none' : '';
 
         document.getElementById('label-campo-valor').textContent =
             esTarjetas ? 'CAMPO A MEDIR (numérico)' :
@@ -775,6 +977,31 @@
             });
         });
 
+        // Llenar lista de columnas para tipo tabla
+        const lista = document.getElementById('viz-columnas-lista');
+        lista.innerHTML = '';
+        const todosLosCampos = [
+            ...sueltos.map(c => ({ ...c, grupo: null, gid: null })),
+            ...grupos.flatMap(g => g.campos.map(c => ({ ...c, grupo: g.nombre, gid: g.gid })))
+        ];
+        todosLosCampos.forEach(c => {
+            const id  = `col-check-${c.id}`;
+            const etq = c.grupo ? `${c.grupo} → ${c.nombre}` : c.nombre;
+            lista.innerHTML += `
+                <label style="display:flex;align-items:center;gap:8px;font-size:13px;
+                            cursor:pointer;padding:4px 0;">
+                    <input type="checkbox" id="${id}"
+                        data-campo-id="${c.id}"
+                        data-campo-nombre="${c.nombre}"
+                        data-campo-tipo="${c.tipo}"
+                        data-es-grupo="${c.grupo ? 'true' : 'false'}"
+                        data-gid="${c.gid || ''}"
+                        style="width:15px;height:15px;cursor:pointer;
+                                accent-color:var(--naranja,#FFAF33);">
+                    ${etq}
+                </label>`;
+        });
+
         wrap.style.display = 'block';
     }
 
@@ -809,6 +1036,24 @@
         const campoFechaEjeId  = document.getElementById('viz-campo-fecha-eje').value;
         const granularidad     = document.getElementById('viz-granularidad').value;
         const esLinea          = tipoSeleccionado === 'linea';
+        const esTabla = tipoSeleccionado === 'tabla';
+
+        // Recoger columnas seleccionadas para tipo tabla
+        const columnasSeleccionadas = esTabla
+            ? Array.from(document.querySelectorAll('#viz-columnas-lista input[type="checkbox"]:checked'))
+                .map(cb => ({
+                    campo_id:     cb.dataset.campoId,
+                    campo_nombre: cb.dataset.campoNombre,
+                    campo_tipo:   cb.dataset.campoTipo,
+                    es_grupo:     cb.dataset.esGrupo === 'true',
+                    gid:          cb.dataset.gid || ''
+                }))
+            : [];
+
+        if (esTabla && columnasSeleccionadas.length === 0) {
+            mostrarToast('⚠️ Selecciona al menos una columna');
+            return;
+        }
 
         if (!titulo)           { mostrarToast('⚠️ Ingresa un título'); return; }
         if (!tipoSeleccionado) { mostrarToast('⚠️ Selecciona un tipo de gráfico'); return; }
@@ -837,6 +1082,8 @@
             es_agrupado:             esAgrupado,                                              // ← nuevo
             campo_serie:             esAgrupado ? campoSerie.campo_id : '',                   // ← nuevo
             campo_serie_nombre:      campoSerieNombre,                                        // ← nuevo
+            es_tabla:                esTabla,                    // ← nuevo
+            columnas:                columnasSeleccionadas,      // ← nuevo
             agregacion:              agregacion,
             es_grupo:                campoValor.es_grupo,
             gid:                     campoValor.gid,

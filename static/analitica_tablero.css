@@ -473,3 +473,127 @@
     color: var(--naranja, #FFAF33);
     background: #fff8ee;
 }
+
+/* ── Tabla de datos ── */
+.tb-tabla-filtros {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.tb-tabla-buscar {
+    flex: 1;
+    min-width: 160px;
+    padding: 7px 10px;
+    border: 1px solid var(--an-borde, #E5E7EB);
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+}
+
+.tb-tabla-buscar:focus {
+    border-color: var(--naranja, #FFAF33);
+}
+
+.tb-tabla-filtro-sel {
+    padding: 7px 10px;
+    border: 1px solid var(--an-borde, #E5E7EB);
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-family: inherit;
+    background: #fff;
+    outline: none;
+    cursor: pointer;
+}
+
+.tb-tabla-filtro-sel:focus {
+    border-color: var(--naranja, #FFAF33);
+}
+
+.tb-tabla-limpiar {
+    padding: 7px 12px;
+    border-radius: 8px;
+    border: 1px solid #E5E7EB;
+    background: #fff;
+    font-size: 12px;
+    color: #6b7280;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.tb-tabla-limpiar:hover {
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+.tb-tabla-scroll {
+    overflow-x: auto;
+}
+
+.tb-tabla-datos {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.tb-tabla-datos th {
+    background: #F9FAFB;
+    padding: 9px 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 11.5px;
+    color: #374151;
+    border-bottom: 2px solid var(--an-borde, #E5E7EB);
+    white-space: nowrap;
+}
+
+.tb-tabla-datos td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #F3F4F6;
+    color: var(--an-texto, #111827);
+    white-space: nowrap;
+}
+
+.tb-tabla-datos tbody tr:hover {
+    background: #FAFAFA;
+}
+
+.tb-tabla-datos tfoot td {
+    padding: 8px 12px;
+    border-top: 2px solid var(--an-borde, #E5E7EB);
+    background: #F9FAFB;
+    font-size: 12px;
+    color: #374151;
+}
+
+.tb-tabla-paginacion {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 12px;
+}
+
+.tb-tabla-pag-btn {
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--an-borde, #E5E7EB);
+    background: #fff;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+    color: var(--an-texto, #111827);
+    transition: background .15s, border-color .15s;
+}
+
+.tb-tabla-pag-btn:hover {
+    border-color: var(--naranja, #FFAF33);
+}
+
+.tb-tabla-pag-btn.activo {
+    background: var(--naranja, #FFAF33);
+    border-color: var(--naranja, #FFAF33);
+    color: #fff;
+    font-weight: 700;
+}
