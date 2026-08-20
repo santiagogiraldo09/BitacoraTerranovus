@@ -1021,6 +1021,36 @@ def api_movil_eliminar_usuario(uid):
         current_app.logger.exception("api_movil_eliminar_usuario")
         return jsonify({"success": False, "error": str(e)}), 500
 
+@api_movil.route("/api/movil/upload-foto", methods=["POST"])
+@requiere_token
+def api_movil_upload_foto():
+    """Sube una imagen en base64 a Supabase Storage."""
+    from app import supabase_client, SUPABASE_URL
+    import base64, uuid
+    data = request.get_json(silent=True) or {}
+    file_data = data.get('file_data', '')
+    if not file_data:
+        return jsonify({"error": "No se recibió imagen"}), 400
+    try:
+        if ',' in file_data:
+            header, b64 = file_data.split(',', 1)
+            if 'png' in header:   ext, mime = 'png', 'image/png'
+            elif 'webp' in header: ext, mime = 'webp', 'image/webp'
+            else:                  ext, mime = 'jpg', 'image/jpeg'
+        else:
+            b64, ext, mime = file_data, 'jpg', 'image/jpeg'
+        imagen_bytes   = base64.b64decode(b64)
+        nombre_archivo = f"{uuid.uuid4()}.{ext}"
+        ruta           = f"registros/{nombre_archivo}"
+        supabase_client.storage.from_('fotos-bitacora').upload(
+            ruta, imagen_bytes, {"content-type": mime}
+        )
+        url_publica = f"{SUPABASE_URL}/storage/v1/object/public/fotos-bitacora/{ruta}"
+        return jsonify({"url": url_publica}), 200
+    except Exception as e:
+        current_app.logger.exception("api_movil_upload_foto")
+        return jsonify({"error": str(e)}), 500
+
 
 @api_movil.route("/api/ping", methods=["GET"])
 def api_ping():
