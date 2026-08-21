@@ -718,9 +718,10 @@
         return {
             visibles,
             valorCentro,
-            etiquetaCentro: (ds.titulo_eje_y || '').trim().toUpperCase()
-                            || ETIQUETA_AUTO[agg] || 'TOTAL',
-            campoMedido:    ds.campo_valor_nombre || '',
+            // Línea superior: automática según la agregación (palabra corta)
+            etiquetaCentro: ETIQUETA_AUTO[agg] || 'TOTAL',
+            // Línea inferior: editable por el usuario, default = nombre del campo
+            campoMedido:    (ds.titulo_eje_y || '').trim() || ds.campo_valor_nombre || '',
             tituloLeyenda:  (ds.titulo_eje_x || '').trim()
                             || ds.campo_agrupacion_nombre || ''
         };
@@ -963,7 +964,7 @@
                 </span>
                 ${t.visibles && t.campoMedido ? `
                 <span style="font-size:9px;color:#9ca3af;font-weight:500;line-height:1.25;
-                             margin-top:2px;overflow:hidden;display:-webkit-box;
+                             margin-top:3px;overflow:hidden;display:-webkit-box;
                              -webkit-line-clamp:2;-webkit-box-orient:vertical;">
                     ${t.campoMedido}
                 </span>` : ''}
@@ -1108,7 +1109,7 @@
             : 'Mostrar títulos en los ejes';
 
         document.getElementById('label-eje-y').innerHTML = esDona
-            ? `ETIQUETA DEL CENTRO ${OPC}`
+            ? `DESCRIPCIÓN BAJO EL NÚMERO ${OPC}`
             : `TÍTULO EJE Y (vertical) ${OPC}`;
 
         document.getElementById('label-eje-x').innerHTML = esDona
@@ -1140,10 +1141,9 @@
         const inputY = document.getElementById('viz-titulo-eje-y');
         const inputX = document.getElementById('viz-titulo-eje-x');
 
-        // ── Dona: etiqueta del centro + título de la leyenda ──
+        // ── Dona: descripción bajo el número + título de la leyenda ──
         if (tipoSeleccionado === 'dona') {
-            const ETIQUETA_AUTO = { suma: 'TOTAL', promedio: 'PROMEDIO', conteo: 'REGISTROS' };
-            inputY.placeholder = ETIQUETA_AUTO[agregacion] || 'TOTAL';
+            inputY.placeholder = textoSel(selValor)  || 'Automático';
             inputX.placeholder = textoSel(selAgrupa) || 'Automático';
             return;
         }

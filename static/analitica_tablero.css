@@ -596,18 +596,18 @@
 .tb-dona-wrap {
     display: flex;
     align-items: center;
-    justify-content: center;         /* el sobrante se reparte a ambos lados */
-    gap: clamp(20px, 6%, 60px);      /* la separación crece con la card */
+    justify-content: center;
+    gap: clamp(24px, 5%, 48px);   /* antes 6% / 60px máx */
     flex-wrap: wrap;
 }
 
 .tb-dona-canvas {
     position: relative;
-    flex: 0 1 240px;      /* algo más grande que los 200px actuales */
+    flex: 0 1 240px;
     max-width: 280px;
     min-width: 170px;
     aspect-ratio: 1 / 1;
-    margin: 0 auto;       /* centrada cuando la leyenda baja */
+    /* ← se eliminó `margin: 0 auto` (rompía el centrado del conjunto) */
 }
 
 .tb-dona-centro {
