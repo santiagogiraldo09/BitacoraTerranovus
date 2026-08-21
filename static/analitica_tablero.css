@@ -146,12 +146,6 @@
     padding: 20px 0;
 }
 
-/* ── Gráfico de barras ── */
-.tb-chart-wrap {
-    position: relative;
-    height: 260px;
-}
-
 /* ── Tarjetas resumen ── */
 .tb-tarjetas-grid {
     display: grid;
@@ -424,7 +418,7 @@
 /* Ajustar altura del chart de dona */
 .tb-chart-wrap {
     position: relative;
-    height: 260px;
+    height: 300px;       /* +40px para acomodar los títulos de eje */
     overflow: visible;   /* ← permite que el tooltip del canvas salga */
 }
 

@@ -226,6 +226,39 @@
                     </div>
                 </div>
 
+                <!-- ── Títulos de ejes (solo barras y línea) ────────────────── -->
+                <div id="viz-ejes-wrap" style="display:none;">
+
+                    <div style="margin-top:18px;padding-top:14px;border-top:1px solid #EEE;">
+                        <label style="display:flex;align-items:center;gap:8px;font-size:12px;
+                                      font-weight:600;color:#374151;cursor:pointer;">
+                            <input type="checkbox" id="viz-mostrar-ejes" checked
+                                   style="accent-color:var(--naranja,#FFAF33);width:15px;height:15px;">
+                            Mostrar títulos en los ejes
+                        </label>
+                    </div>
+
+                    <div id="viz-ejes-campos">
+                        <label class="tb-label" style="margin-top:14px;">
+                            TÍTULO EJE Y (vertical)
+                            <span style="font-weight:400;text-transform:none;color:#9ca3af;">(opcional)</span>
+                        </label>
+                        <input type="text" id="viz-titulo-eje-y" class="tb-input"
+                               maxlength="60" placeholder="Automático">
+
+                        <label class="tb-label" style="margin-top:14px;">
+                            TÍTULO EJE X (horizontal)
+                            <span style="font-weight:400;text-transform:none;color:#9ca3af;">(opcional)</span>
+                        </label>
+                        <input type="text" id="viz-titulo-eje-x" class="tb-input"
+                               maxlength="60" placeholder="Automático">
+
+                        <p style="font-size:11px;color:#9ca3af;margin-top:8px;line-height:1.45;">
+                            Déjalos vacíos para usar el título automático que aparece en gris.
+                        </p>
+                    </div>
+                </div>
+
             </div>
         </div>
 
@@ -609,6 +642,121 @@
         renderTabla();
     }
 
+    // ══════════════════════════════════════════════════════════════════
+    //  TÍTULOS DE EJES
+    //  Patrón Power BI: automático por defecto, sobrescribible por el
+    //  usuario, con toggle de visibilidad por visualización.
+    // ══════════════════════════════════════════════════════════════════
+
+    const AGREGACION_ETIQUETA = {
+        suma:     'Suma',
+        promedio: 'Promedio',
+        conteo:   'Conteo'
+    };
+
+    const GRANULARIDAD_ETIQUETA = {
+        dia:    'por día',
+        semana: 'por semana',
+        mes:    'por mes'
+    };
+
+    /**
+     * Construye el título automático de un eje a partir de la config del dataset.
+     * @param {Object} ds   dataset de viz.config.datasets[0]
+     * @param {String} eje  'x' | 'y'
+     * @param {String} tipo tipo de visualización ('barras' | 'linea')
+     */
+    function tituloEjeAutomatico(ds, eje, tipo) {
+        if (!ds) return '';
+
+        // Eje Y: siempre la medida → "Suma de Horas de paro"
+        if (eje === 'y') {
+            const agg   = AGREGACION_ETIQUETA[ds.agregacion] || 'Suma';
+            const campo = ds.campo_valor_nombre || 'Valor';
+            return `${agg} de ${campo}`;
+        }
+
+        // Eje X en gráficos de línea: campo de fecha + granularidad
+        if (tipo === 'linea') {
+            const campo = ds.campo_fecha_eje_nombre || 'Fecha';
+            const gran  = GRANULARIDAD_ETIQUETA[ds.granularidad] || '';
+            return gran ? `${campo} (${gran})` : campo;
+        }
+
+        // Eje X en barras: campo de agrupación
+        return ds.campo_agrupacion_nombre || 'Categoría';
+    }
+
+    /**
+     * Ajusta un título largo a máximo `maxLineas` líneas de `maxLinea` caracteres.
+     * Chart.js acepta un array de strings como título multilínea.
+     * Si aún así sobra texto, trunca con puntos suspensivos.
+     */
+    function ajustarTextoEje(texto, maxLinea = 48, maxLineas = 2) {
+        const t = String(texto || '').trim();
+        if (!t) return '';
+        if (t.length <= maxLinea) return t;
+
+        const palabras = t.split(/\s+/);
+        const lineas   = [];
+        let actual     = '';
+
+        for (const p of palabras) {
+            const tentativa = (actual ? actual + ' ' : '') + p;
+            if (tentativa.length <= maxLinea) {
+                actual = tentativa;
+            } else {
+                if (actual) lineas.push(actual);
+                if (lineas.length >= maxLineas) { actual = ''; break; }
+                actual = p;
+            }
+        }
+        if (actual && lineas.length < maxLineas) lineas.push(actual);
+
+        // ¿Quedó texto fuera? → marcar truncado
+        if (lineas.join(' ').length < t.length && lineas.length) {
+            const ult = lineas[lineas.length - 1];
+            lineas[lineas.length - 1] = ult.slice(0, Math.max(1, maxLinea - 1)).trim() + '…';
+        }
+        return lineas.length === 1 ? lineas[0] : lineas;
+    }
+
+    /**
+     * Devuelve el objeto `scales` de Chart.js con los títulos ya resueltos.
+     * Prioridad: título manual del usuario → título automático.
+     * @param {Object} viz    visualización completa
+     * @param {Object} extra  overrides opcionales: { x: {...}, y: {...} }
+     */
+    function construirEscalas(viz, extra = {}) {
+        const ds       = viz?.config?.datasets?.[0] || {};
+        const visibles = ds.mostrar_ejes !== false;   // default true (retrocompatible)
+
+        const textoX = (ds.titulo_eje_x || '').trim() || tituloEjeAutomatico(ds, 'x', viz.tipo);
+        const textoY = (ds.titulo_eje_y || '').trim() || tituloEjeAutomatico(ds, 'y', viz.tipo);
+
+        const estiloTitulo = {
+            display: true,
+            color:   '#4B5563',
+            font:    { size: 11, weight: '600', family: "'Sora', sans-serif" },
+            padding: { top: 8, bottom: 4 }
+        };
+
+        return {
+            y: {
+                beginAtZero: true,
+                grid:        { color: '#F0F0F0' },
+                title:       visibles ? { ...estiloTitulo, text: ajustarTextoEje(textoY) }
+                                      : { display: false },
+                ...(extra.y || {})
+            },
+            x: {
+                ticks: { maxRotation: 45, minRotation: 0 },
+                title: visibles ? { ...estiloTitulo, text: ajustarTextoEje(textoX) }
+                                : { display: false },
+                ...(extra.x || {})
+            }
+        };
+    }
 
     function renderVizBarrasAgrupadas(viz, data) {
         const body = document.getElementById(`viz-body-${viz.id}`);
@@ -641,10 +789,10 @@
                     plugins: {
                         legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
                     },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#F0F0F0' } },
+                    // Títulos de ejes resueltos (manual → automático)
+                    scales: construirEscalas(viz, {
                         x: { ticks: { maxRotation: 45 } }
-                    }
+                    })
                 }
             }
         );
@@ -677,10 +825,7 @@
                     plugins: {
                         legend: { display: false }
                     },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#F0F0F0' } },
-                        x: { ticks: { maxRotation: 45, minRotation: 0 } }
-                    }
+                    scales: construirEscalas(viz)
                 }
             }
         );
@@ -727,25 +872,22 @@
                 data: {
                     labels:   data.labels,
                     datasets: [{
-                        label:           viz.titulo,
-                        data:            data.valores,
-                        borderColor:     COLOR_ACENTO,
-                        backgroundColor: COLOR_ACENTO + '22',
-                        borderWidth:     2,
-                        pointRadius:     4,
+                        label:                viz.titulo,
+                        data:                 data.valores,
+                        borderColor:          COLOR_ACENTO,
+                        backgroundColor:      COLOR_ACENTO + '22',
+                        borderWidth:          2,
+                        pointRadius:          4,
                         pointBackgroundColor: COLOR_ACENTO,
-                        tension:         0.3,
-                        fill:            true
+                        tension:              0.3,
+                        fill:                 true
                     }]
                 },
                 options: {
                     responsive:          true,
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#F0F0F0' } },
-                        x: { ticks: { maxRotation: 45, minRotation: 0 } }
-                    }
+                    scales: construirEscalas(viz)
                 }
             }
         );
@@ -831,11 +973,18 @@
 
     // ── Modal: agregar visualización ───────────────────────────────────
     function abrirModalViz() {
-        vizEnEdicion = null;
+        vizEnEdicion     = null;
         tipoSeleccionado = '';
-        document.getElementById('viz-titulo').value = '';
-        document.getElementById('viz-formulario').value = '';
+        document.getElementById('viz-titulo').value      = '';
+        document.getElementById('viz-formulario').value  = '';
         document.getElementById('viz-campos-wrap').style.display = 'none';
+
+        // Reset de títulos de ejes
+        document.getElementById('viz-titulo-eje-x').value   = '';
+        document.getElementById('viz-titulo-eje-y').value   = '';
+        document.getElementById('viz-mostrar-ejes').checked = true;
+        document.getElementById('viz-ejes-campos').style.display = 'block';
+
         document.querySelectorAll('.tb-tipo-btn').forEach(b => b.classList.remove('activo'));
         document.getElementById('modal-viz-titulo').textContent = 'Nueva visualización';
         document.getElementById('modal-viz').style.display = 'flex';
@@ -866,10 +1015,6 @@
         document.getElementById('viz-campo-agrupacion').style.display = esLinea || esTabla ? 'none' : '';
         document.getElementById('label-campo-agrupa').style.display   = esLinea || esTabla ? 'none' : '';
         document.getElementById('viz-agregacion').style.display       = esTabla ? 'none' : '';
-        document.getElementById('label-campo-valor').closest('label') ||
-        document.querySelector('label[for="viz-agregacion"]');
-        document.querySelector('[for="viz-agregacion"], #viz-agregacion')
-            ?.closest('div')?.previousElementSibling;
 
         // Ocultar label de agregación
         const labelAgregacion = document.getElementById('viz-agregacion').previousElementSibling;
@@ -879,13 +1024,69 @@
             esTarjetas ? 'CAMPO A MEDIR (numérico)' :
             esLinea    ? 'CAMPO A MEDIR (eje Y, numérico)' :
             esDona     ? 'VALORES (tamaño de cada segmento)' :
-                        'CAMPO A MEDIR (eje Y, numérico)';
+                         'CAMPO A MEDIR (eje Y, numérico)';
 
         document.getElementById('label-campo-agrupa').textContent =
             esTarjetas ? 'AGRUPAR POR (categorías de las tarjetas)' :
             esDona     ? 'LEYENDA (qué representa cada segmento)' :
-                        'AGRUPAR POR (eje X)';
+                         'AGRUPAR POR (eje X)';
+
+        // ── Títulos de ejes: solo aplican a gráficos cartesianos ──
+        document.getElementById('viz-ejes-wrap').style.display =
+            (esBarras || esLinea) ? 'block' : 'none';
+        actualizarPlaceholdersEjes();
     }
+
+
+    /**
+     * Recalcula los placeholders de los inputs de título de eje con el
+     * título automático que se aplicaría según la configuración actual
+     * del modal. Réplica del comportamiento de Power BI.
+     */
+    function actualizarPlaceholdersEjes() {
+        const wrap = document.getElementById('viz-ejes-wrap');
+        if (!wrap || wrap.style.display === 'none') return;
+
+        const selValor    = document.getElementById('viz-campo-valor');
+        const selAgrupa   = document.getElementById('viz-campo-agrupacion');
+        const selFechaEje = document.getElementById('viz-campo-fecha-eje');
+
+        // Dataset "en borrador" con lo que hay ahora mismo en el formulario
+        const dsBorrador = {
+            agregacion:              document.getElementById('viz-agregacion').value,
+            granularidad:            document.getElementById('viz-granularidad').value,
+            campo_valor_nombre:      selValor.options[selValor.selectedIndex]?.value
+                                        ? selValor.options[selValor.selectedIndex].text : '',
+            campo_agrupacion_nombre: selAgrupa.options[selAgrupa.selectedIndex]?.value
+                                        ? selAgrupa.options[selAgrupa.selectedIndex].text : '',
+            campo_fecha_eje_nombre:  selFechaEje.options[selFechaEje.selectedIndex]?.value
+                                        ? selFechaEje.options[selFechaEje.selectedIndex].text : ''
+        };
+
+        document.getElementById('viz-titulo-eje-y').placeholder =
+            tituloEjeAutomatico(dsBorrador, 'y', tipoSeleccionado) || 'Automático';
+        document.getElementById('viz-titulo-eje-x').placeholder =
+            tituloEjeAutomatico(dsBorrador, 'x', tipoSeleccionado) || 'Automático';
+    }
+
+    // Listeners: cualquier cambio de configuración refresca los placeholders
+    document.addEventListener('DOMContentLoaded', () => {
+        [
+            'viz-campo-valor', 'viz-campo-agrupacion', 'viz-agregacion',
+            'viz-campo-fecha-eje', 'viz-granularidad'
+        ].forEach(id => {
+            document.getElementById(id)
+                ?.addEventListener('change', actualizarPlaceholdersEjes);
+        });
+
+        // Toggle mostrar/ocultar los inputs de título
+        document.getElementById('viz-mostrar-ejes')
+            ?.addEventListener('change', function () {
+                document.getElementById('viz-ejes-campos').style.display =
+                    this.checked ? 'block' : 'none';
+            });
+    });
+
 
     async function cargarCampos(formularioId) {
         const wrap = document.getElementById('viz-campos-wrap');
@@ -1038,6 +1239,21 @@
         const esLinea         = tipoSeleccionado === 'linea';
         const esTabla         = tipoSeleccionado === 'tabla';
 
+        // ── Títulos de ejes (solo barras y línea) ──
+        const esCartesiano  = tipoSeleccionado === 'barras' || esLinea;
+        const tituloEjeX    = esCartesiano
+            ? document.getElementById('viz-titulo-eje-x').value.trim() : '';
+        const tituloEjeY    = esCartesiano
+            ? document.getElementById('viz-titulo-eje-y').value.trim() : '';
+        const mostrarEjes   = esCartesiano
+            ? document.getElementById('viz-mostrar-ejes').checked : true;
+
+        // Nombre legible del campo de fecha del eje X (para el título automático)
+        const selFechaEjeEl      = document.getElementById('viz-campo-fecha-eje');
+        const campoFechaEjeNombre = campoFechaEjeId
+            ? (selFechaEjeEl.options[selFechaEjeEl.selectedIndex]?.text || '')
+            : '';
+
         // Recoger columnas seleccionadas para tipo tabla
         const columnasSeleccionadas = esTabla
             ? Array.from(document.querySelectorAll('#viz-columnas-lista input[type="checkbox"]:checked'))
@@ -1095,7 +1311,14 @@
             campo_fecha_id:          campoFechaId,
             es_temporal:             esLinea,
             granularidad:            esLinea ? granularidad : '',
-            campo_fecha_eje:         esLinea ? campoFechaEjeId : ''
+            campo_fecha_eje:         esLinea ? campoFechaEjeId : '',
+            campo_fecha_eje_nombre:  esLinea ? campoFechaEjeNombre : '',
+
+            // ── Títulos de ejes ──
+            // Vacío = usar título automático (patrón Power BI)
+            titulo_eje_x:            tituloEjeX,
+            titulo_eje_y:            tituloEjeY,
+            mostrar_ejes:            mostrarEjes
         };
 
         // ── Guardar en lista local ──
@@ -1138,8 +1361,6 @@
 
         } catch(e) {
             console.error(e);
-            // Revertir si falló
-            if (vizEnEdicion === null) vizGuardadas.pop();
             mostrarToast('❌ Error al guardar');
         }
     }
@@ -1166,7 +1387,6 @@
         }
 
         // Restaurar selecciones de campos
-        // Construir el valor del option para campo valor
         const esGrupo  = ds.es_grupo ? 'grupo' : 'suelto';
         const gidVal   = ds.gid || '';
         const parteVal = ds.parte_agrupacion || 'valor';
@@ -1175,13 +1395,24 @@
             `${ds.campo_valor}|${esGrupo}|${gidVal}|valor`;
         document.getElementById('viz-campo-agrupacion').value =
             `${ds.campo_agrupacion}|${esGrupo}|${gidVal}|${parteVal}`;
-        document.getElementById('viz-agregacion').value = ds.agregacion || 'suma';
+        document.getElementById('viz-agregacion').value  = ds.agregacion || 'suma';
         document.getElementById('viz-campo-fecha').value = ds.campo_fecha_id || '';
 
         if (viz.tipo === 'linea') {
             document.getElementById('viz-campo-fecha-eje').value = ds.campo_fecha_eje || '';
             document.getElementById('viz-granularidad').value    = ds.granularidad || 'dia';
         }
+
+        // ── Restaurar títulos de ejes ──
+        const chkEjes = document.getElementById('viz-mostrar-ejes');
+        document.getElementById('viz-titulo-eje-x').value = ds.titulo_eje_x || '';
+        document.getElementById('viz-titulo-eje-y').value = ds.titulo_eje_y || '';
+        chkEjes.checked = ds.mostrar_ejes !== false;   // default true (retrocompatible)
+        document.getElementById('viz-ejes-campos').style.display =
+            chkEjes.checked ? 'block' : 'none';
+
+        // Recalcular placeholders con la config ya restaurada
+        actualizarPlaceholdersEjes();
 
         document.getElementById('modal-viz').style.display = 'flex';
     }
