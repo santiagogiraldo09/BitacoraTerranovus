@@ -591,3 +591,38 @@
     color: #fff;
     font-weight: 700;
 }
+
+/* ── Dona responsiva ── */
+.tb-dona-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;         /* el sobrante se reparte a ambos lados */
+    gap: clamp(20px, 6%, 60px);      /* la separación crece con la card */
+    flex-wrap: wrap;
+}
+
+.tb-dona-canvas {
+    position: relative;
+    flex: 0 1 240px;      /* algo más grande que los 200px actuales */
+    max-width: 280px;
+    min-width: 170px;
+    aspect-ratio: 1 / 1;
+    margin: 0 auto;       /* centrada cuando la leyenda baja */
+}
+
+.tb-dona-centro {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    padding: 0 17%;
+    text-align: center;
+}
+
+.tb-dona-col-leyenda {
+    flex: 0 1 auto;       /* ocupa solo lo que necesita, no se estira */
+    min-width: 0;
+}

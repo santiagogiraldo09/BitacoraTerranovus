@@ -951,15 +951,13 @@
 
         // Bloque central: etiqueta + número + campo medido
         const htmlCentro = `
-            <div style="position:absolute;inset:0;display:flex;flex-direction:column;
-                        align-items:center;justify-content:center;pointer-events:none;
-                        padding:0 34px;text-align:center;">
+            <div class="tb-dona-centro">
                 ${t.visibles ? `
                 <span style="font-size:10px;color:#6b7280;font-weight:600;letter-spacing:.4px;
                              line-height:1.2;">
                     ${t.etiquetaCentro}
                 </span>` : ''}
-                <span style="font-family:'Sora',sans-serif;font-size:20px;font-weight:700;
+                <span style="font-family:'Sora',sans-serif;font-size:22px;font-weight:700;
                              line-height:1.25;">
                     ${t.valorCentro.toLocaleString('es-CO', {maximumFractionDigits:1})}
                 </span>
@@ -979,12 +977,12 @@
             </span>` : '';
 
         body.innerHTML = `
-            <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
-                <div style="position:relative;width:200px;height:200px;flex-shrink:0;">
+            <div class="tb-dona-wrap">
+                <div class="tb-dona-canvas">
                     <canvas id="chart-${viz.id}"></canvas>
                     ${htmlCentro}
                 </div>
-                <div style="flex:1;min-width:150px;">
+                <div class="tb-dona-col-leyenda">
                     ${htmlTituloLeyenda}
                     <div class="tb-dona-leyenda" id="leyenda-${viz.id}"></div>
                 </div>
