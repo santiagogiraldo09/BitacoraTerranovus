@@ -226,7 +226,7 @@
                     </div>
                 </div>
 
-                <!-- ── Títulos de ejes (solo barras y línea) ────────────────── -->
+                <!-- ── Títulos de ejes / etiquetas (barras, línea y dona) ────── -->
                 <div id="viz-ejes-wrap" style="display:none;">
 
                     <div style="margin-top:18px;padding-top:14px;border-top:1px solid #EEE;">
@@ -234,19 +234,19 @@
                                       font-weight:600;color:#374151;cursor:pointer;">
                             <input type="checkbox" id="viz-mostrar-ejes" checked
                                    style="accent-color:var(--naranja,#FFAF33);width:15px;height:15px;">
-                            Mostrar títulos en los ejes
+                            <span id="label-mostrar-ejes">Mostrar títulos en los ejes</span>
                         </label>
                     </div>
 
                     <div id="viz-ejes-campos">
-                        <label class="tb-label" style="margin-top:14px;">
+                        <label class="tb-label" style="margin-top:14px;" id="label-eje-y">
                             TÍTULO EJE Y (vertical)
                             <span style="font-weight:400;text-transform:none;color:#9ca3af;">(opcional)</span>
                         </label>
                         <input type="text" id="viz-titulo-eje-y" class="tb-input"
                                maxlength="60" placeholder="Automático">
 
-                        <label class="tb-label" style="margin-top:14px;">
+                        <label class="tb-label" style="margin-top:14px;" id="label-eje-x">
                             TÍTULO EJE X (horizontal)
                             <span style="font-weight:400;text-transform:none;color:#9ca3af;">(opcional)</span>
                         </label>
@@ -254,7 +254,7 @@
                                maxlength="60" placeholder="Automático">
 
                         <p style="font-size:11px;color:#9ca3af;margin-top:8px;line-height:1.45;">
-                            Déjalos vacíos para usar el título automático que aparece en gris.
+                            Déjalos vacíos para usar el texto automático que aparece en gris.
                         </p>
                     </div>
                 </div>
@@ -688,6 +688,45 @@
     }
 
     /**
+     * Resuelve los textos de un gráfico de dona/anillo.
+     * Mismo patrón que los ejes: manual del usuario → automático.
+     *
+     * - etiquetaCentro : reemplaza el "TOTAL" fijo, sensible a la agregación
+     * - campoMedido    : nombre del campo bajo el número (siempre automático)
+     * - tituloLeyenda  : qué representa cada segmento
+     * - valorCentro    : con agregación=promedio el backend devuelve una suma
+     *                    de promedios (sin sentido) → se recalcula la media
+     */
+    function resolverTextosDona(viz, data) {
+        const ds       = viz?.config?.datasets?.[0] || {};
+        const visibles = ds.mostrar_ejes !== false;   // default true
+        const agg      = ds.agregacion || 'suma';
+
+        const ETIQUETA_AUTO = {
+            suma:     'TOTAL',
+            promedio: 'PROMEDIO',
+            conteo:   'REGISTROS'
+        };
+
+        // Con promedio, sumar los promedios de cada categoría no significa nada.
+        // Se muestra la media de las categorías (no ponderada).
+        let valorCentro = data.total;
+        if (agg === 'promedio' && Array.isArray(data.valores) && data.valores.length) {
+            valorCentro = data.valores.reduce((a, b) => a + b, 0) / data.valores.length;
+        }
+
+        return {
+            visibles,
+            valorCentro,
+            etiquetaCentro: (ds.titulo_eje_y || '').trim().toUpperCase()
+                            || ETIQUETA_AUTO[agg] || 'TOTAL',
+            campoMedido:    ds.campo_valor_nombre || '',
+            tituloLeyenda:  (ds.titulo_eje_x || '').trim()
+                            || ds.campo_agrupacion_nombre || ''
+        };
+    }
+
+    /**
      * Ajusta un título largo a máximo `maxLineas` líneas de `maxLinea` caracteres.
      * Chart.js acepta un array de strings como título multilínea.
      * Si aún así sobra texto, trunca con puntos suspensivos.
@@ -907,19 +946,48 @@
             '#A78BFA', '#FBBF24', '#60A5FA', '#F472B6'
         ];
 
+        // Textos resueltos (manual del usuario → automático)
+        const t = resolverTextosDona(viz, data);
+
+        // Bloque central: etiqueta + número + campo medido
+        const htmlCentro = `
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;
+                        align-items:center;justify-content:center;pointer-events:none;
+                        padding:0 34px;text-align:center;">
+                ${t.visibles ? `
+                <span style="font-size:10px;color:#6b7280;font-weight:600;letter-spacing:.4px;
+                             line-height:1.2;">
+                    ${t.etiquetaCentro}
+                </span>` : ''}
+                <span style="font-family:'Sora',sans-serif;font-size:20px;font-weight:700;
+                             line-height:1.25;">
+                    ${t.valorCentro.toLocaleString('es-CO', {maximumFractionDigits:1})}
+                </span>
+                ${t.visibles && t.campoMedido ? `
+                <span style="font-size:9px;color:#9ca3af;font-weight:500;line-height:1.25;
+                             margin-top:2px;overflow:hidden;display:-webkit-box;
+                             -webkit-line-clamp:2;-webkit-box-orient:vertical;">
+                    ${t.campoMedido}
+                </span>` : ''}
+            </div>`;
+
+        // Encabezado de la leyenda (equivalente al título del eje X)
+        const htmlTituloLeyenda = (t.visibles && t.tituloLeyenda) ? `
+            <span style="font-size:10px;color:#6b7280;font-weight:700;letter-spacing:.4px;
+                         text-transform:uppercase;display:block;margin-bottom:6px;">
+                ${t.tituloLeyenda}
+            </span>` : '';
+
         body.innerHTML = `
             <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
                 <div style="position:relative;width:200px;height:200px;flex-shrink:0;">
                     <canvas id="chart-${viz.id}"></canvas>
-                    <div style="position:absolute;inset:0;display:flex;flex-direction:column;
-                                align-items:center;justify-content:center;pointer-events:none;">
-                        <span style="font-size:11px;color:#6b7280;font-weight:600;">TOTAL</span>
-                        <span style="font-family:'Sora',sans-serif;font-size:20px;font-weight:700;">
-                            ${data.total.toLocaleString('es-CO', {maximumFractionDigits:1})}
-                        </span>
-                    </div>
+                    ${htmlCentro}
                 </div>
-                <div class="tb-dona-leyenda" id="leyenda-${viz.id}"></div>
+                <div style="flex:1;min-width:150px;">
+                    ${htmlTituloLeyenda}
+                    <div class="tb-dona-leyenda" id="leyenda-${viz.id}"></div>
+                </div>
             </div>`;
 
         // Leyenda con valor + porcentaje
@@ -1031,17 +1099,32 @@
             esDona     ? 'LEYENDA (qué representa cada segmento)' :
                          'AGRUPAR POR (eje X)';
 
-        // ── Títulos de ejes: solo aplican a gráficos cartesianos ──
+        // ── Títulos / etiquetas: barras, línea y dona ──
         document.getElementById('viz-ejes-wrap').style.display =
-            (esBarras || esLinea) ? 'block' : 'none';
+            (esBarras || esLinea || esDona) ? 'block' : 'none';
+
+        const OPC = '<span style="font-weight:400;text-transform:none;color:#9ca3af;">(opcional)</span>';
+
+        document.getElementById('label-mostrar-ejes').textContent = esDona
+            ? 'Mostrar etiquetas y título de leyenda'
+            : 'Mostrar títulos en los ejes';
+
+        document.getElementById('label-eje-y').innerHTML = esDona
+            ? `ETIQUETA DEL CENTRO ${OPC}`
+            : `TÍTULO EJE Y (vertical) ${OPC}`;
+
+        document.getElementById('label-eje-x').innerHTML = esDona
+            ? `TÍTULO DE LA LEYENDA ${OPC}`
+            : `TÍTULO EJE X (horizontal) ${OPC}`;
+
         actualizarPlaceholdersEjes();
     }
 
-
     /**
-     * Recalcula los placeholders de los inputs de título de eje con el
-     * título automático que se aplicaría según la configuración actual
-     * del modal. Réplica del comportamiento de Power BI.
+     * Recalcula los placeholders de los inputs con el texto automático que se
+     * aplicaría según la configuración actual del modal.
+     * En dona, los dos inputs significan "etiqueta del centro" y
+     * "título de la leyenda" en lugar de títulos de eje.
      */
     function actualizarPlaceholdersEjes() {
         const wrap = document.getElementById('viz-ejes-wrap');
@@ -1050,23 +1133,35 @@
         const selValor    = document.getElementById('viz-campo-valor');
         const selAgrupa   = document.getElementById('viz-campo-agrupacion');
         const selFechaEje = document.getElementById('viz-campo-fecha-eje');
+        const agregacion  = document.getElementById('viz-agregacion').value;
 
+        // Devuelve el texto visible del option seleccionado, o '' si no hay selección
+        const textoSel = sel => sel.options[sel.selectedIndex]?.value
+            ? sel.options[sel.selectedIndex].text : '';
+
+        const inputY = document.getElementById('viz-titulo-eje-y');
+        const inputX = document.getElementById('viz-titulo-eje-x');
+
+        // ── Dona: etiqueta del centro + título de la leyenda ──
+        if (tipoSeleccionado === 'dona') {
+            const ETIQUETA_AUTO = { suma: 'TOTAL', promedio: 'PROMEDIO', conteo: 'REGISTROS' };
+            inputY.placeholder = ETIQUETA_AUTO[agregacion] || 'TOTAL';
+            inputX.placeholder = textoSel(selAgrupa) || 'Automático';
+            return;
+        }
+
+        // ── Barras y línea: títulos de eje ──
         // Dataset "en borrador" con lo que hay ahora mismo en el formulario
         const dsBorrador = {
-            agregacion:              document.getElementById('viz-agregacion').value,
+            agregacion:              agregacion,
             granularidad:            document.getElementById('viz-granularidad').value,
-            campo_valor_nombre:      selValor.options[selValor.selectedIndex]?.value
-                                        ? selValor.options[selValor.selectedIndex].text : '',
-            campo_agrupacion_nombre: selAgrupa.options[selAgrupa.selectedIndex]?.value
-                                        ? selAgrupa.options[selAgrupa.selectedIndex].text : '',
-            campo_fecha_eje_nombre:  selFechaEje.options[selFechaEje.selectedIndex]?.value
-                                        ? selFechaEje.options[selFechaEje.selectedIndex].text : ''
+            campo_valor_nombre:      textoSel(selValor),
+            campo_agrupacion_nombre: textoSel(selAgrupa),
+            campo_fecha_eje_nombre:  textoSel(selFechaEje)
         };
 
-        document.getElementById('viz-titulo-eje-y').placeholder =
-            tituloEjeAutomatico(dsBorrador, 'y', tipoSeleccionado) || 'Automático';
-        document.getElementById('viz-titulo-eje-x').placeholder =
-            tituloEjeAutomatico(dsBorrador, 'x', tipoSeleccionado) || 'Automático';
+        inputY.placeholder = tituloEjeAutomatico(dsBorrador, 'y', tipoSeleccionado) || 'Automático';
+        inputX.placeholder = tituloEjeAutomatico(dsBorrador, 'x', tipoSeleccionado) || 'Automático';
     }
 
     // Listeners: cualquier cambio de configuración refresca los placeholders
@@ -1239,8 +1334,10 @@
         const esLinea         = tipoSeleccionado === 'linea';
         const esTabla         = tipoSeleccionado === 'tabla';
 
-        // ── Títulos de ejes (solo barras y línea) ──
-        const esCartesiano  = tipoSeleccionado === 'barras' || esLinea;
+        // ── Títulos de ejes / etiquetas (barras, línea y dona) ──
+        const esCartesiano  = tipoSeleccionado === 'barras'
+                           || esLinea
+                           || tipoSeleccionado === 'dona';
         const tituloEjeX    = esCartesiano
             ? document.getElementById('viz-titulo-eje-x').value.trim() : '';
         const tituloEjeY    = esCartesiano
