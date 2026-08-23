@@ -65,8 +65,8 @@ def requiere_token(f):
 
 # ¿Los formularios activos son por usuario o por proyecto?
 # Tu tabla proyecto_formularios_activos tiene user_id, así que si quieres
-# que cada quien vea solo los que él activó, pon esto en True.
-FILTRAR_FORMULARIOS_POR_USUARIO = False
+# que cada quien vea solo los que él activó, pon esto en True. con False se duplican los formularios
+FILTRAR_FORMULARIOS_POR_USUARIO = True
 
 
 def _num(v):
