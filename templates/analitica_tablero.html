@@ -890,7 +890,8 @@
     /**
      * Calcula el porcentaje acumulado de cada categoría y cuántas
      * concentran el umbral definido.
-     * @returns {{acumulados:number[], total:number, categoriasUmbral:number}}
+     * @returns Objeto con: acumulados (number[]), total (number)
+     *          y categoriasUmbral (number).
      */
     function calcularAcumuladoPareto(valores) {
         const total = valores.reduce((a, b) => a + b, 0);
