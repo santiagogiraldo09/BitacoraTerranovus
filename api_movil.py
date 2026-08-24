@@ -186,14 +186,27 @@ def _proyectos_del_usuario(uid, empresa_id):
             .eq("empresa_id", empresa_id)
             .execute())
 
-    q = (supabase_client.table("proyecto_formularios_activos")
-         .select("proyecto_id, formulario_id, activated_at")
-         .in_("proyecto_id", ids))
-    if FILTRAR_FORMULARIOS_POR_USUARIO:
-        q = q.eq("user_id", uid)
-    activos = q.execute()
+    # 1. Todos los formularios ASIGNADOS a estos proyectos
+    asignados = (supabase_client.table("proyecto_formularios")
+                 .select("proyecto_id, formulario_id")
+                 .in_("proyecto_id", ids)
+                 .execute())
 
-    ids_form = list({a["formulario_id"] for a in (activos.data or [])})
+    # 2. Formularios ACTIVOS para este usuario
+    activos = (supabase_client.table("proyecto_formularios_activos")
+               .select("proyecto_id, formulario_id")
+               .in_("proyecto_id", ids)
+               .eq("user_id", uid)
+               .execute())
+
+    # Set de (proyecto_id, formulario_id) activos para lookup rápido
+    activos_set = {
+        (a["proyecto_id"], a["formulario_id"])
+        for a in (activos.data or [])
+    }
+
+    # 3. Catálogo de nombres de formularios
+    ids_form = list({a["formulario_id"] for a in (asignados.data or [])})
     catalogo = {}
     if ids_form:
         forms = (supabase_client.table("formularios")
@@ -202,22 +215,19 @@ def _proyectos_del_usuario(uid, empresa_id):
                  .execute())
         catalogo = {f["id"]: f for f in (forms.data or [])}
 
+    # 4. Construir formularios por proyecto con booleano activo
     por_proyecto = {}
-    for a in (activos.data or []):
-        f = catalogo.get(a["formulario_id"], {})
-        por_proyecto.setdefault(a["proyecto_id"], []).append({
-            "id": str(a["formulario_id"]),
+    for a in (asignados.data or []):
+        pid = a["proyecto_id"]
+        fid = a["formulario_id"]
+        f = catalogo.get(fid, {})
+        activo = (pid, fid) in activos_set
+        por_proyecto.setdefault(pid, []).append({
+            "id": str(fid),
             "nombre": f.get("nombre") or "Formulario",
             "subtexto": f.get("descripcion") or "",
-            "_orden": a.get("activated_at") or "",
+            "activo": activo,
         })
-
-    for lista in por_proyecto.values():
-        lista.sort(key=lambda x: x["_orden"], reverse=True)
-        if lista:
-            lista[0]["es_ultimo"] = True
-        for f in lista:
-            f.pop("_orden", None)
 
     salida = []
     for p in (proy.data or []):
