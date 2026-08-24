@@ -917,21 +917,9 @@
             return;
         }
 
-        const { acumulados, total, categoriasUmbral } =
-            calcularAcumuladoPareto(data.valores);
+        const { acumulados } = calcularAcumuladoPareto(data.valores);
 
-        // Resumen: la conclusión que busca quien lee un Pareto
-        const plural = categoriasUmbral === 1 ? 'categoría concentra' : 'categorías concentran';
-        const resumen = `
-            <p style="font-size:11px;color:#6b7280;margin:0 0 10px;line-height:1.4;">
-                <strong>${categoriasUmbral}</strong> de <strong>${data.labels.length}</strong>
-                ${plural} el ${PARETO_UMBRAL}% del total
-                (${total.toLocaleString('es-CO', {maximumFractionDigits:1})})
-            </p>`;
-
-        body.innerHTML = `
-            ${resumen}
-            <div class="tb-chart-wrap"><canvas id="chart-${viz.id}"></canvas></div>`;
+        body.innerHTML = `<div class="tb-chart-wrap"><canvas id="chart-${viz.id}"></canvas></div>`;
 
         if (chartsInstancias[viz.id]) chartsInstancias[viz.id].destroy();
 
