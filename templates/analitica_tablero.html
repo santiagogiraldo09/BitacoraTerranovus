@@ -320,13 +320,18 @@
             const res  = await fetch('/api/proyectos-usuario');
             const data = await res.json();
             const sel  = document.getElementById('f-proyecto');
+
             (data.proyectos || data || []).forEach(p => {
                 const opt = document.createElement('option');
-                opt.value = p.id;
-                opt.textContent = p.nombre || p.nombre_proyecto;
-                sel.appendChild(opt);
+                // get_user_projects devuelve 'id_proyecto' y 'name';
+                // se aceptan alias por si la API cambia de forma.
+                opt.value       = p.id_proyecto ?? p.id ?? '';
+                opt.textContent = p.name || p.nombre || p.nombre_proyecto || 'Sin nombre';
+                if (opt.value !== '') sel.appendChild(opt);
             });
-        } catch(e) { console.error('Error cargando proyectos:', e); }
+        } catch(e) {
+            console.error('Error cargando proyectos:', e);
+        }
     }
 
     async function cargarFormularios() {
