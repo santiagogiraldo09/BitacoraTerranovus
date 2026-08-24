@@ -626,3 +626,8 @@
     flex: 0 1 auto;       /* ocupa solo lo que necesita, no se estira */
     min-width: 0;
 }
+
+/* ── Pareto: más alto por las etiquetas rotadas ── */
+.tb-viz-card[data-tipo="pareto"] .tb-chart-wrap {
+    height: 340px;
+}

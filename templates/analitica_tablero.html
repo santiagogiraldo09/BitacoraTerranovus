@@ -166,6 +166,10 @@
                     <i class="fas fa-table"></i>
                     <span>Tabla de datos</span>
                 </button>
+                <button class="tb-tipo-btn" data-tipo="pareto" onclick="seleccionarTipo('pareto')">
+                    <i class="fas fa-sort-amount-down"></i>
+                    <span>Pareto (80/20)</span>
+                </button>
             </div>
 
             <label class="tb-label" style="margin-top:14px;">FORMULARIO FUENTE</label>
@@ -394,6 +398,7 @@
         // Crear la card
         const card = document.createElement('div');
         card.className = 'tb-viz-card';
+        card.dataset.tipo = viz.tipo;
         card.dataset.vizId = viz.id;
         card.innerHTML = `
             <div class="tb-viz-header">
@@ -460,6 +465,8 @@
                 renderVizDona(viz, data);
             } else if (viz.tipo === 'tabla') {
                 renderVizTabla(viz, data);
+            } else if (viz.tipo === 'pareto') {
+                renderVizPareto(viz, data);
             }
         } catch(e) {
             console.error(e);
@@ -871,6 +878,148 @@
         );
     }
 
+    // ══════════════════════════════════════════════════════════════════
+    //  DIAGRAMA DE PARETO (80/20)
+    //  Barras ordenadas de mayor a menor + línea de % acumulado.
+    //  bi_datos ya devuelve los valores ordenados desc, no hay que
+    //  reordenar aquí.
+    // ══════════════════════════════════════════════════════════════════
+
+    const PARETO_UMBRAL = 80;   // % de referencia (convención estándar)
+
+    /**
+     * Calcula el porcentaje acumulado de cada categoría y cuántas
+     * concentran el umbral definido.
+     * @returns {{acumulados:number[], total:number, categoriasUmbral:number}}
+     */
+    function calcularAcumuladoPareto(valores) {
+        const total = valores.reduce((a, b) => a + b, 0);
+        let acum = 0, categoriasUmbral = 0, yaPasoUmbral = false;
+
+        const acumulados = valores.map(v => {
+            acum += total ? (v / total) * 100 : 0;
+            if (!yaPasoUmbral) {
+                categoriasUmbral++;
+                if (acum >= PARETO_UMBRAL) yaPasoUmbral = true;
+            }
+            return acum;
+        });
+
+        return { acumulados, total, categoriasUmbral };
+    }
+
+    function renderVizPareto(viz, data) {
+        const body = document.getElementById(`viz-body-${viz.id}`);
+
+        if (!data.labels?.length) {
+            body.innerHTML = '<p style="text-align:center;color:#9ca3af;font-size:13px;padding:20px 0;">Sin datos para mostrar</p>';
+            return;
+        }
+
+        const { acumulados, total, categoriasUmbral } =
+            calcularAcumuladoPareto(data.valores);
+
+        // Resumen: la conclusión que busca quien lee un Pareto
+        const plural = categoriasUmbral === 1 ? 'categoría concentra' : 'categorías concentran';
+        const resumen = `
+            <p style="font-size:11px;color:#6b7280;margin:0 0 10px;line-height:1.4;">
+                <strong>${categoriasUmbral}</strong> de <strong>${data.labels.length}</strong>
+                ${plural} el ${PARETO_UMBRAL}% del total
+                (${total.toLocaleString('es-CO', {maximumFractionDigits:1})})
+            </p>`;
+
+        body.innerHTML = `
+            ${resumen}
+            <div class="tb-chart-wrap"><canvas id="chart-${viz.id}"></canvas></div>`;
+
+        if (chartsInstancias[viz.id]) chartsInstancias[viz.id].destroy();
+
+        // Títulos de eje resueltos (manual del usuario → automático).
+        // El eje derecho es siempre "% Acumulado": no es un campo del
+        // formulario, es una magnitud derivada.
+        const escalas = construirEscalas(viz, {
+            y: { position: 'left' }
+        });
+
+        escalas.y1 = {
+            type:        'linear',
+            position:    'right',
+            min:         0,
+            max:         100,
+            grid:        { drawOnChartArea: false },
+            ticks:       { callback: v => v + '%' },
+            title: escalas.y.title?.display ? {
+                display: true,
+                text:    '% Acumulado',
+                color:   '#4B5563',
+                font:    { size: 11, weight: '600', family: "'Sora', sans-serif" },
+                padding: { top: 8, bottom: 4 }
+            } : { display: false }
+        };
+
+        chartsInstancias[viz.id] = new Chart(
+            document.getElementById(`chart-${viz.id}`).getContext('2d'),
+            {
+                data: {
+                    labels: data.labels,
+                    datasets: [
+                        {
+                            type:            'bar',
+                            label:           viz.titulo,
+                            data:            data.valores,
+                            backgroundColor: '#5B8DEF',
+                            borderRadius:    4,
+                            yAxisID:         'y',
+                            order:           2
+                        },
+                        {
+                            type:        'line',
+                            label:       '% Acumulado',
+                            data:        acumulados,
+                            borderColor: COLOR_ACENTO,
+                            backgroundColor: COLOR_ACENTO,
+                            borderWidth: 2,
+                            pointRadius: 3,
+                            tension:     0.15,
+                            yAxisID:     'y1',
+                            order:       1
+                        },
+                        {
+                            type:        'line',
+                            label:       `Referencia ${PARETO_UMBRAL}%`,
+                            data:        data.labels.map(() => PARETO_UMBRAL),
+                            borderColor: '#9CA3AF',
+                            borderDash:  [6, 4],
+                            borderWidth: 1.5,
+                            pointRadius: 0,
+                            yAxisID:     'y1',
+                            order:       0
+                        }
+                    ]
+                },
+                options: {
+                    responsive:          true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    scales:      escalas,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels:   { boxWidth: 12, font: { size: 11 } }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ctx.datasetIndex === 0
+                                    ? ` ${ctx.parsed.y.toLocaleString('es-CO')}`
+                                    : ` ${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}%`
+                            }
+                        }
+                    }
+                }
+            }
+        );
+    }
+
     function renderVizTarjetas(viz, data) {
         const body = document.getElementById(`viz-body-${viz.id}`);
 
@@ -1071,6 +1220,7 @@
         const esDona     = tipo === 'dona';
         const esBarras   = tipo === 'barras';
         const esTabla    = tipo === 'tabla';
+        const esPareto   = tipo === 'pareto';
 
         document.getElementById('viz-campos-temporal').style.display  = esLinea  ? 'block' : 'none';
         document.getElementById('viz-campo-serie-wrap').style.display = esBarras ? 'block' : 'none';
@@ -1091,16 +1241,18 @@
             esTarjetas ? 'CAMPO A MEDIR (numérico)' :
             esLinea    ? 'CAMPO A MEDIR (eje Y, numérico)' :
             esDona     ? 'VALORES (tamaño de cada segmento)' :
+            esPareto   ? 'IMPACTO A MEDIR (eje Y, numérico)' :
                          'CAMPO A MEDIR (eje Y, numérico)';
 
         document.getElementById('label-campo-agrupa').textContent =
             esTarjetas ? 'AGRUPAR POR (categorías de las tarjetas)' :
             esDona     ? 'LEYENDA (qué representa cada segmento)' :
+            esPareto   ? 'CATEGORÍAS A ORDENAR (eje X)' :
                          'AGRUPAR POR (eje X)';
 
         // ── Títulos / etiquetas: barras, línea y dona ──
         document.getElementById('viz-ejes-wrap').style.display =
-            (esBarras || esLinea || esDona) ? 'block' : 'none';
+            (esBarras || esLinea || esDona || esPareto) ? 'block' : 'none';
 
         const OPC = '<span style="font-weight:400;text-transform:none;color:#9ca3af;">(opcional)</span>';
 
@@ -1332,10 +1484,11 @@
         const esLinea         = tipoSeleccionado === 'linea';
         const esTabla         = tipoSeleccionado === 'tabla';
 
-        // ── Títulos de ejes / etiquetas (barras, línea y dona) ──
+        // ── Títulos de ejes / etiquetas (barras, línea, dona y pareto) ──
         const esCartesiano  = tipoSeleccionado === 'barras'
                            || esLinea
-                           || tipoSeleccionado === 'dona';
+                           || tipoSeleccionado === 'dona'
+                           || tipoSeleccionado === 'pareto';
         const tituloEjeX    = esCartesiano
             ? document.getElementById('viz-titulo-eje-x').value.trim() : '';
         const tituloEjeY    = esCartesiano
