@@ -2612,7 +2612,11 @@ def api_registros_proyecto(project_id):
                     'formulario_id':     r[1],
                     'formulario_nombre': r[2],
                     'preview':           preview,
-                    'created_at':        r[4].isoformat() if r[4] else None,
+                    'created_at':        (
+                        r[4].replace(tzinfo=timezone.utc)
+                            .astimezone(pytz.timezone('America/Bogota'))
+                            .isoformat()
+                    ) if r[4] else None,
                     'autor':             f"{r[5] or ''} {r[6] or ''}".strip() or 'Usuario'
                 })
 
