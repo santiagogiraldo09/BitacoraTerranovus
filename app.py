@@ -3774,6 +3774,22 @@ def exportar_formulario(project_id, formulario_id):
             clave = campo_id + '_codigo' if parte == 'codigo' else campo_id
             return fuente.get(clave, '')
 
+        def _fecha_produccion(fuente):
+            """Lee el campo 'Fecha de producción' y lo convierte a date.
+            Devuelve None si está vacío o no es parseable."""
+            campo_id = nombre_a_id.get('Fecha de producción', '')
+            if not campo_id:
+                return None
+            raw = str(fuente.get(campo_id, '') or '').strip()
+            if not raw:
+                return None
+            for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y'):
+                try:
+                    return datetime.strptime(raw[:10], fmt).date()
+                except ValueError:
+                    continue
+            return None
+
         # ── Generar Excel ──
         wb = openpyxl.Workbook()
         ws = wb.active
@@ -3813,6 +3829,9 @@ def exportar_formulario(project_id, formulario_id):
             resp = respuestas if isinstance(respuestas, dict) else {}
             repeticiones = resp.get('__repeticiones') or {}
 
+            # Mes y Día salen del campo del formulario, no de created_at
+            fecha_prod = _fecha_produccion(resp)
+
             bloques_pp  = repeticiones.get(gid_pp, [])  if gid_pp  else []
             bloques_pnp = repeticiones.get(gid_pnp, []) if gid_pnp else []
             num_filas   = max(len(bloques_pp), len(bloques_pnp), 1)
@@ -3825,9 +3844,9 @@ def exportar_formulario(project_id, formulario_id):
                     valor = ''
 
                     if col_name == 'Mes':
-                        valor = meses_es.get(created_at.month, '') if created_at else ''
+                        valor = meses_es.get(fecha_prod.month, '') if fecha_prod else ''
                     elif col_name == 'Día':
-                        valor = created_at.day if created_at else ''
+                        valor = fecha_prod.day if fecha_prod else ''
                     elif col_name in columnas_grupo_pp:
                         campo_nombre, parte = columnas_grupo_pp[col_name]
                         valor = _leer(bloque_pp, campo_nombre, parte)

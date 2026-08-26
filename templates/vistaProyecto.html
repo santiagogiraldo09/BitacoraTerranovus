@@ -59,7 +59,8 @@
                     Todos
                 </button>
             </div>
-            <button class="btn-exportar" onclick="abrirModalExportar()" title="Exportar a Excel">
+            <button class="btn-exportar" id="btn-exportar-excel" onclick="abrirModalExportar()"
+                    title="Exportar a Excel" style="display:none;">
                 <i class="fas fa-download"></i>
             </button>
         </div>
@@ -133,6 +134,21 @@
     const formulariosProy   = {{ formularios_proy | tojson | safe }};
     let registrosCache      = [];
     let filtroActual        = 'todos';
+
+    // IDs de formularios que tienen plantilla de exportación a Excel.
+    // El endpoint /api/exportar-formulario mapea columnas por nombre de campo,
+    // así que solo funciona con los formularios contemplados en esa plantilla.
+    const FORMULARIOS_EXPORTABLES = [8];
+
+    // Formularios del proyecto que sí se pueden exportar
+    const formulariosExportables = formulariosProy.filter(
+        f => FORMULARIOS_EXPORTABLES.includes(Number(f.id))
+    );
+
+    // Mostrar el botón solo si el proyecto tiene alguno
+    if (formulariosExportables.length > 0) {
+        document.getElementById('btn-exportar-excel').style.display = '';
+    }
 
     // ── Toast ──
     function mostrarToast(msg, tipo = '') {
@@ -319,15 +335,16 @@
         const select = document.getElementById('export-formulario');
         select.innerHTML = '';
 
-        formulariosProy.forEach(f => {
+        formulariosExportables.forEach(f => {
             const opt = document.createElement('option');
             opt.value = f.id;
             opt.textContent = f.nombre;
             select.appendChild(opt);
         });
 
-        // Si hay un filtro activo, preseleccionar ese formulario
-        if (filtroActual && filtroActual !== 'todos') {
+        // Preseleccionar el del filtro activo solo si es exportable
+        if (filtroActual && filtroActual !== 'todos' &&
+            formulariosExportables.some(f => String(f.id) === String(filtroActual))) {
             select.value = filtroActual;
         }
 
@@ -368,7 +385,7 @@
 <div class="modal-overlay" id="modal-exportar">
     <div class="modal-box" style="text-align:left;">
         <h3 class="modal-title" style="margin-bottom:16px;">
-            <i class="fas fa-file-excel" style="color:#16a34a;"></i> Exportar a Excel
+            <i class="fas fa-file-excel" style="color:var(--naranja);"></i> Exportar a Excel
         </h3>
 
         <div style="margin-bottom:14px;">
@@ -391,7 +408,7 @@
 
         <div style="display:flex; flex-direction:column; gap:8px;">
             <button class="modal-btn" onclick="ejecutarExportacion()" 
-                    style="background:#16a34a; color:white; width:100%; padding:12px; border-radius:8px; font-weight:600;">
+                    style="background:var(--naranja); color:white; width:100%; padding:12px; border-radius:8px; font-weight:600;">
                 <i class="fas fa-download"></i> Descargar Excel
             </button>
             <button class="modal-btn modal-btn-cancel" onclick="cerrarModalExportar()" style="width:100%;">
