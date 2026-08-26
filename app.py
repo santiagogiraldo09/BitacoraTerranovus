@@ -3789,6 +3789,27 @@ def exportar_formulario(project_id, formulario_id):
                 except ValueError:
                     continue
             return None
+        
+        # Columnas que deben quedar como número en el Excel.
+        # Los códigos de paro son numéricos sin ceros a la izquierda
+        # (2, 34, 90), así que se convierten a entero sin riesgo.
+        COLUMNAS_ENTERAS   = {'Turno', 'Cant. Aceptada', 'Codigo PP', 'Codigo PNP'}
+        COLUMNAS_DECIMALES = {'Horas Maq.', 'H.PP', 'H.PNP'}
+
+        def _a_numero(valor, entero=False):
+            """Convierte un string numérico a int/float para que Excel lo
+            reconozca como número. Devuelve None si está vacío o no es
+            convertible, para que la celda quede vacía de verdad (una
+            cadena '' haría que la columna se lea como texto)."""
+            if valor is None or valor == '':
+                return None
+            if isinstance(valor, (int, float)):
+                return int(valor) if entero else valor
+            try:
+                num = float(str(valor).strip().replace(',', '.'))
+            except ValueError:
+                return None
+            return int(round(num)) if entero else num
 
         # ── Generar Excel ──
         wb = openpyxl.Workbook()
@@ -3857,10 +3878,27 @@ def exportar_formulario(project_id, formulario_id):
                         campo_nombre, parte = columnas_raiz[col_name]
                         valor = _leer(resp, campo_nombre, parte)
 
+                    # Tipado numérico para tablas dinámicas
+                    if col_name in COLUMNAS_ENTERAS:
+                        valor = _a_numero(valor, entero=True)
+                    elif col_name in COLUMNAS_DECIMALES:
+                        valor = _a_numero(valor)
+                    elif valor == '':
+                        valor = None
+
                     cell = ws.cell(row=fila_actual, column=col_idx, value=valor)
                     cell.font = cell_font
                     cell.alignment = cell_align
                     cell.border = thin_border
+
+                    # Formato visual de los números
+                    if col_name in COLUMNAS_DECIMALES:
+                        cell.number_format = '0.00'
+                    elif col_name in COLUMNAS_ENTERAS or col_name == 'Día':
+                        cell.number_format = '0'
+
+                    if col_name in {'Codigo PP', 'Codigo PNP'}:
+                        cell.alignment = Alignment(horizontal='center', vertical='center')
 
                 fila_actual += 1
 
