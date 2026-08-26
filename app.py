@@ -1160,6 +1160,253 @@ def bi_datos():
         return jsonify({'error': str(e)}), 500
 
 
+# ── Exportar tablero BI a PDF ───────────────────────────────────
+@app.route('/api/bi/tableros/<int:tablero_id>/exportar-pdf', methods=['POST'])
+def bi_exportar_pdf(tablero_id):
+    if 'user_id' not in session or session.get('user_rol') != 'admin':
+        return jsonify({'error': 'No autorizado'}), 401
+
+    try:
+        data      = request.get_json() or {}
+        bloques   = data.get('bloques') or []
+        titulo    = (data.get('titulo') or 'Reporte analítico').strip()
+        subtitulo = (data.get('subtitulo') or '').strip()
+        notas     = (data.get('notas') or '').strip()
+        filtros   = (data.get('filtros') or '').strip()
+
+        if not bloques:
+            return jsonify({'error': 'No se recibió ninguna visualización'}), 400
+
+        # ── Datos de marca de la empresa ──
+        empresa_nombre = ''
+        logo_url       = None
+        color_primario = '#FFAF33'
+
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT nombre, logo_url, color_primario
+                FROM empresas WHERE id = %s
+            """, (session.get('empresa_id'),))
+            emp = cursor.fetchone()
+            if emp:
+                empresa_nombre = emp[0] or ''
+                logo_url       = emp[1]
+                color_primario = emp[2] or '#FFAF33'
+
+        rgb = _hex_a_rgb(color_primario)
+
+        # ── Descargar el logo a un archivo temporal (FPDF necesita ruta) ──
+        logo_path = None
+        if logo_url:
+            try:
+                r = requests.get(logo_url, timeout=8)
+                if r.ok:
+                    tmp = NamedTemporaryFile(delete=False, suffix='.png')
+                    # Normaliza a PNG con fondo blanco: FPDF no maneja
+                    # transparencia ni algunos formatos exóticos.
+                    im = Image.open(BytesIO(r.content)).convert('RGBA')
+                    fondo = Image.new('RGBA', im.size, (255, 255, 255, 255))
+                    fondo.alpha_composite(im)
+                    fondo.convert('RGB').save(tmp.name, 'PNG')
+                    logo_path = tmp.name
+            except Exception as e:
+                print(f"No se pudo cargar el logo para el PDF: {e}")
+
+        ahora = datetime.now(pytz.timezone('America/Bogota'))
+
+        pdf = _PDFTablero(
+            titulo_tablero=titulo,
+            logo_path=logo_path,
+            rgb=rgb,
+            empresa=empresa_nombre
+        )
+        pdf.set_auto_page_break(auto=True, margin=20)
+        pdf.alias_nb_pages()
+
+        # ── Portada ──
+        pdf.portada(titulo, subtitulo, empresa_nombre, filtros, ahora,
+                    session.get('user_nombre') or '')
+
+        # ── Visualizaciones ──
+        pdf.add_page()
+        for bloque in bloques:
+            imagen_b64 = bloque.get('imagen')
+            if not imagen_b64:
+                continue   # las tablas se manejan aparte (ver nota al final)
+            pdf.bloque_grafico(bloque.get('titulo', ''), imagen_b64)
+
+        # ── Notas ──
+        if notas:
+            pdf.bloque_notas(notas)
+
+        salida = pdf.output(dest='S')
+        if isinstance(salida, str):
+            salida = salida.encode('latin-1')
+
+        if logo_path:
+            try:
+                os.remove(logo_path)
+            except OSError:
+                pass
+
+        return send_file(
+            BytesIO(salida),
+            mimetype='application/pdf',
+            as_attachment=False,
+            download_name=f"{titulo[:40]}.pdf"
+        )
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': f'Error generando el PDF: {e}'}), 500
+
+def _hex_a_rgb(hex_color):
+    """'#FFAF33' → (255, 175, 51). Devuelve el naranja por defecto si falla."""
+    try:
+        h = (hex_color or '').lstrip('#')
+        return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+    except Exception:
+        return (255, 175, 51)
+
+
+class _PDFTablero(FPDF):
+    """PDF del tablero BI con encabezado y pie de marca."""
+
+    def __init__(self, titulo_tablero='', logo_path=None, rgb=(255, 175, 51), empresa=''):
+        super().__init__(orientation='P', unit='mm', format='A4')
+        self.titulo_tablero = titulo_tablero
+        self.logo_path      = logo_path
+        self.rgb            = rgb
+        self.empresa        = empresa
+        self.es_portada     = False
+
+    # ── Encabezado / pie automáticos ──
+    def header(self):
+        if self.es_portada:
+            return
+        if self.logo_path:
+            try:
+                self.image(self.logo_path, 15, 8, 16)
+            except Exception:
+                pass
+        self.set_font('Helvetica', 'B', 9)
+        self.set_text_color(90, 90, 90)
+        self.set_xy(34, 11)
+        self.cell(0, 5, self._txt(self.titulo_tablero), 0, 1, 'L')
+
+        # Franja de color
+        self.set_fill_color(*self.rgb)
+        self.rect(15, 22, 180, 0.8, 'F')
+        self.ln(8)
+
+    def footer(self):
+        if self.es_portada:
+            return
+        self.set_y(-14)
+        self.set_font('Helvetica', '', 8)
+        self.set_text_color(150, 150, 150)
+        self.cell(0, 5, self._txt(self.empresa), 0, 0, 'L')
+        self.cell(0, 5, f'Pagina {self.page_no()} de {{nb}}', 0, 0, 'R')
+
+    # ── Secciones ──
+    def portada(self, titulo, subtitulo, empresa, filtros, ahora, autor):
+        self.es_portada = True
+        self.add_page()
+
+        # Franja superior de color
+        self.set_fill_color(*self.rgb)
+        self.rect(0, 0, 210, 6, 'F')
+
+        y = 60
+        if self.logo_path:
+            try:
+                self.image(self.logo_path, 85, y, 40)
+                y += 48
+            except Exception:
+                y += 8
+
+        self.set_xy(20, y)
+        self.set_font('Helvetica', 'B', 22)
+        self.set_text_color(30, 30, 30)
+        self.multi_cell(170, 10, self._txt(titulo), 0, 'C')
+
+        if subtitulo:
+            self.ln(2)
+            self.set_x(20)
+            self.set_font('Helvetica', '', 12)
+            self.set_text_color(110, 110, 110)
+            self.multi_cell(170, 7, self._txt(subtitulo), 0, 'C')
+
+        self.ln(14)
+        self.set_x(20)
+        self.set_font('Helvetica', 'B', 11)
+        self.set_text_color(*self.rgb)
+        self.cell(170, 6, self._txt(empresa), 0, 1, 'C')
+
+        # Metadatos
+        self.ln(10)
+        self.set_font('Helvetica', '', 10)
+        self.set_text_color(110, 110, 110)
+        for linea in [
+            f"Filtros aplicados: {filtros}" if filtros else '',
+            f"Generado: {ahora.strftime('%d/%m/%Y %I:%M %p')}",
+            f"Por: {autor}" if autor else ''
+        ]:
+            if linea:
+                self.set_x(20)
+                self.cell(170, 6, self._txt(linea), 0, 1, 'C')
+
+        self.es_portada = False
+
+    def bloque_grafico(self, titulo, imagen_b64):
+        """Inserta un gráfico. Salta de página si no cabe completo."""
+        ALTO_IMG   = 78    # mm
+        ALTO_TOTAL = ALTO_IMG + 14
+
+        if self.get_y() + ALTO_TOTAL > 270:
+            self.add_page()
+
+        self.set_font('Helvetica', 'B', 12)
+        self.set_text_color(30, 30, 30)
+        self.cell(0, 7, self._txt(titulo), 0, 1, 'L')
+        self.ln(1)
+
+        try:
+            b64 = imagen_b64.split(',', 1)[1] if ',' in imagen_b64 else imagen_b64
+            tmp = NamedTemporaryFile(delete=False, suffix='.png')
+            tmp.write(base64.b64decode(b64))
+            tmp.close()
+            self.image(tmp.name, x=15, w=180)
+            os.remove(tmp.name)
+        except Exception as e:
+            print(f"Error insertando gráfico en el PDF: {e}")
+            self.set_font('Helvetica', 'I', 9)
+            self.set_text_color(160, 160, 160)
+            self.cell(0, 6, 'No se pudo renderizar esta visualizacion', 0, 1)
+
+        self.ln(6)
+
+    def bloque_notas(self, notas):
+        if self.get_y() > 230:
+            self.add_page()
+        self.ln(4)
+        self.set_font('Helvetica', 'B', 12)
+        self.set_text_color(30, 30, 30)
+        self.cell(0, 7, 'Notas y conclusiones', 0, 1)
+        self.set_fill_color(*self.rgb)
+        self.rect(15, self.get_y(), 30, 0.6, 'F')
+        self.ln(4)
+        self.set_font('Helvetica', '', 10)
+        self.set_text_color(70, 70, 70)
+        self.multi_cell(180, 6, self._txt(notas))
+
+    # ── Utilidad ──
+    @staticmethod
+    def _txt(s):
+        """FPDF clásico solo maneja latin-1: descarta lo que no pueda codificar."""
+        return str(s or '').encode('latin-1', 'ignore').decode('latin-1')
+
+
 # ── Utilidad: generar slug ──────────────────────────────────────
 def generar_slug(nombre_empresa):
     # Normalizar: quitar tildes, minúsculas, reemplazar espacios

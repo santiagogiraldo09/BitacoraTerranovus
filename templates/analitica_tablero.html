@@ -87,6 +87,9 @@
                 <button class="an-btn-generar" onclick="abrirModalViz()">
                     <i class="fas fa-plus"></i> Agregar
                 </button>
+                <button class="tb-btn-pdf" id="btn-exportar-pdf" onclick="abrirModalPDF()">
+                    <i class="fas fa-file-pdf"></i> Exportar PDF
+                </button>
                 {% endif %}
             </div>
         </header>
@@ -269,6 +272,73 @@
         <div class="tb-modal-footer">
             <button class="tb-btn-secundario" onclick="cerrarModalViz()">Cancelar</button>
             <button class="tb-btn-primario" onclick="guardarViz()">Guardar</button>
+        </div>
+
+    </div>
+</div>
+
+<!-- ══════════ Modal: exportar PDF ══════════ -->
+<div class="tb-modal-overlay" id="modal-pdf" style="display:none;">
+    <div class="pdf-modal-box" id="pdf-modal-box">
+
+        <!-- ── Paso 1: configuración ── -->
+        <div id="pdf-paso-config">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;">
+                <h3 style="font-family:'Sora',sans-serif;font-size:17px;margin:0;">Exportar reporte PDF</h3>
+                <button onclick="cerrarModalPDF()" style="background:none;border:none;font-size:20px;color:#9CA3AF;cursor:pointer;">&times;</button>
+            </div>
+
+            <label class="tb-label">TÍTULO DEL REPORTE</label>
+            <input type="text" id="pdf-titulo" class="tb-input" maxlength="80">
+
+            <label class="tb-label" style="margin-top:14px;">SUBTÍTULO <span style="font-weight:400;text-transform:none;color:#9ca3af;">(opcional)</span></label>
+            <input type="text" id="pdf-subtitulo" class="tb-input" maxlength="120">
+
+            <label class="tb-label" style="margin-top:16px;">
+                VISUALIZACIONES A INCLUIR
+                <span style="font-weight:400;text-transform:none;color:#9ca3af;">
+                    (<a href="javascript:void(0)" onclick="pdfMarcarTodas(true)">todas</a> ·
+                     <a href="javascript:void(0)" onclick="pdfMarcarTodas(false)">ninguna</a>)
+                </span>
+            </label>
+            <div class="pdf-viz-lista" id="pdf-viz-lista"></div>
+
+            <label class="tb-label" style="margin-top:16px;">NOTAS O CONCLUSIONES <span style="font-weight:400;text-transform:none;color:#9ca3af;">(opcional)</span></label>
+            <textarea id="pdf-notas" class="tb-input" rows="3" maxlength="600"
+                      style="resize:vertical;font-family:'DM Sans',sans-serif;"></textarea>
+
+            <label class="tb-label" style="margin-top:16px;">MARCA DE LA EMPRESA</label>
+            <div class="pdf-marca">
+                {% if logo_actual %}<img src="{{ logo_actual }}" alt="Logo">{% endif %}
+                <span class="swatch" style="background:{{ color_primario }};"></span>
+                <span>Se toman de Configuración. Para cambiarlos, edítalos allí.</span>
+            </div>
+
+            <p id="pdf-filtros-resumen" style="font-size:11px;color:#6B7280;margin-top:14px;line-height:1.5;"></p>
+
+            <div style="display:flex;gap:10px;margin-top:20px;">
+                <button class="tb-btn-sec" onclick="cerrarModalPDF()" style="flex:1;">Cancelar</button>
+                <button class="tb-btn-pdf" id="pdf-btn-generar" onclick="generarPDF()" style="flex:2;justify-content:center;">
+                    <i class="fas fa-file-pdf"></i> <span id="pdf-btn-texto">Previsualizar</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ── Paso 2: previsualización (solo escritorio) ── -->
+        <div id="pdf-paso-preview" style="display:none;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                <h3 style="font-family:'Sora',sans-serif;font-size:17px;margin:0;">Previsualización</h3>
+                <button onclick="cerrarModalPDF()" style="background:none;border:none;font-size:20px;color:#9CA3AF;cursor:pointer;">&times;</button>
+            </div>
+
+            <iframe class="pdf-preview-frame" id="pdf-preview-frame"></iframe>
+
+            <div style="display:flex;gap:10px;margin-top:16px;">
+                <button class="tb-btn-sec" onclick="pdfVolverEditar()" style="flex:1;">Volver a editar</button>
+                <button class="tb-btn-pdf" onclick="pdfDescargar()" style="flex:2;justify-content:center;">
+                    <i class="fas fa-download"></i> Descargar
+                </button>
+            </div>
         </div>
 
     </div>
@@ -1756,6 +1826,218 @@
         // Guardar el nuevo orden en el backend
         await guardarOrden();
     }
+
+    // ══════════════════════════════════════════════════════════════════
+    //  EXPORTAR TABLERO A PDF
+    //  Los canvas de Chart.js solo existen en el navegador, así que se
+    //  capturan aquí y se envían al backend, que arma el PDF con FPDF.
+    // ══════════════════════════════════════════════════════════════════
+
+    const PDF_ANCHO_CAPTURA = 1200;   // px — calidad uniforme en móvil y escritorio
+    let pdfBlob     = null;           // último PDF generado
+    let pdfUrlObj   = null;           // objectURL del iframe (hay que revocarlo)
+    const pdfEsMovil = window.matchMedia('(max-width: 820px)').matches;
+
+    function abrirModalPDF() {
+        // Título por defecto: el del tablero que ya está en el encabezado
+        const tituloTablero = document.querySelector('.tb-titulo')?.textContent?.trim() || 'Reporte analítico';
+        document.getElementById('pdf-titulo').value    = tituloTablero;
+        document.getElementById('pdf-subtitulo').value = '';
+        document.getElementById('pdf-notas').value     = '';
+
+        // Lista de visualizaciones, en el orden en que están en el tablero
+        const lista = document.getElementById('pdf-viz-lista');
+        lista.innerHTML = '';
+        vizGuardadas.forEach(v => {
+            const item = document.createElement('label');
+            item.className = 'pdf-viz-item';
+            item.innerHTML = `
+                <input type="checkbox" checked data-viz-id="${v.id}">
+                <span>${v.titulo}</span>
+                <span class="tipo">${v.tipo}</span>`;
+            lista.appendChild(item);
+        });
+
+        document.getElementById('pdf-filtros-resumen').textContent = pdfResumenFiltros();
+        document.getElementById('pdf-btn-texto').textContent = pdfEsMovil ? 'Generar y descargar' : 'Previsualizar';
+
+        pdfVolverEditar();   // asegura que arranque en el paso de configuración
+        document.getElementById('modal-pdf').style.display = 'flex';
+    }
+
+    function cerrarModalPDF() {
+        document.getElementById('modal-pdf').style.display = 'none';
+        if (pdfUrlObj) { URL.revokeObjectURL(pdfUrlObj); pdfUrlObj = null; }
+        pdfBlob = null;
+    }
+
+    function pdfMarcarTodas(estado) {
+        document.querySelectorAll('#pdf-viz-lista input').forEach(c => c.checked = estado);
+    }
+
+    function pdfVolverEditar() {
+        document.getElementById('pdf-paso-config').style.display  = 'block';
+        document.getElementById('pdf-paso-preview').style.display = 'none';
+        document.getElementById('pdf-modal-box').classList.remove('previsualizando');
+    }
+
+    /** Texto legible de los filtros activos, para imprimirlo en el PDF. */
+    function pdfResumenFiltros() {
+        const sel   = document.getElementById('f-proyecto');
+        const proy  = sel.value ? sel.options[sel.selectedIndex].text : 'Todos los proyectos';
+        const desde = filtrosActivos.desde;
+        const hasta = filtrosActivos.hasta;
+
+        let rango = 'Sin filtro de fechas';
+        if (desde && hasta)      rango = `Del ${desde} al ${hasta}`;
+        else if (desde)          rango = `Desde ${desde}`;
+        else if (hasta)          rango = `Hasta ${hasta}`;
+
+        return `${proy} · ${rango}`;
+    }
+
+    /**
+     * Re-renderiza un gráfico a PDF_ANCHO_CAPTURA px en un canvas fuera de
+     * pantalla y lo devuelve como PNG base64. Sin esto, la captura sale a la
+     * resolución de la pantalla y en móvil el PDF se ve borroso.
+     */
+    async function pdfCapturarGrafico(vizId) {
+        const original = chartsInstancias[vizId];
+        if (!original) return null;
+
+        const alto = Math.round(PDF_ANCHO_CAPTURA * 0.5);
+
+        const contenedor = document.createElement('div');
+        contenedor.style.cssText =
+            `position:fixed;left:-99999px;top:0;width:${PDF_ANCHO_CAPTURA}px;height:${alto}px;background:#fff;`;
+        const canvas = document.createElement('canvas');
+        contenedor.appendChild(canvas);
+        document.body.appendChild(contenedor);
+
+        // Clona la configuración desactivando animación y responsive
+        const cfg = {
+            type:    original.config.type,
+            data:    JSON.parse(JSON.stringify(original.config.data)),
+            options: JSON.parse(JSON.stringify(original.config.options || {}))
+        };
+        cfg.options.responsive          = false;
+        cfg.options.maintainAspectRatio = false;
+        cfg.options.animation           = false;
+        cfg.options.devicePixelRatio    = 2;
+
+        let img = null;
+        try {
+            const temp = new Chart(canvas.getContext('2d'), cfg);
+            // Un frame para que termine de pintar antes de capturar
+            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+            img = temp.toBase64Image('image/png', 1.0);
+            temp.destroy();
+        } catch (e) {
+            console.error('Error capturando gráfico', vizId, e);
+        } finally {
+            contenedor.remove();
+        }
+        return img;
+    }
+
+    async function generarPDF() {
+        const btn = document.getElementById('pdf-btn-generar');
+        const txt = document.getElementById('pdf-btn-texto');
+
+        const seleccionados = Array.from(
+            document.querySelectorAll('#pdf-viz-lista input:checked')
+        ).map(c => c.dataset.vizId);
+
+        if (!seleccionados.length) {
+            mostrarToast('⚠️ Selecciona al menos una visualización');
+            return;
+        }
+
+        btn.disabled = true;
+        txt.textContent = 'Generando…';
+
+        try {
+            // Capturar en el mismo orden del tablero
+            const bloques = [];
+            for (const vizId of seleccionados) {
+                const viz = vizGuardadas.find(v => String(v.id) === String(vizId));
+                if (!viz) continue;
+
+                // Las tablas no tienen canvas: se envían como datos y FPDF
+                // las redibuja como tabla nativa (legible y seleccionable).
+                if (viz.tipo === 'tabla') {
+                    bloques.push({ id: viz.id, titulo: viz.titulo, tipo: 'tabla' });
+                    continue;
+                }
+
+                const imagen = await pdfCapturarGrafico(viz.id);
+                if (imagen) {
+                    bloques.push({ id: viz.id, titulo: viz.titulo, tipo: viz.tipo, imagen });
+                }
+            }
+
+            if (!bloques.length) {
+                mostrarToast('⚠️ No se pudo capturar ninguna visualización');
+                return;
+            }
+
+            const res = await fetch(`/api/bi/tableros/${TABLERO_ID}/exportar-pdf`, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({
+                    titulo:    document.getElementById('pdf-titulo').value.trim(),
+                    subtitulo: document.getElementById('pdf-subtitulo').value.trim(),
+                    notas:     document.getElementById('pdf-notas').value.trim(),
+                    filtros:   pdfResumenFiltros(),
+                    bloques
+                })
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || 'Error generando el PDF');
+            }
+
+            pdfBlob = await res.blob();
+
+            if (pdfEsMovil) {
+                pdfDescargar();               // el visor embebido no es fiable en móvil
+                cerrarModalPDF();
+            } else {
+                if (pdfUrlObj) URL.revokeObjectURL(pdfUrlObj);
+                pdfUrlObj = URL.createObjectURL(pdfBlob);
+                document.getElementById('pdf-preview-frame').src = pdfUrlObj;
+                document.getElementById('pdf-paso-config').style.display  = 'none';
+                document.getElementById('pdf-paso-preview').style.display = 'block';
+                document.getElementById('pdf-modal-box').classList.add('previsualizando');
+            }
+
+        } catch (e) {
+            console.error(e);
+            mostrarToast('❌ ' + e.message);
+        } finally {
+            btn.disabled = false;
+            txt.textContent = pdfEsMovil ? 'Generar y descargar' : 'Previsualizar';
+        }
+    }
+
+    function pdfDescargar() {
+        if (!pdfBlob) return;
+        const titulo = document.getElementById('pdf-titulo').value.trim() || 'reporte';
+        const nombre = titulo.replace(/[^\w\sáéíóúñÁÉÍÓÚÑ-]/g, '').trim().replace(/\s+/g, '_');
+
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(pdfBlob);
+        a.download = `${nombre}.pdf`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+        mostrarToast('✅ Reporte descargado');
+    }
+
+    // Cerrar al hacer clic fuera
+    document.getElementById('modal-pdf').addEventListener('click', function (e) {
+        if (e.target === this) cerrarModalPDF();
+    });
 
     // Cerrar modal al hacer clic fuera
     document.getElementById('modal-viz').addEventListener('click', function(e) {
