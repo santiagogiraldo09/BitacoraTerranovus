@@ -1897,24 +1897,34 @@
     }
 
     /**
-     * Re-renderiza un gráfico a PDF_ANCHO_CAPTURA px en un canvas fuera de
-     * pantalla y lo devuelve como PNG base64. Sin esto, la captura sale a la
-     * resolución de la pantalla y en móvil el PDF se ve borroso.
+     * Re-renderiza un gráfico a tamaño fijo en un canvas fuera de pantalla y
+     * lo devuelve como PNG base64.
+     * Con responsive:false Chart.js usa los atributos width/height del canvas
+     * (300x150 por defecto), no el tamaño del contenedor: hay que fijarlos.
      */
     async function pdfCapturarGrafico(vizId) {
         const original = chartsInstancias[vizId];
         if (!original) return null;
 
-        const alto = Math.round(PDF_ANCHO_CAPTURA * 0.5);
+        const viz    = vizGuardadas.find(v => String(v.id) === String(vizId));
+        const esDona = viz?.tipo === 'dona';
+
+        const ANCHO = 1000;
+        const ALTO  = esDona ? 520 : 500;
 
         const contenedor = document.createElement('div');
         contenedor.style.cssText =
-            `position:fixed;left:-99999px;top:0;width:${PDF_ANCHO_CAPTURA}px;height:${alto}px;background:#fff;`;
+            `position:fixed;left:-99999px;top:0;width:${ANCHO}px;height:${ALTO}px;background:#fff;`;
+
         const canvas = document.createElement('canvas');
+        // Clave: Chart.js lee estos atributos, no el CSS del contenedor
+        canvas.width  = ANCHO;
+        canvas.height = ALTO;
+        canvas.style.width  = ANCHO + 'px';
+        canvas.style.height = ALTO + 'px';
         contenedor.appendChild(canvas);
         document.body.appendChild(contenedor);
 
-        // Clona la configuración desactivando animación y responsive
         const cfg = {
             type:    original.config.type,
             data:    JSON.parse(JSON.stringify(original.config.data)),
@@ -1923,12 +1933,55 @@
         cfg.options.responsive          = false;
         cfg.options.maintainAspectRatio = false;
         cfg.options.animation           = false;
-        cfg.options.devicePixelRatio    = 2;
+        cfg.options.devicePixelRatio    = 2;   // nitidez sin cambiar proporciones
+
+        // La leyenda y el texto central de la dona son HTML, no canvas.
+        // Para el PDF se activa la leyenda nativa y se dibuja el centro.
+        const plugins = [];
+        if (esDona) {
+            cfg.options.plugins = cfg.options.plugins || {};
+            cfg.options.plugins.legend = {
+                display:  true,
+                position: 'right',
+                labels:   { boxWidth: 14, padding: 12, font: { size: 13 } }
+            };
+
+            // Se reutiliza el texto que ya está pintado en el DOM
+            const nodo   = document.querySelector(`#viz-body-${vizId} .tb-dona-centro`);
+            const lineas = nodo
+                ? nodo.innerText.split('\n').map(s => s.trim()).filter(Boolean)
+                : [];
+
+            if (lineas.length) {
+                plugins.push({
+                    id: 'centroDona',
+                    afterDraw(chart) {
+                        const meta = chart.getDatasetMeta(0);
+                        const el   = meta?.data?.[0];
+                        if (!el) return;
+                        const { x, y } = el;
+                        const ctx = chart.ctx;
+                        ctx.save();
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+
+                        // Línea grande al centro, las demás arriba y abajo
+                        const idxNum = lineas.length > 1 ? 1 : 0;
+                        lineas.forEach((linea, i) => {
+                            const esNum = i === idxNum;
+                            ctx.font = esNum ? 'bold 30px sans-serif' : '13px sans-serif';
+                            ctx.fillStyle = esNum ? '#1F2937' : '#6B7280';
+                            ctx.fillText(linea, x, y + (i - idxNum) * 26);
+                        });
+                        ctx.restore();
+                    }
+                });
+            }
+        }
 
         let img = null;
         try {
-            const temp = new Chart(canvas.getContext('2d'), cfg);
-            // Un frame para que termine de pintar antes de capturar
+            const temp = new Chart(canvas.getContext('2d'), { ...cfg, plugins });
             await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
             img = temp.toBase64Image('image/png', 1.0);
             temp.destroy();
