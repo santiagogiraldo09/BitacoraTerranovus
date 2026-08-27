@@ -767,3 +767,15 @@
     color: #EF4444;
     background: #FEF2F2;
 }
+
+/* El título ocupa su propia fila: un nombre de tablero largo no debe
+   competir por ancho con los filtros. */
+.an-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+}
+
+.an-header-acciones {
+    justify-content: flex-start;
+}
