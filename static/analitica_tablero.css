@@ -5,7 +5,7 @@
 
 /* ── Filtros globales en el header ── */
 .tb-filtros {
-    display: flex;
+    display: contents;
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
@@ -371,9 +371,14 @@
         align-items: stretch;
     }
 
-    .tb-filtros { width: 100%; }
+    /* Vuelve a ser un contenedor real para poder apilar en móvil */
+    .tb-filtros {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        width: 100%;
+    }
 
-    /* El proyecto ocupa toda la fila; las fechas van a mitades */
     .tb-filtro-select { flex: 1 1 100%; width: 100%; min-width: 0; }
     .tb-filtro-input  { flex: 1 1 calc(50% - 3px); width: auto; min-width: 0; }
 
@@ -725,9 +730,10 @@
 /* ── Barra superior: filtros y acciones ── */
 .an-header-acciones {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     align-items: center;
     flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .an-header-botones {
