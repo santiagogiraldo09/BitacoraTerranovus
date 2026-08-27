@@ -360,6 +360,9 @@
     // Chart.js instances
     const chartsInstancias = {};
 
+    // Campos disponibles para el tipo tabla, para poder re-renderizar la lista
+    let camposTablaDisponibles = [];
+
     // Estado vivo de cada tabla, para que la exportación a PDF lea
     // exactamente lo que el usuario tiene filtrado y ordenado en pantalla.
     const tablasEstado = {};
@@ -1498,31 +1501,85 @@
         });
 
         // Llenar lista de columnas para tipo tabla
-        const lista = document.getElementById('viz-columnas-lista');
-        lista.innerHTML = '';
-        const todosLosCampos = [
+        camposTablaDisponibles = [
             ...sueltos.map(c => ({ ...c, grupo: null, gid: null })),
             ...grupos.flatMap(g => g.campos.map(c => ({ ...c, grupo: g.nombre, gid: g.gid })))
         ];
-        todosLosCampos.forEach(c => {
-            const id  = `col-check-${c.id}`;
+        renderColumnasLista();
+
+        wrap.style.display = 'block';
+    }
+
+    /**
+     * Dibuja la lista de columnas con checkbox y controles de orden.
+     * Las seleccionadas se muestran primero, en el orden guardado; el resto
+     * queda debajo sin marcar. guardarViz lee el orden del DOM, así que
+     * reordenar aquí es lo único necesario para persistirlo.
+     * @param {Array} seleccionadas columnas guardadas: [{campo_id, gid}, ...]
+     */
+    function renderColumnasLista(seleccionadas = []) {
+        const lista = document.getElementById('viz-columnas-lista');
+        if (!lista) return;
+
+        const clave = c => `${c.campo_id ?? c.id}|${c.gid || ''}`;
+        const orden = seleccionadas.map(clave);
+
+        // Primero las guardadas en su orden; después las demás
+        const ordenados = [
+            ...seleccionadas
+                .map(sel => camposTablaDisponibles.find(c => clave(c) === clave(sel)))
+                .filter(Boolean),
+            ...camposTablaDisponibles.filter(c => !orden.includes(clave(c)))
+        ];
+
+        lista.innerHTML = '';
+        ordenados.forEach(c => {
+            const marcado = orden.includes(clave(c));
             const etq = c.grupo ? `${c.grupo} → ${c.nombre}` : c.nombre;
-            lista.innerHTML += `
-                <label style="display:flex;align-items:center;gap:8px;font-size:13px;
-                            cursor:pointer;padding:4px 0;">
-                    <input type="checkbox" id="${id}"
+
+            const fila = document.createElement('div');
+            fila.className = 'col-item';
+            fila.style.cssText =
+                'display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0;';
+            fila.innerHTML = `
+                <label style="display:flex;align-items:center;gap:8px;flex:1;
+                              cursor:pointer;min-width:0;">
+                    <input type="checkbox"
+                        ${marcado ? 'checked' : ''}
                         data-campo-id="${c.id}"
                         data-campo-nombre="${c.nombre}"
                         data-campo-tipo="${c.tipo}"
                         data-es-grupo="${c.grupo ? 'true' : 'false'}"
                         data-gid="${c.gid || ''}"
-                        style="width:15px;height:15px;cursor:pointer;
-                                accent-color:var(--naranja,#FFAF33);">
-                    ${etq}
-                </label>`;
+                        style="width:15px;height:15px;cursor:pointer;flex-shrink:0;
+                               accent-color:var(--naranja,#FFAF33);">
+                    <span style="overflow:hidden;text-overflow:ellipsis;
+                                 white-space:nowrap;">${etq}</span>
+                </label>
+                <button type="button" onclick="moverColumna(this,-1)" title="Subir"
+                        style="background:none;border:none;cursor:pointer;color:#9ca3af;
+                               font-size:13px;padding:2px 5px;line-height:1;">▲</button>
+                <button type="button" onclick="moverColumna(this,1)" title="Bajar"
+                        style="background:none;border:none;cursor:pointer;color:#9ca3af;
+                               font-size:13px;padding:2px 5px;line-height:1;">▼</button>`;
+            lista.appendChild(fila);
         });
+    }
 
-        wrap.style.display = 'block';
+    /** Mueve una columna una posición arriba (-1) o abajo (1). */
+    function moverColumna(btn, direccion) {
+        const fila = btn.closest('.col-item');
+        const destino = direccion === -1
+            ? fila.previousElementSibling
+            : fila.nextElementSibling;
+        if (!destino) return;
+
+        if (direccion === -1) {
+            fila.parentNode.insertBefore(fila, destino);
+        } else {
+            fila.parentNode.insertBefore(destino, fila);
+        }
+        fila.scrollIntoView({ block: 'nearest' });
     }
 
     // Parsear el valor del selector de campo: "id|tipo|gid"
@@ -1723,6 +1780,11 @@
         if (viz.tipo === 'linea') {
             document.getElementById('viz-campo-fecha-eje').value = ds.campo_fecha_eje || '';
             document.getElementById('viz-granularidad').value    = ds.granularidad || 'dia';
+        }
+
+        // Restaurar columnas de tabla con su orden guardado
+        if (viz.tipo === 'tabla') {
+            renderColumnasLista(ds.columnas || []);
         }
 
         // ── Restaurar títulos de ejes ──
