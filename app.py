@@ -1228,22 +1228,29 @@ def bi_exportar_pdf(tablero_id):
                     session.get('user_nombre') or '')
 
         # ── Visualizaciones ──
-        pdf.add_page()
-        for bloque in bloques:
-            tipo = bloque.get('tipo')
+        
+        # Las tablas van al final, como anexo: así el reporte mantiene
+        # orientación vertical de principio a fin y solo rota en los anexos.
+        graficos = [b for b in bloques if b.get('tipo') != 'tabla']
+        tablas   = [b for b in bloques if b.get('tipo') == 'tabla']
 
+        pdf.add_page()
+        for bloque in graficos:
+            tipo = bloque.get('tipo')
             if tipo == 'tarjetas':
                 pdf.bloque_tarjetas(bloque.get('titulo', ''), bloque.get('tarjetas') or [])
-            elif tipo == 'tabla':
-                pdf.bloque_tabla(bloque.get('titulo', ''),
-                                 bloque.get('columnas') or [],
-                                 bloque.get('filas') or [])
             elif bloque.get('imagen'):
                 pdf.bloque_grafico(bloque.get('titulo', ''), bloque['imagen'])
 
-        # ── Notas ──
+        # ── Notas (antes de los anexos) ──
         if notas:
             pdf.bloque_notas(notas)
+
+        # ── Anexo: tablas de datos ──
+        for bloque in tablas:
+            pdf.bloque_tabla(bloque.get('titulo', ''),
+                             bloque.get('columnas') or [],
+                             bloque.get('filas') or [])
 
         salida = pdf.output(dest='S')
         if isinstance(salida, str):
