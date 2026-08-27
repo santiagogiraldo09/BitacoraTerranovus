@@ -363,10 +363,27 @@
 }
 
 @media (max-width: 640px) {
-    .an-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+    .an-header { flex-direction: column; align-items: stretch; gap: 12px; }
+
+    .an-header-acciones {
+        width: 100%;
+        flex-direction: column;
+        align-items: stretch;
+    }
+
     .tb-filtros { width: 100%; }
-    .tb-filtro-select,
-    .tb-filtro-input { flex: 1; width: auto; }
+
+    /* El proyecto ocupa toda la fila; las fechas van a mitades */
+    .tb-filtro-select { flex: 1 1 100%; width: 100%; min-width: 0; }
+    .tb-filtro-input  { flex: 1 1 calc(50% - 3px); width: auto; min-width: 0; }
+
+    .tb-filtros-acciones { width: 100%; }
+    .tb-btn-aplicar,
+    .tb-btn-limpiar-f { flex: 1; justify-content: center; }
+
+    .an-header-botones { width: 100%; }
+    .an-btn-generar,
+    .tb-btn-pdf { flex: 1; justify-content: center; }
 }
 
 /* ── Dona / Anillo ── */
@@ -703,4 +720,44 @@
     height: 62vh;
     border: 1.5px solid #E5E7EB;
     border-radius: 10px;
+}
+
+/* ── Barra superior: filtros y acciones ── */
+.an-header-acciones {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.an-header-botones {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.tb-filtros-acciones {
+    display: flex;
+    gap: 6px;
+}
+
+.tb-btn-limpiar-f {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border-radius: 9px;
+    border: 1px solid var(--an-borde);
+    background: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    color: #6B7280;
+    white-space: nowrap;
+}
+.tb-btn-limpiar-f:hover {
+    border-color: #EF4444;
+    color: #EF4444;
+    background: #FEF2F2;
 }

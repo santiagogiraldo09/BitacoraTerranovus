@@ -71,7 +71,7 @@
                 </a>
                 <h1 class="an-title" id="tablero-nombre">Cargando...</h1>
             </div>
-            <div style="display:flex;gap:10px;align-items:center;">
+            <div class="an-header-acciones">
                 <!-- Filtros globales -->
                 <div class="tb-filtros">
                     <select id="f-proyecto" class="tb-filtro-select">
@@ -79,17 +79,25 @@
                     </select>
                     <input type="date" id="f-desde" class="tb-filtro-input" title="Desde">
                     <input type="date" id="f-hasta" class="tb-filtro-input" title="Hasta">
-                    <button class="tb-btn-aplicar" onclick="aplicarFiltros()">
-                        <i class="fas fa-filter"></i> Filtrar
-                    </button>
+                    <div class="tb-filtros-acciones">
+                        <button class="tb-btn-aplicar" onclick="aplicarFiltros()">
+                            <i class="fas fa-filter"></i> Filtrar
+                        </button>
+                        <button class="tb-btn-limpiar-f" onclick="limpiarFiltrosTablero()"
+                                title="Quitar filtros">
+                            <i class="fas fa-eraser"></i> Limpiar
+                        </button>
+                    </div>
                 </div>
                 {% if user_rol == 'admin' %}
-                <button class="an-btn-generar" onclick="abrirModalViz()">
-                    <i class="fas fa-plus"></i> Agregar
-                </button>
-                <button class="tb-btn-pdf" id="btn-exportar-pdf" onclick="abrirModalPDF()">
-                    <i class="fas fa-file-pdf"></i> Exportar PDF
-                </button>
+                <div class="an-header-botones">
+                    <button class="an-btn-generar" onclick="abrirModalViz()">
+                        <i class="fas fa-plus"></i> Agregar
+                    </button>
+                    <button class="tb-btn-pdf" id="btn-exportar-pdf" onclick="abrirModalPDF()">
+                        <i class="fas fa-file-pdf"></i> Exportar PDF
+                    </button>
+                </div>
                 {% endif %}
             </div>
         </header>
@@ -555,6 +563,14 @@
             document.getElementById(`viz-body-${viz.id}`).innerHTML =
                 `<p class="tb-viz-error"><i class="fas fa-exclamation-circle"></i> Error al cargar datos</p>`;
         }
+    }
+
+    function limpiarFiltrosTablero() {
+        document.getElementById('f-proyecto').value = '';
+        document.getElementById('f-desde').value    = '';
+        document.getElementById('f-hasta').value    = '';
+        aplicarFiltros();   // recarga las visualizaciones sin filtros
+        mostrarToast('✅ Filtros eliminados');
     }
 
     function renderVizTabla(viz, data) {
