@@ -1234,6 +1234,10 @@ def bi_exportar_pdf(tablero_id):
 
             if tipo == 'tarjetas':
                 pdf.bloque_tarjetas(bloque.get('titulo', ''), bloque.get('tarjetas') or [])
+            elif tipo == 'tabla':
+                pdf.bloque_tabla(bloque.get('titulo', ''),
+                                 bloque.get('columnas') or [],
+                                 bloque.get('filas') or [])
             elif bloque.get('imagen'):
                 pdf.bloque_grafico(bloque.get('titulo', ''), bloque['imagen'])
 
@@ -1281,6 +1285,7 @@ class _PDFTablero(FPDF):
         self.rgb            = rgb
         self.empresa        = empresa
         self.es_portada     = False
+        self.orientacion_actual = 'P'
 
     # ── Encabezado / pie automáticos ──
     def header(self):
@@ -1298,7 +1303,7 @@ class _PDFTablero(FPDF):
 
         # Franja de color
         self.set_fill_color(*self.rgb)
-        self.rect(15, 22, 180, 0.8, 'F')
+        self.rect(15, 22, self.w - 30, 0.8, 'F')
         self.ln(8)
 
     def footer(self):
@@ -1360,7 +1365,24 @@ class _PDFTablero(FPDF):
 
         self.es_portada = False
 
+    def _asegurar_vertical(self):
+        """Los gráficos y tarjetas van en vertical. Si la tabla anterior
+        dejó la página en horizontal, se abre una nueva vertical."""
+        if self.orientacion_actual != 'P':
+            self.add_page(orientation='P')
+            self.orientacion_actual = 'P'
+
+    def _ajustar(self, texto, ancho_mm):
+        """Recorta el texto a lo que quepa en el ancho dado, con puntos suspensivos."""
+        t = self._txt(texto)
+        if self.get_string_width(t) <= ancho_mm - 2:
+            return t
+        while t and self.get_string_width(t + '...') > ancho_mm - 2:
+            t = t[:-1]
+        return t + '...' if t else ''
+
     def bloque_grafico(self, titulo, imagen_b64):
+        self._asegurar_vertical()
         """Inserta un gráfico. Salta de página si no cabe completo."""
         ALTO_IMG   = 78    # mm
         ALTO_TOTAL = ALTO_IMG + 14
@@ -1389,6 +1411,7 @@ class _PDFTablero(FPDF):
         self.ln(6)
 
     def bloque_tarjetas(self, titulo, tarjetas):
+        self._asegurar_vertical()
         """Dibuja las tarjetas resumen como recuadros nativos, en filas de 3."""
         if not tarjetas:
             return
@@ -1435,6 +1458,104 @@ class _PDFTablero(FPDF):
             self.cell(ANCHO - 8, 6, self._txt(t.get('valor', '')), 0, 0, 'L')
 
         self.set_y(y0 + n_filas * (ALTO + GAP) + 5)
+
+    def bloque_tabla(self, titulo, columnas, filas):
+        """Dibuja la tabla con TODAS las columnas seleccionadas y TODAS las
+        filas que el usuario tiene filtradas. Las columnas se estrechan si son
+        muchas (el usuario decide si quita alguna); las filas paginan solas."""
+        if not columnas or not filas:
+            return
+
+        # Más de 6 columnas: hoja horizontal para ganar 77mm de ancho
+        orientacion = 'L' if len(columnas) > 6 else 'P'
+        self.add_page(orientation=orientacion)
+        self.orientacion_actual = orientacion
+
+        util = self.w - 30
+
+        # Ancho proporcional al contenido más largo (encabezado o celdas)
+        pesos = []
+        for col in columnas:
+            cid = col.get('campo_id')
+            muestras = [str(col.get('nombre', ''))]
+            muestras += [str(f.get(cid, '') or '') for f in filas[:60]]
+            pesos.append(min(max(len(m) for m in muestras), 40))
+
+        total_peso = sum(pesos) or 1
+        anchos = [p / total_peso * util for p in pesos]
+
+        # Totales de columnas numéricas (mismo criterio que la tabla en pantalla)
+        totales = {}
+        for col in columnas:
+            if col.get('tipo') == 'numero':
+                cid = col.get('campo_id')
+                suma = 0.0
+                for f in filas:
+                    try:
+                        suma += float(str(f.get(cid, '') or '0').replace(',', '.'))
+                    except ValueError:
+                        pass
+                totales[cid] = suma
+
+        def encabezado():
+            self.set_font('Helvetica', 'B', 7.5)
+            self.set_fill_color(55, 58, 64)
+            self.set_text_color(255, 255, 255)
+            for col, w in zip(columnas, anchos):
+                self.cell(w, 7, self._ajustar(col.get('nombre', ''), w), 1, 0, 'C', True)
+            self.ln()
+
+        self.set_font('Helvetica', 'B', 12)
+        self.set_text_color(30, 30, 30)
+        self.cell(0, 7, self._txt(titulo), 0, 1, 'L')
+        self.set_font('Helvetica', '', 8)
+        self.set_text_color(120, 120, 120)
+        self.cell(0, 5, self._txt(f"{len(filas)} registros"), 0, 1, 'L')
+        self.ln(1)
+
+        encabezado()
+
+        self.set_font('Helvetica', '', 7.5)
+        alto_fila = 5.5
+        alterno = False
+
+        for fila in filas:
+            # Salto de página conservando la orientación y repitiendo encabezado
+            if self.get_y() + alto_fila > self.h - 18:
+                self.add_page(orientation=orientacion)
+                encabezado()
+                self.set_font('Helvetica', '', 7.5)
+
+            self.set_fill_color(248, 249, 250) if alterno else self.set_fill_color(255, 255, 255)
+            self.set_text_color(50, 50, 50)
+
+            for col, w in zip(columnas, anchos):
+                valor = fila.get(col.get('campo_id'), '')
+                valor = '' if valor is None else str(valor)
+                alineacion = 'R' if col.get('tipo') == 'numero' else 'L'
+                self.cell(w, alto_fila, self._ajustar(valor, w), 1, 0, alineacion, True)
+            self.ln()
+            alterno = not alterno
+
+        # Fila de totales
+        if totales:
+            if self.get_y() + alto_fila > self.h - 18:
+                self.add_page(orientation=orientacion)
+                encabezado()
+            self.set_font('Helvetica', 'B', 7.5)
+            self.set_fill_color(*self.rgb)
+            self.set_text_color(255, 255, 255)
+            for col, w in zip(columnas, anchos):
+                cid = col.get('campo_id')
+                if cid in totales:
+                    txt = f"{totales[cid]:,.2f}".rstrip('0').rstrip('.')
+                    self.cell(w, alto_fila + 1, self._ajustar(txt, w), 1, 0, 'R', True)
+                else:
+                    self.cell(w, alto_fila + 1, '', 1, 0, 'C', True)
+            self.ln()
+
+        self.set_text_color(50, 50, 50)
+        self.ln(5)
 
     def bloque_notas(self, notas):
         if self.get_y() > 230:

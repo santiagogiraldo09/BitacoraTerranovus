@@ -360,6 +360,10 @@
     // Chart.js instances
     const chartsInstancias = {};
 
+    // Estado vivo de cada tabla, para que la exportación a PDF lea
+    // exactamente lo que el usuario tiene filtrado y ordenado en pantalla.
+    const tablasEstado = {};
+
     // Campos disponibles por formulario (caché)
     const camposCache = {};
 
@@ -563,6 +567,12 @@
         let paginaActual = 1;
         const porPagina  = 7;
         let filasFiltradas = [...todasFilas];
+
+         // El getter devuelve siempre la referencia actual, que cambia al filtrar
+        tablasEstado[viz.id] = {
+            columnas,
+            filas: () => filasFiltradas
+        };
 
         // Estado de ordenamiento
         let colOrden = null;
@@ -2032,8 +2042,28 @@
                     continue;
                 }
 
-                // Pendiente: las tablas requieren manejo de ancho y paginación
-                if (viz.tipo === 'tabla') continue;
+                // Las tablas se envían como datos: FPDF las redibuja nativas,
+                // respetando el filtro y el orden que el usuario tiene aplicado.
+                if (viz.tipo === 'tabla') {
+                    const est = tablasEstado[viz.id];
+                    if (est) {
+                        const filas = est.filas();
+                        if (filas.length) {
+                            bloques.push({
+                                id:       viz.id,
+                                titulo:   viz.titulo,
+                                tipo:     'tabla',
+                                columnas: est.columnas.map(c => ({
+                                    campo_id: c.campo_id,
+                                    nombre:   c.nombre,
+                                    tipo:     c.tipo
+                                })),
+                                filas
+                            });
+                        }
+                    }
+                    continue;
+                }
 
                 const imagen = await pdfCapturarGrafico(viz.id);
                 if (imagen) {
