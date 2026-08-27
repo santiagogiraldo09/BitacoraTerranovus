@@ -1230,10 +1230,12 @@ def bi_exportar_pdf(tablero_id):
         # ── Visualizaciones ──
         pdf.add_page()
         for bloque in bloques:
-            imagen_b64 = bloque.get('imagen')
-            if not imagen_b64:
-                continue   # las tablas se manejan aparte (ver nota al final)
-            pdf.bloque_grafico(bloque.get('titulo', ''), imagen_b64)
+            tipo = bloque.get('tipo')
+
+            if tipo == 'tarjetas':
+                pdf.bloque_tarjetas(bloque.get('titulo', ''), bloque.get('tarjetas') or [])
+            elif bloque.get('imagen'):
+                pdf.bloque_grafico(bloque.get('titulo', ''), bloque['imagen'])
 
         # ── Notas ──
         if notas:
@@ -1385,6 +1387,54 @@ class _PDFTablero(FPDF):
             self.cell(0, 6, 'No se pudo renderizar esta visualizacion', 0, 1)
 
         self.ln(6)
+
+    def bloque_tarjetas(self, titulo, tarjetas):
+        """Dibuja las tarjetas resumen como recuadros nativos, en filas de 3."""
+        if not tarjetas:
+            return
+
+        COLS, ANCHO, ALTO, GAP = 3, 58.0, 20.0, 3.0
+        n_filas    = (len(tarjetas) + COLS - 1) // COLS
+        alto_total = 12 + n_filas * (ALTO + GAP)
+
+        if self.get_y() + alto_total > 268:
+            self.add_page()
+
+        self.set_font('Helvetica', 'B', 12)
+        self.set_text_color(30, 30, 30)
+        self.cell(0, 7, self._txt(titulo), 0, 1, 'L')
+        self.ln(2)
+
+        x0 = 15.0
+        y0 = self.get_y()
+
+        for i, t in enumerate(tarjetas):
+            col, fila = i % COLS, i // COLS
+            x = x0 + col * (ANCHO + GAP)
+            y = y0 + fila * (ALTO + GAP)
+
+            # Fondo gris claro y franja del color de la empresa
+            self.set_fill_color(249, 250, 251)
+            self.rect(x, y, ANCHO, ALTO, 'F')
+            self.set_fill_color(*self.rgb)
+            self.rect(x, y, 1.6, ALTO, 'F')
+
+            # Etiqueta (truncada si no cabe)
+            label = self._txt(t.get('label', ''))
+            self.set_xy(x + 5, y + 4)
+            self.set_font('Helvetica', '', 8)
+            self.set_text_color(120, 120, 120)
+            while label and self.get_string_width(label) > ANCHO - 8:
+                label = label[:-1]
+            self.cell(ANCHO - 8, 4, label, 0, 0, 'L')
+
+            # Valor
+            self.set_xy(x + 5, y + 10)
+            self.set_font('Helvetica', 'B', 14)
+            self.set_text_color(30, 30, 30)
+            self.cell(ANCHO - 8, 6, self._txt(t.get('valor', '')), 0, 0, 'L')
+
+        self.set_y(y0 + n_filas * (ALTO + GAP) + 5)
 
     def bloque_notas(self, notas):
         if self.get_y() > 230:

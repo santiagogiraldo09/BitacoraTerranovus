@@ -2016,12 +2016,24 @@
                 const viz = vizGuardadas.find(v => String(v.id) === String(vizId));
                 if (!viz) continue;
 
-                // Las tablas no tienen canvas: se envían como datos y FPDF
-                // las redibuja como tabla nativa (legible y seleccionable).
-                if (viz.tipo === 'tabla') {
-                    bloques.push({ id: viz.id, titulo: viz.titulo, tipo: 'tabla' });
+                // Las tarjetas son HTML, no canvas: se leen del DOM y FPDF
+                // las redibuja como recuadros nativos.
+                if (viz.tipo === 'tarjetas') {
+                    const tarjetas = Array.from(
+                        document.querySelectorAll(`#viz-body-${viz.id} .tb-tarjeta`)
+                    ).map(t => ({
+                        label: t.querySelector('.tb-tarjeta-label')?.textContent.trim() || '',
+                        valor: t.querySelector('.tb-tarjeta-valor')?.textContent.trim() || ''
+                    })).filter(t => t.label || t.valor);
+
+                    if (tarjetas.length) {
+                        bloques.push({ id: viz.id, titulo: viz.titulo, tipo: 'tarjetas', tarjetas });
+                    }
                     continue;
                 }
+
+                // Pendiente: las tablas requieren manejo de ancho y paginación
+                if (viz.tipo === 'tabla') continue;
 
                 const imagen = await pdfCapturarGrafico(viz.id);
                 if (imagen) {
