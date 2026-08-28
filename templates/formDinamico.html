@@ -827,7 +827,7 @@
                     // Trazabilidad para el log de calidad
                     sesion_uuid:    SESION_VOZ,
                     orden:          ordenDictado,
-                    formulario_id:  FORMULARIO_ID,
+                    formulario_id:  parseInt(formularioId),
                     ...ultimaMetricaAudio
                 })
             });
@@ -858,9 +858,9 @@
             //     setTimeout(() => preguntarSiguienteFaltante(), 1000);
             // }
 
-        } catch {
+        } catch (e) {
+            console.error('[DISTRIBUIR] fallo:', e);
             mostrarToast('❌ Error al procesar');
-            mostrarEstado('idle');
         }
     }
 
