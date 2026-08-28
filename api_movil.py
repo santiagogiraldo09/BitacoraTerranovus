@@ -538,6 +538,22 @@ def api_movil_guardar_respuesta():
 
         r = supabase_client.table("respuestas_formulario").insert(fila).execute()
         nuevo_id = (r.data or [{}])[0].get("id")
+
+        # Enlazar transcripciones de esta sesión con el registro guardado
+        sesion_uuid = data.get("sesion_uuid")
+        if sesion_uuid and nuevo_id:
+            try:
+                from app import db_connection
+                with db_connection() as (conn, cursor):
+                    cursor.execute("""
+                        UPDATE transcripciones_log
+                        SET respuesta_id = %s
+                        WHERE sesion_uuid = %s AND respuesta_id IS NULL
+                    """, (nuevo_id, sesion_uuid))
+                    conn.commit()
+            except Exception as e:
+                print(f"[LOG-TRANS] No se pudo enlazar sesión móvil: {e}")
+
         return jsonify({"success": True, "id": nuevo_id})
 
     except Exception as e:
