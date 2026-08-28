@@ -665,20 +665,21 @@ def api_movil_config():
 @requiere_token
 def api_movil_distribuir():
     import app as appmod
+    import time
     u = request.usuario
     data = request.get_json(silent=True) or {}
-
-    # Inyectar empresa_id y user_id del token para que _log_transcripcion los use
     data['_empresa_id'] = _num(u['empresa_id'])
     data['_user_id'] = _num(u['uid'])
-
     try:
+        t_inicio = time.time()
         resultado, codigo = appmod.distribuir_campos_core(data)
+        ms_interpretacion = int((time.time() - t_inicio) * 1000)
+        if codigo == 200:
+            appmod._log_transcripcion(data, resultado, ms_interpretacion)
         return jsonify(resultado), codigo
     except Exception as e:
         current_app.logger.exception("api_movil_distribuir")
         return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
-
 
 # ==================== IDENTIDAD VISUAL ================================
 
