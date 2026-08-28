@@ -3556,6 +3556,21 @@ def guardar_respuesta_formulario(_reintento=0):
                 json.dumps(respuestas)
             ))
             nuevo_id = cursor.fetchone()[0]
+
+            # Enlazar las transcripciones de esta sesión con el registro final.
+            # Permite comparar lo que extrajo el modelo contra lo que quedó
+            # guardado, es decir, medir las correcciones manuales del usuario.
+            sesion_uuid = data.get('sesion_uuid')
+            if sesion_uuid:
+                try:
+                    cursor.execute("""
+                        UPDATE transcripciones_log
+                        SET respuesta_id = %s
+                        WHERE sesion_uuid = %s AND respuesta_id IS NULL
+                    """, (nuevo_id, sesion_uuid))
+                except Exception as e:
+                    print(f"[LOG-TRANS] No se pudo enlazar la sesión: {e}")
+
             return jsonify({'success': True, 'id': nuevo_id})
 
     except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
@@ -5590,24 +5605,33 @@ def transcribe_audio():
 
         # Exportar a WAV (Whisper acepta mp3, mp4, mpeg, mpga, m4a, wav, webm)
         audio.export(temp_wav.name, format="wav")
+        # Duración real del audio (pydub la expone en ms)
+        duracion_audio_ms = len(audio)
+        print(f"⏱️ [WHISPER] Duración del audio: {duracion_audio_ms} ms")
         print("🔄 [WHISPER] Exportado a WAV:", temp_wav.name)
 
         # Transcribir con Whisper API de OpenAI
         try:
+            t_inicio = time.time()
             with open(temp_wav.name, 'rb') as f:
                 transcription = openai_client.audio.transcriptions.create(
                     model="gpt-4o-transcribe",
                     file=f,
-                    language="es",  # español
+                    language="es",
                     prompt="Bitácora industrial IAC. Registros de campo con proyectos, formularios, clientes, contratistas, evidencias, observaciones y actividades. Se dictan correos electrónicos en formato nombre.apellido@empresa.com, ana_lopez@gmail.com, contacto@iac.com.co, carlos-mesa@outlook.com. Nombres colombianos comunes: Juan Pérez, María García, Andrés López, Camilo Ramírez, Santiago Giraldo. Cuando se escuche arroba se escribe @, punto se escribe ., guion bajo se escribe _, guion medio se escribe -. Dominios frecuentes: .com, .co, .com.co, .org."
                 )
+            ms_transcripcion = int((time.time() - t_inicio) * 1000)
             texto = transcription.text
-            print(f"✅ [WHISPER] Texto reconocido ({len(texto)} caracteres): {texto[:100]}...")
+            print(f"✅ [WHISPER] {len(texto)} caracteres en {ms_transcripcion} ms")
 
             return jsonify({
-                "text": texto,
+                "text":              texto,
                 "formato_detectado": formato_detectado,
-                "servicio": "whisper-api"  # ← marca clara para verificar
+                "servicio":          "whisper-api",
+                # Métricas para el log de calidad
+                "duracion_audio_ms": duracion_audio_ms,
+                "ms_transcripcion":  ms_transcripcion,
+                "modelo_transcribe": "gpt-4o-transcribe"
             })
 
         except Exception as e_whisper:
@@ -5633,13 +5657,62 @@ def transcribe_audio():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+def _log_transcripcion(data, resultado, ms_interpretacion):
+    """Registra la transcripción y lo que el modelo extrajo de ella.
+    Nunca interrumpe el flujo: si falla, solo se imprime."""
+    try:
+        texto = (data.get('transcripcion') or '').strip()
+        if not texto:
+            return
+
+        extraido = json.dumps({
+            'campos':       resultado.get('campos', {}),
+            'grupos':       resultado.get('grupos', {}),
+            'ambiguedades': resultado.get('ambiguedades', []),
+            'faltantes':    resultado.get('faltantes', [])
+        }, ensure_ascii=False)
+
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                INSERT INTO transcripciones_log
+                    (empresa_id, formulario_id, user_id, sesion_uuid, orden,
+                     texto, extraido, duracion_audio_ms, formato_audio,
+                     ms_transcripcion, ms_interpretacion,
+                     modelo_transcribe, modelo_interpreta)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                session.get('empresa_id'),
+                data.get('formulario_id'),
+                session.get('user_id'),
+                data.get('sesion_uuid') or str(uuid.uuid4()),
+                data.get('orden') or 1,
+                texto,
+                extraido,
+                data.get('duracion_audio_ms'),
+                data.get('formato_audio'),
+                data.get('ms_transcripcion'),
+                ms_interpretacion,
+                data.get('modelo_transcribe'),
+                'gpt-4o-mini'
+            ))
+            conn.commit()
+    except Exception as e:
+        print(f"[LOG-TRANS] No se pudo registrar la transcripción: {e}")
+
 @app.route('/api/distribuir-campos', methods=['POST'])
 def distribuir_campos():
     # La web valida por sesión; la lógica vive en distribuir_campos_core.
     if 'user_id' not in session:
         return jsonify({'error': 'No autorizado'}), 401
+
     data = request.get_json()
+    t_inicio = time.time()
     resultado, codigo = distribuir_campos_core(data)
+    ms_interpretacion = int((time.time() - t_inicio) * 1000)
+
+    if codigo == 200:
+        _log_transcripcion(data, resultado, ms_interpretacion)
+
     return jsonify(resultado), codigo
 
 
@@ -5650,7 +5723,6 @@ def distribuir_campos_core(data):
 
     respuesta_texto = ''
     try:
-        data          = request.get_json()
         transcripcion = data.get('transcripcion', '')
         sueltos       = data.get('sueltos', [])
         grupos        = data.get('grupos', [])

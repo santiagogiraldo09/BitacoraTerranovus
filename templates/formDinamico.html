@@ -511,6 +511,12 @@
         setTimeout(() => t.classList.remove('show'), 2500);
     }
 
+    // Identifica un llenado completo del formulario: agrupa todos los
+    // dictados que el usuario haga antes de guardar, incluidos reintentos.
+    const SESION_VOZ = (crypto.randomUUID?.() || String(Date.now()));
+    let ordenDictado = 0;
+    let ultimaMetricaAudio = {};
+
     // ── Voz central: variables ──
     let mediaRecorder = null;
     let audioChunks   = [];
@@ -692,6 +698,15 @@
             const res  = await fetch('/transcribe-audio', { method: 'POST', body: formData });
             const data = await res.json();
 
+            // Guardar métricas para enviarlas al distribuir
+            ordenDictado++;
+            ultimaMetricaAudio = {
+                duracion_audio_ms: data.duracion_audio_ms,
+                ms_transcripcion:  data.ms_transcripcion,
+                modelo_transcribe: data.modelo_transcribe,
+                formato_audio:     data.formato_detectado
+            };
+
             if (!data.text) {
                 mostrarToast('⚠️ No se detectó audio');
                 mostrarEstado('idle');
@@ -808,7 +823,12 @@
                 body:    JSON.stringify({
                     transcripcion: transcripcion,
                     sueltos:       sueltos,
-                    grupos:        grupos
+                    grupos:        grupos,
+                    // Trazabilidad para el log de calidad
+                    sesion_uuid:    SESION_VOZ,
+                    orden:          ordenDictado,
+                    formulario_id:  FORMULARIO_ID,
+                    ...ultimaMetricaAudio
                 })
             });
             const data = await res.json();
@@ -1699,7 +1719,8 @@
                 : {
                     formulario_id: parseInt(formularioId),
                     project_id:    parseInt(projectId),
-                    respuestas
+                    respuestas,
+                    sesion_uuid:   SESION_VOZ
                 };
 
             const res = await fetch(url, {
