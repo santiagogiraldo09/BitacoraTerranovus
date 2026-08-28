@@ -517,6 +517,11 @@
     let ordenDictado = 0;
     let ultimaMetricaAudio = {};
 
+    // Id del formulario tomado de la URL, disponible para toda la página
+    const FORM_ID_GLOBAL = parseInt(
+        new URLSearchParams(location.search).get('formulario_id')
+    ) || null;
+
     // ── Voz central: variables ──
     let mediaRecorder = null;
     let audioChunks   = [];
@@ -827,7 +832,7 @@
                     // Trazabilidad para el log de calidad
                     sesion_uuid:    SESION_VOZ,
                     orden:          ordenDictado,
-                    formulario_id:  parseInt(formularioId),
+                    formulario_id:  FORM_ID_GLOBAL,
                     ...ultimaMetricaAudio
                 })
             });
