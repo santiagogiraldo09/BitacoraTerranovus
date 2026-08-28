@@ -5672,6 +5672,9 @@ def _log_transcripcion(data, resultado, ms_interpretacion):
             'faltantes':    resultado.get('faltantes', [])
         }, ensure_ascii=False)
 
+        empresa_id = data.get('_empresa_id') or session.get('empresa_id')
+        user_id    = data.get('_user_id')    or session.get('user_id')
+
         with db_connection() as (conn, cursor):
             cursor.execute("""
                 INSERT INTO transcripciones_log
@@ -5681,9 +5684,9 @@ def _log_transcripcion(data, resultado, ms_interpretacion):
                      modelo_transcribe, modelo_interpreta)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (
-                session.get('empresa_id'),
+                empresa_id,
                 data.get('formulario_id'),
-                session.get('user_id'),
+                user_id,
                 data.get('sesion_uuid') or str(uuid.uuid4()),
                 data.get('orden') or 1,
                 texto,

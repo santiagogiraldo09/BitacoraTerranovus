@@ -665,9 +665,14 @@ def api_movil_config():
 @requiere_token
 def api_movil_distribuir():
     import app as appmod
+    u = request.usuario
     data = request.get_json(silent=True) or {}
+
+    # Inyectar empresa_id y user_id del token para que _log_transcripcion los use
+    data['_empresa_id'] = _num(u['empresa_id'])
+    data['_user_id'] = _num(u['uid'])
+
     try:
-        # distribuir_campos_core devuelve un dict listo para jsonify
         resultado, codigo = appmod.distribuir_campos_core(data)
         return jsonify(resultado), codigo
     except Exception as e:
