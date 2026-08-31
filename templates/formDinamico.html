@@ -533,6 +533,10 @@
         new URLSearchParams(location.search).get('formulario_id')
     ) || null;
 
+    const PROJECT_ID_GLOBAL = parseInt(
+        new URLSearchParams(location.search).get('project_id')
+    ) || null;
+
     // ── Voz central: variables ──
     let mediaRecorder = null;
     let audioChunks   = [];
@@ -1031,7 +1035,7 @@
             const clave = `${formOrigen}|${campoOrigen}`;
             try {
                 if (!cache[clave]) {
-                    const url = `/api/opciones-dinamicas?proyecto_id=${projectId}`
+                    const url = `/api/opciones-dinamicas?proyecto_id=${PROJECT_ID_GLOBAL}`
                               + `&formulario_id=${encodeURIComponent(formOrigen)}`
                               + `&campo=${encodeURIComponent(campoOrigen)}`;
                     const res = await fetch(url);
