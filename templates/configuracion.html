@@ -1861,8 +1861,6 @@
         document.getElementById('campo-opciones-group').style.display  = 'none';
         document.getElementById('opciones-lista').innerHTML             = '';
         document.getElementById('campo-feedback').textContent           = '';
-        document.getElementById('campo-con-codigo').checked = false;
-        document.getElementById('campo-con-codigo-group').style.display = 'none';
         document.getElementById('campo-con-valor').checked = false;
         document.getElementById('campo-con-valor-group').style.display = 'none';
         document.getElementById('valor-asociado-config').style.display = 'none';
@@ -1908,28 +1906,32 @@
 
     function onTipoCampoChange() {
         const tipo = document.getElementById('campo-tipo').value;
-        document.getElementById('campo-max-chars-group').style.display =
-            ['texto_corto', 'texto_largo'].includes(tipo) ? '' : 'none';
-        document.getElementById('campo-opciones-group').style.display =
-            ['seleccion', 'seleccion_unica'].includes(tipo) ? '' : 'none';
-        document.getElementById('campo-con-valor-group').style.display =
-            ['seleccion', 'seleccion_unica'].includes(tipo) ? '' : 'none';
+        const esSeleccion = ['seleccion', 'seleccion_unica'].includes(tipo);
+        const esDinamico  = tipo === 'seleccion_dinamica';
 
-        if (!['seleccion', 'seleccion_unica'].includes(tipo)) {
-            document.getElementById('campo-con-valor').checked = false;
-            toggleValorAsociado();
-        }
+        // Helpers: evitan que un id faltante aborte la función entera
+        const mostrar = (id, visible) => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = visible ? '' : 'none';
+        };
+        const desmarcar = id => {
+            const el = document.getElementById(id);
+            if (el) el.checked = false;
+        };
 
-        // Resetear checkbox si cambia de tipo
-        if (!['seleccion', 'seleccion_unica'].includes(tipo)) {
-            document.getElementById('campo-con-codigo').checked = false;
-            toggleCodigoOpciones();
+        mostrar('campo-max-chars-group', ['texto_corto', 'texto_largo'].includes(tipo));
+        mostrar('campo-opciones-group',  esSeleccion);
+        mostrar('campo-con-valor-group', esSeleccion);
+
+        if (!esSeleccion) {
+            desmarcar('campo-con-valor');
+            desmarcar('campo-con-codigo');
+            if (typeof toggleValorAsociado === 'function') toggleValorAsociado();
+            if (typeof toggleCodigoOpciones === 'function') toggleCodigoOpciones();
         }
 
         // Selección dinámica: origen de datos en lugar de opciones estáticas
-        const esDinamico = tipo === 'seleccion_dinamica';
-        document.getElementById('campo-dinamico-group').style.display =
-            esDinamico ? '' : 'none';
+        mostrar('campo-dinamico-group', esDinamico);
         if (esDinamico) cargarFormulariosOrigen();
     }
 
