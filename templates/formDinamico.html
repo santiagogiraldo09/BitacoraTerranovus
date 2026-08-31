@@ -218,6 +218,17 @@
                 </div>
                 {% endif %}
 
+                {% elif campo.tipo == 'seleccion_dinamica' %}
+                {% set conf = campo.configuracion or {} %}
+                <select class="field-select campo-respuesta seleccion-dinamica"
+                        data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                        data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"
+                        data-origen-formulario="{{ conf.get('formulario_id', '') }}"
+                        data-origen-campo="{{ conf.get('campo_etiqueta', '') }}"
+                        data-valor-actual="{{ valor }}"{{ extra }} disabled>
+                    <option value="">Cargando opciones...</option>
+                </select>
+
                 {% elif campo.tipo == 'booleano' %}
                 <div class="campo-check-wrapper">
                     <input type="checkbox" id="campo-{{ uid }}" class="campo-respuesta"
@@ -995,6 +1006,75 @@
             });
     }
 
+    /**
+     * Llena los selects de tipo seleccion_dinamica con los valores ya
+     * registrados en otro formulario del mismo proyecto.
+     * El id del registro va en data-asociado, así el guardado existente
+     * lo persiste como campo_id + '_codigo' sin cambios adicionales.
+     */
+    async function cargarSeleccionesDinamicas(contenedor = document) {
+        const selects = contenedor.querySelectorAll('select.seleccion-dinamica');
+        if (!selects.length) return;
+
+        // Cache por origen: varios campos pueden apuntar al mismo formulario
+        const cache = cargarSeleccionesDinamicas._cache ||= {};
+
+        for (const sel of selects) {
+            const formOrigen  = sel.dataset.origenFormulario;
+            const campoOrigen = sel.dataset.origenCampo;
+
+            if (!formOrigen || !campoOrigen) {
+                sel.innerHTML = '<option value="">Campo sin configurar</option>';
+                continue;
+            }
+
+            const clave = `${formOrigen}|${campoOrigen}`;
+            try {
+                if (!cache[clave]) {
+                    const url = `/api/opciones-dinamicas?proyecto_id=${projectId}`
+                              + `&formulario_id=${encodeURIComponent(formOrigen)}`
+                              + `&campo=${encodeURIComponent(campoOrigen)}`;
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error('HTTP ' + res.status);
+                    cache[clave] = await res.json();
+                }
+
+                const ops = cache[clave];
+
+                if (!ops.length) {
+                    sel.innerHTML = '<option value="">Sin registros previos</option>';
+                    continue;
+                }
+
+                sel.innerHTML = '<option value="">Selecciona...</option>';
+                ops.forEach(o => {
+                    const opt = new Option(o.value, o.value);
+                    opt.dataset.asociado = o.codigo;   // → se guarda como _codigo
+                    sel.appendChild(opt);
+                });
+
+                // Restaurar el valor en modo edición. Si el registro de origen
+                // se borró, se conserva igual para no perder el dato histórico.
+                const actual = sel.dataset.valorActual;
+                if (actual) {
+                    if (![...sel.options].some(o => o.value === actual)) {
+                        const huerfano = new Option(`${actual} (ya no disponible)`, actual);
+                        sel.appendChild(huerfano);
+                    }
+                    sel.value = actual;
+                }
+
+                sel.disabled = false;
+
+            } catch (e) {
+                console.error('[SEL-DIN] Error cargando opciones:', e);
+                sel.innerHTML = '<option value="">Error al cargar</option>';
+            }
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => cargarSeleccionesDinamicas());
+
     async function procesarRespuestaAmbiguedad() {
         document.getElementById('question-recording').style.display = 'none';
         document.getElementById('question-processing').style.display = 'flex';
@@ -1594,10 +1674,17 @@
             } else {
                 input.value = '';
             }
+            // El clon hereda las opciones ya cargadas: solo hay que
+            // limpiar la selección y el valor de edición heredado.
+            if (input.classList.contains('seleccion-dinamica')) {
+                input.selectedIndex = 0;
+                input.dataset.valorActual = '';
+            }
             input.classList.remove('campo-lleno');
         });
 
         cont.insertBefore(nuevo, cont.querySelector('.btn-rep-agregar'));
+        cargarSeleccionesDinamicas(nuevo);   // no-op si el clon ya venía lleno
         renumerarGrupo(gid);
         if (silencioso) return;
         nuevo.scrollIntoView({ block: 'nearest', behavior: 'smooth' });

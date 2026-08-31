@@ -609,6 +609,50 @@ def invitar_usuarios_core(data, admin_user_id, empresa_id, _reintento=0):
         return {'success': False, 'error': 'Ocurrió un error al procesar la invitación. Intenta de nuevo.'}, 500
 
 
+@app.route('/api/opciones-dinamicas')
+def opciones_dinamicas():
+    """Devuelve las opciones de un campo de selección dinámica: los valores
+    ya registrados en otro formulario del mismo proyecto."""
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    proyecto_id   = request.args.get('proyecto_id')
+    formulario_id = request.args.get('formulario_id')
+    campo         = request.args.get('campo')
+
+    if not all([proyecto_id, formulario_id, campo]):
+        return jsonify({'error': 'Faltan parámetros'}), 400
+
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT rf.id, rf.respuestas->>%s AS etiqueta
+                FROM respuestas_formulario rf
+                JOIN formularios f ON f.id = rf.formulario_id
+                WHERE rf.id_proyecto   = %s
+                  AND rf.formulario_id = %s
+                  AND f.empresa_id     = %s
+                  AND COALESCE(rf.respuestas->>%s, '') <> ''
+                ORDER BY rf.created_at DESC
+            """, (campo, proyecto_id, formulario_id,
+                  session.get('empresa_id'), campo))
+
+            vistos, opciones = set(), []
+            for rid, etiqueta in cursor.fetchall():
+                clave = etiqueta.strip().lower()
+                if clave in vistos:
+                    continue          # el mismo frente puede tener varias aperturas
+                vistos.add(clave)
+                opciones.append({'value': etiqueta.strip(), 'codigo': rid})
+
+            opciones.sort(key=lambda o: o['value'])
+            return jsonify(opciones)
+
+    except Exception as e:
+        print(f"Error en opciones-dinamicas: {e}")
+        return jsonify({'error': 'Error consultando opciones'}), 500
+
+
 # ── BI: CRUD de tableros ─────────────────────────────────────────────
 
 @app.route('/api/bi/tableros', methods=['GET'])
