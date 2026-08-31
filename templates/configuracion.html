@@ -306,6 +306,26 @@
                     </div>
                 </div>
 
+                <!-- Origen de datos (solo selección dinámica) -->
+                <div id="campo-dinamico-group" style="display:none;">
+                    <div class="invite-field">
+                        <label>Formulario de origen *</label>
+                        <select id="dinamico-formulario" onchange="cargarCamposOrigen()">
+                            <option value="">Selecciona un formulario</option>
+                        </select>
+                    </div>
+                    <div class="invite-field">
+                        <label>Campo que será la opción *</label>
+                        <select id="dinamico-campo" disabled>
+                            <option value="">Primero elige un formulario</option>
+                        </select>
+                    </div>
+                    <p style="font-size:12px;color:#6b7280;line-height:1.5;margin-top:-6px;">
+                        Las opciones se generan con los valores ya registrados en ese
+                        campo, dentro del mismo proyecto.
+                    </p>
+                </div>
+
                 <!-- Checkbox: opciones con código (solo selección) -->
                 <div id="campo-con-valor-group" style="display:none;">
                     <div class="invite-field" style="display:flex; align-items:center; gap:10px; margin-top:4px;">
@@ -1850,6 +1870,9 @@
         document.getElementById('etiqueta-derecha').value = '';
         document.getElementById('radio-label-izq').textContent = 'Izquierda';
         document.getElementById('radio-label-der').textContent = 'Derecha';
+        document.getElementById('dinamico-formulario').value = '';
+        document.getElementById('dinamico-campo').innerHTML =           
+            '<option value="">Primero elige un formulario</option>';
     }
 
     function toggleValorAsociado() {
@@ -1901,6 +1924,67 @@
         if (!['seleccion', 'seleccion_unica'].includes(tipo)) {
             document.getElementById('campo-con-codigo').checked = false;
             toggleCodigoOpciones();
+        }
+
+        // Selección dinámica: origen de datos en lugar de opciones estáticas
+        const esDinamico = tipo === 'seleccion_dinamica';
+        document.getElementById('campo-dinamico-group').style.display =
+            esDinamico ? '' : 'none';
+        if (esDinamico) cargarFormulariosOrigen();
+    }
+
+    /** Llena el desplegable de formularios de origen. */
+    async function cargarFormulariosOrigen() {
+        const sel = document.getElementById('dinamico-formulario');
+        if (sel.options.length > 1) return;   // ya cargado
+
+        try {
+            const res  = await fetch('/api/formularios');
+            const data = await res.json();
+            (data.formularios || []).forEach(f => {
+                sel.appendChild(new Option(f.nombre, f.id));
+            });
+        } catch (e) {
+            console.error('[SEL-DIN] Error cargando formularios:', e);
+        }
+    }
+
+    /** Llena el desplegable de campos del formulario elegido. */
+    async function cargarCamposOrigen(valorPreseleccionado = '') {
+        const selForm  = document.getElementById('dinamico-formulario');
+        const selCampo = document.getElementById('dinamico-campo');
+        const formId   = selForm.value;
+
+        selCampo.innerHTML = '<option value="">Cargando...</option>';
+        selCampo.disabled  = true;
+        if (!formId) {
+            selCampo.innerHTML = '<option value="">Primero elige un formulario</option>';
+            return;
+        }
+
+        try {
+            const res  = await fetch(`/api/bi/campos?formulario_id=${formId}`);
+            const data = await res.json();
+
+            selCampo.innerHTML = '<option value="">Selecciona un campo</option>';
+
+            // Campos sueltos y de grupos: se usa el id porque es la clave
+            // con la que se guarda el valor dentro del JSONB respuestas
+            (data.sueltos || []).forEach(c => {
+                selCampo.appendChild(new Option(c.nombre, c.id));
+            });
+            (data.grupos || []).forEach(g => {
+                (g.campos || []).forEach(c => {
+                    selCampo.appendChild(new Option(`${g.nombre} → ${c.nombre}`, c.id));
+                });
+            });
+
+            if (valorPreseleccionado) selCampo.value = valorPreseleccionado;
+            selCampo.disabled = false;
+
+        } catch (e) {
+            console.error('[SEL-DIN] Error cargando campos:', e);
+            selCampo.innerHTML = '<option value="">Error al cargar</option>';
         }
     }
 
@@ -1964,6 +2048,22 @@
             configuracion.etiqueta_izquierda = document.getElementById('etiqueta-izquierda').value.trim() || 'Izquierda';
             configuracion.etiqueta_derecha   = document.getElementById('etiqueta-derecha').value.trim() || 'Derecha';
             configuracion.mostrar_como       = document.querySelector('input[name="mostrar-como"]:checked')?.value || 'izquierda';
+        }
+
+        // Configuración del origen para selección dinámica
+        if (tipo === 'seleccion_dinamica') {
+            const formOrigen  = document.getElementById('dinamico-formulario').value;
+            const campoOrigen = document.getElementById('dinamico-campo').value;
+
+            if (!formOrigen || !campoOrigen) {
+                fb.textContent = 'Selecciona el formulario y el campo de origen.';
+                fb.className   = 'invite-feedback error';
+                return;
+            }
+
+            configuracion.origen         = 'formulario';
+            configuracion.formulario_id  = parseInt(formOrigen);
+            configuracion.campo_etiqueta = String(campoOrigen);
         }
 
         try {
@@ -2053,6 +2153,14 @@
             document.getElementById('campo-nombre').value = campo.nombre;
             document.getElementById('campo-tipo').value   = campo.tipo;
             document.getElementById('campo-objeto').value = campo.objeto || 'formulario';
+
+            // Restaurar origen de la selección dinámica
+            if (campo.tipo === 'seleccion_dinamica' && campo.configuracion) {
+                await cargarFormulariosOrigen();
+                document.getElementById('dinamico-formulario').value =
+                    campo.configuracion.formulario_id || '';
+                await cargarCamposOrigen(campo.configuracion.campo_etiqueta || '');
+            }
 
             // Mostrar/ocultar secciones según el tipo
             onTipoCampoChange();
