@@ -63,9 +63,11 @@
                     title="Exportar a Excel" style="display:none;">
                 <i class="fas fa-download"></i>
             </button>
+            {% if empresa_id == 14 %}
             <button class="btn-exportar" onclick="abrirModalInforme()" title="Informe de avance">
                 <i class="fas fa-file-contract"></i>
             </button>
+            {% endif %}
         </div>
 
         <!-- Lista de registros -->
@@ -472,45 +474,44 @@
 
 <!-- Modal informe de obra -->
 <div class="modal-overlay" id="modal-informe">
-    <div class="modal-box">
+    <div class="modal-box" style="text-align:left;">
         <h3 class="modal-title" style="margin-bottom:16px;">
-            <i class="fas fa-file-contract" style="color:var(--naranja);"></i>
-            Informe de avance de obra
+            <i class="fas fa-file-contract" style="color:var(--naranja);"></i> Informe de avance de obra
         </h3>
 
-        <div style="display:flex; gap:10px;">
+        <div style="display:flex; gap:12px; margin-bottom:14px;">
             <div style="flex:1;">
-                <label class="modal-label">Desde</label>
-                <input type="date" id="inf-desde" class="modal-input">
+                <label style="font-size:13px; font-weight:600; color:#4b5563; display:block; margin-bottom:4px;">Desde</label>
+                <input type="date" id="inf-desde" style="width:100%; padding:10px 12px; border:1.5px solid #e5e7eb; border-radius:8px; font-size:14px; font-family:'DM Sans',sans-serif; box-sizing:border-box;">
             </div>
             <div style="flex:1;">
-                <label class="modal-label">Hasta</label>
-                <input type="date" id="inf-hasta" class="modal-input">
-            </div>
-        </div>
-
-        <div style="display:flex; gap:10px; margin-top:12px;">
-            <div style="flex:1;">
-                <label class="modal-label">% Planeado</label>
-                <input type="number" id="inf-planeado" class="modal-input"
-                       step="0.01" min="0" max="100" placeholder="11.34">
-            </div>
-            <div style="flex:1;">
-                <label class="modal-label">% Ejecutado</label>
-                <input type="number" id="inf-ejecutado" class="modal-input"
-                       step="0.01" min="0" max="100" placeholder="9.04">
+                <label style="font-size:13px; font-weight:600; color:#4b5563; display:block; margin-bottom:4px;">Hasta</label>
+                <input type="date" id="inf-hasta" style="width:100%; padding:10px 12px; border:1.5px solid #e5e7eb; border-radius:8px; font-size:14px; font-family:'DM Sans',sans-serif; box-sizing:border-box;">
             </div>
         </div>
 
-        <p id="inf-variacion" style="font-size:12px;color:#6b7280;margin-top:10px;"></p>
+        <div style="display:flex; gap:12px; margin-bottom:8px;">
+            <div style="flex:1;">
+                <label style="font-size:13px; font-weight:600; color:#4b5563; display:block; margin-bottom:4px;">% Planeado</label>
+                <input type="number" id="inf-planeado" step="0.01" min="0" max="100" placeholder="11.34" style="width:100%; padding:10px 12px; border:1.5px solid #e5e7eb; border-radius:8px; font-size:14px; font-family:'DM Sans',sans-serif; box-sizing:border-box;">
+            </div>
+            <div style="flex:1;">
+                <label style="font-size:13px; font-weight:600; color:#4b5563; display:block; margin-bottom:4px;">% Ejecutado</label>
+                <input type="number" id="inf-ejecutado" step="0.01" min="0" max="100" placeholder="9.04" style="width:100%; padding:10px 12px; border:1.5px solid #e5e7eb; border-radius:8px; font-size:14px; font-family:'DM Sans',sans-serif; box-sizing:border-box;">
+            </div>
+        </div>
 
-        <button class="modal-btn" onclick="descargarInforme()"
-                style="background:var(--naranja); color:white; width:100%; padding:12px;
-                       border-radius:8px; font-weight:600; margin-top:16px;">
-            <i class="fas fa-download"></i> Descargar informe
-        </button>
-        <button class="modal-btn" onclick="cerrarModalInforme()"
-                style="width:100%; padding:10px; margin-top:8px;">Cancelar</button>
+        <p id="inf-variacion" style="font-size:12px; color:#6b7280; margin:0 0 18px; min-height:16px;"></p>
+
+        <div style="display:flex; flex-direction:column; gap:8px;">
+            <button class="modal-btn" onclick="descargarInforme()"
+                    style="background:var(--naranja); color:white; width:100%; padding:12px; border-radius:8px; font-weight:600;">
+                <i class="fas fa-download"></i> Descargar informe
+            </button>
+            <button class="modal-btn modal-btn-cancel" onclick="cerrarModalInforme()" style="width:100%;">
+                Cancelar
+            </button>
+        </div>
     </div>
 </div>
 

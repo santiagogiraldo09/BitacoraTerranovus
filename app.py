@@ -1856,6 +1856,12 @@ def informe_obra(proyecto_id):
     if 'user_id' not in session:
         return jsonify({'error': 'No autorizado'}), 401
 
+    # El informe está construido sobre la estructura de formularios de
+    # Ingeniarcol (ids fijos en INFORME_OBRA_CFG), así que no aplica a
+    # otras empresas.
+    if session.get('empresa_id') != EMPRESA_INFORME_OBRA:
+        return jsonify({'error': 'Función no disponible para esta empresa'}), 403
+
     desde     = request.args.get('desde') or None
     hasta     = request.args.get('hasta') or None
     planeado  = _io_num(request.args.get('planeado'))
@@ -1863,6 +1869,7 @@ def informe_obra(proyecto_id):
     variacion = round(ejecutado - planeado, 2)
 
     C = INFORME_OBRA_CFG
+    EMPRESA_INFORME_OBRA = 14   # Ingeniarcol SAS
 
     try:
         with db_connection() as (conn, cursor):
@@ -3523,7 +3530,8 @@ def vista_proyecto(project_id):
                            proyecto=proyecto,
                            formularios_proy=formularios_proy,
                            logo_actual=logo_actual,
-                           color_primario=color_primario)
+                           color_primario=color_primario,
+                           empresa_id=empresa_id)
 
 
 # ── API: registros del proyecto ─────────────────────────────────
