@@ -1733,6 +1733,59 @@ def _io_fecha(valor):
             continue
     return raw
 
+INFORME_OBRA_EVIDENCIA_IDS = ['164', '133', '98']   # ids de campos de imagen
+INFORME_OBRA_MAX_FOTOS     = 40                     # tope por informe (RAM en Render)
+
+
+def _io_urls(valor):
+    """El campo de imagen guarda una URL suelta o un array JSON de URLs."""
+    raw = str(valor or '').strip()
+    if not raw:
+        return []
+    if raw.startswith('['):
+        try:
+            return [u for u in json.loads(raw) if isinstance(u, str) and u.strip()]
+        except (ValueError, TypeError):
+            return []
+    return [raw]
+
+
+def _io_evidencias_de(bloque):
+    """Extrae todas las URLs de imagen de un dict de respuestas."""
+    urls = []
+    for cid in INFORME_OBRA_EVIDENCIA_IDS:
+        urls += _io_urls(bloque.get(cid))
+    return urls
+
+
+def _io_imagen_temp(url, ancho_px=900):
+    """Descarga una imagen y la redimensiona antes de insertarla.
+    Redimensionar es obligatorio: fotos de celular de 4 MB agotarían
+    los 512 MB de RAM del plan de Render."""
+    try:
+        r = requests.get(url, timeout=12)
+        if not r.ok:
+            return None
+        im = Image.open(BytesIO(r.content))
+        if im.mode in ('RGBA', 'P', 'LA'):
+            fondo = Image.new('RGB', im.size, (255, 255, 255))
+            fondo.paste(im.convert('RGBA'), mask=im.convert('RGBA').split()[-1])
+            im = fondo
+        else:
+            im = im.convert('RGB')
+
+        if im.width > ancho_px:
+            alto = int(im.height * ancho_px / im.width)
+            im = im.resize((ancho_px, alto), Image.LANCZOS)
+
+        tmp = NamedTemporaryFile(delete=False, suffix='.jpg')
+        im.save(tmp.name, 'JPEG', quality=80)
+        ratio = im.height / im.width
+        im.close()
+        return tmp.name, ratio
+    except Exception as e:
+        print(f"[INFORME] No se pudo cargar la imagen: {e}")
+        return None
 
 class _PDFInformeObra(FPDF):
     """Informe de avance de contrato de obra, con marca de la empresa."""
@@ -1847,6 +1900,74 @@ class _PDFInformeObra(FPDF):
         while t and self.get_string_width(t + '...') > ancho - 2:
             t = t[:-1]
         return t + '...' if t else ''
+
+    def bloque_evidencias(self, evidencias):
+        """Registro fotográfico: dos por fila, con leyenda de origen."""
+        if not evidencias:
+            self.set_font('Helvetica', 'I', 9)
+            self.set_text_color(150, 150, 150)
+            self.cell(0, 6, self._txt('Sin evidencias fotograficas en el periodo.'), 0, 1)
+            self.set_text_color(40, 40, 40)
+            return
+
+        ANCHO, GAP = 86.0, 8.0
+        col = 0
+        y_fila = self.get_y()
+        alto_fila = 0
+
+        for ev in evidencias[:INFORME_OBRA_MAX_FOTOS]:
+            descargada = _io_imagen_temp(ev['url'])
+            if not descargada:
+                continue
+            ruta, ratio = descargada
+
+            alto_img = min(ANCHO * ratio, 62)
+            alto_bloque = alto_img + 13
+
+            if col == 0:
+                self._espacio(alto_bloque)
+                y_fila = self.get_y()
+                alto_fila = 0
+
+            x = 15 + col * (ANCHO + GAP)
+            try:
+                self.image(ruta, x=x, y=y_fila, w=ANCHO, h=alto_img)
+            except Exception as e:
+                print(f"[INFORME] Error insertando imagen: {e}")
+            finally:
+                try:
+                    os.remove(ruta)      # se libera de inmediato
+                except OSError:
+                    pass
+
+            # Leyenda: origen, fecha, frente
+            self.set_xy(x, y_fila + alto_img + 1)
+            self.set_font('Helvetica', 'B', 7)
+            self.set_text_color(*self.rgb)
+            self.cell(ANCHO, 3.5, self._recortar(ev['origen'], ANCHO), 0, 2)
+            self.set_font('Helvetica', '', 7)
+            self.set_text_color(110, 110, 110)
+            self.cell(ANCHO, 3.5, self._recortar(ev['detalle'], ANCHO), 0, 2)
+            if ev.get('nota'):
+                self.cell(ANCHO, 3.5, self._recortar(ev['nota'], ANCHO), 0, 2)
+            self.set_text_color(40, 40, 40)
+
+            alto_fila = max(alto_fila, alto_bloque)
+            col += 1
+            if col == 2:
+                col = 0
+                self.set_y(y_fila + alto_fila + 5)
+
+        if col == 1:
+            self.set_y(y_fila + alto_fila + 5)
+
+        total = len(evidencias)
+        if total > INFORME_OBRA_MAX_FOTOS:
+            self.set_font('Helvetica', 'I', 8)
+            self.set_text_color(150, 150, 150)
+            self.cell(0, 5, self._txt(
+                f'Se muestran {INFORME_OBRA_MAX_FOTOS} de {total} evidencias.'), 0, 1)
+            self.set_text_color(40, 40, 40)
 
 @app.route('/api/informe-obra/<int:proyecto_id>')
 def informe_obra(proyecto_id):
@@ -1975,6 +2096,8 @@ def informe_obra(proyecto_id):
         pdf.titulo_seccion('AVANCES POR FRENTE / COMPONENTE')
         ap = C['apertura']
 
+        evidencias = []
+
         for fr in frentes:
             r  = fr['r']
             co = cortes_por_frente.get(str(fr['id']), {})
@@ -2083,6 +2206,28 @@ def informe_obra(proyecto_id):
                       a.get(ca['responsable'], '')] for a in acts]
                 )
 
+            nombre_frente = r.get(ap['frente'], 'Frente sin nombre')
+
+            # Evidencias de actividades
+            for a in acts:
+                for u in _io_evidencias_de(a):
+                    evidencias.append({
+                        'url':     u,
+                        'origen':  'EVIDENCIA DE ACTIVIDAD',
+                        'detalle': f"{_io_fecha(a.get(ca['fecha']))} · {nombre_frente}",
+                        'nota':    a.get(ca['descripcion'], '')
+                    })
+
+            # Evidencias del avance físico (dentro del corte)
+            for m in metas:
+                for u in _io_evidencias_de(m):
+                    evidencias.append({
+                        'url':     u,
+                        'origen':  'EVIDENCIA DE AVANCE FISICO',
+                        'detalle': nombre_frente,
+                        'nota':    m.get(cc['meta'], '')
+                    })
+
         # ── Novedades ──
         cn = C['novedad']
         pdf.titulo_seccion('NOVEDADES')
@@ -2098,6 +2243,19 @@ def informe_obra(proyecto_id):
             pdf.set_text_color(150, 150, 150)
             pdf.cell(0, 6, pdf._txt('Sin novedades registradas en el periodo.'), 0, 1)
             pdf.set_text_color(40, 40, 40)
+
+        # ── Registro fotográfico ──
+        for n in novedades:
+            for u in _io_evidencias_de(n):
+                evidencias.append({
+                    'url':     u,
+                    'origen':  'EVIDENCIA DE NOVEDAD',
+                    'detalle': f"{_io_fecha(n.get(cn['fecha']))} · {n.get(cn['tipo'], '')}",
+                    'nota':    n.get(cn['descripcion'], '')
+                })
+
+        pdf.titulo_seccion('REGISTRO FOTOGRAFICO')
+        pdf.bloque_evidencias(evidencias)
 
         salida = pdf.output(dest='S')
         if isinstance(salida, str):
