@@ -1338,18 +1338,56 @@ class _PDFTablero(FPDF):
         self.es_portada     = False
         self.orientacion_actual = 'P'
 
+        # Proporción real del logo (ancho/alto). Se lee una sola vez:
+        # el header se ejecuta en cada página y abrir el archivo ahí
+        # multiplicaría las lecturas de disco sin necesidad.
+        self.logo_ratio = 0
+        if logo_path:
+            try:
+                with Image.open(logo_path) as im:
+                    if im.height:
+                        self.logo_ratio = im.width / im.height
+            except Exception as e:
+                # Si el archivo no es legible, se descarta el logo
+                # en vez de fallar página por página.
+                print(f"[PDF] No se pudo leer la proporción del logo: {e}")
+                self.logo_path = None
+
+    def _dim_logo(self, alto_max, ancho_max):
+        """Dimensiones en mm que respetan la proporción del logo.
+
+        Ajusta primero por alto; si el resultado excede el ancho
+        disponible (logos muy apaisados), reajusta por ancho.
+        Devuelve (0, 0) si no hay logo utilizable.
+        """
+        if not self.logo_path or not self.logo_ratio:
+            return 0, 0
+
+        alto  = alto_max
+        ancho = alto * self.logo_ratio
+        if ancho > ancho_max:
+            ancho = ancho_max
+            alto  = ancho / self.logo_ratio
+        return round(ancho, 2), round(alto, 2)
+
     # ── Encabezado / pie automáticos ──
     def header(self):
         if self.es_portada:
             return
-        if self.logo_path:
+        x_titulo = 15
+        ancho, alto = self._dim_logo(alto_max=10, ancho_max=45)
+        if ancho:
             try:
-                self.image(self.logo_path, 15, 8, 16)
+                # Centrado vertical en la banda 8–18 mm, por encima de la franja.
+                self.image(self.logo_path, 15, 8 + (10 - alto) / 2, ancho, alto)
+                x_titulo = 15 + ancho + 5
             except Exception:
                 pass
+
         self.set_font('Helvetica', 'B', 9)
         self.set_text_color(90, 90, 90)
-        self.set_xy(34, 11)
+        # El título arranca donde termine el logo, no en un x fijo.
+        self.set_xy(x_titulo, 11)
         self.cell(0, 5, self._txt(self.titulo_tablero), 0, 1, 'L')
 
         # Franja de color
@@ -1376,10 +1414,11 @@ class _PDFTablero(FPDF):
         self.rect(0, 0, 210, 6, 'F')
 
         y = 60
-        if self.logo_path:
+        ancho, alto = self._dim_logo(alto_max=24, ancho_max=70)
+        if ancho:
             try:
-                self.image(self.logo_path, 85, y, 40)
-                y += 48
+                self.image(self.logo_path, (self.w - ancho) / 2, y, ancho, alto)
+                y += alto + 12
             except Exception:
                 y += 8
 
