@@ -1634,7 +1634,7 @@ class _PDFTablero(FPDF):
 #  Todo el mapeo de ids vive aquí: si se renombra o recrea un campo,
 #  este es el único punto a tocar.
 # ══════════════════════════════════════════════════════════════════
-
+EMPRESA_INFORME_OBRA = 14
 INFORME_OBRA_CFG = {
     # Campos del tipo de proyecto (proyectos.datos_tipo)
     'proyecto': {
@@ -1990,7 +1990,6 @@ def informe_obra(proyecto_id):
     variacion = round(ejecutado - planeado, 2)
 
     C = INFORME_OBRA_CFG
-    EMPRESA_INFORME_OBRA = 14   # Ingeniarcol SAS
 
     try:
         with db_connection() as (conn, cursor):
