@@ -1879,32 +1879,70 @@ class _PDFInformeObra(FPDF):
             self.set_font('Helvetica', '', 9)
             self.cell(180 - ancho_etq, 6, self._txt(val), 1, 1, 'L')
 
+    def _lineas_necesarias(self, texto, ancho):
+        """Cuántas líneas ocupa el texto en el ancho dado, con la fuente actual."""
+        t = self._txt(texto).strip()
+        if not t:
+            return 1
+        disponible = ancho - 2
+        lineas, actual = 1, ''
+        for palabra in t.split():
+            tentativa = (actual + ' ' + palabra).strip()
+            if self.get_string_width(tentativa) <= disponible:
+                actual = tentativa
+            else:
+                # Palabra sola más ancha que la celda: se parte igual
+                if not actual:
+                    actual = palabra
+                    continue
+                lineas += 1
+                actual = palabra
+        return lineas
+
     def tabla(self, encabezados, anchos, filas, alineaciones=None):
-        """Tabla genérica con encabezado repetido al saltar de página."""
+        """Tabla con alto de fila variable: las celdas con texto largo
+        envuelven en varias líneas en lugar de recortarse."""
         if not filas:
             return
         alineaciones = alineaciones or ['L'] * len(encabezados)
+        ALTO_LINEA = 4.2
 
         def pintar_encabezado():
             self.set_font('Helvetica', 'B', 8)
             self.set_fill_color(60, 60, 60)
             self.set_text_color(255, 255, 255)
             for h, w in zip(encabezados, anchos):
-                self.cell(w, 6.5, self._txt(h), 1, 0, 'C', True)
+                self.cell(w, 6.5, self._recortar(h, w), 1, 0, 'C', True)
             self.ln()
             self.set_text_color(40, 40, 40)
+            self.set_font('Helvetica', '', 8)
 
         self._espacio(20)
         pintar_encabezado()
-        self.set_font('Helvetica', '', 8)
+
         for fila in filas:
-            if self.get_y() + 5.5 > self.h - 22:
+            valores = [str(v) if v is not None else '' for v in fila]
+
+            # El alto lo marca la celda que más líneas necesita
+            n_lineas = max(self._lineas_necesarias(v, w) for v, w in zip(valores, anchos))
+            alto = max(n_lineas * ALTO_LINEA, 5.5)
+
+            if self.get_y() + alto > self.h - 22:
                 self.add_page()
                 pintar_encabezado()
-                self.set_font('Helvetica', '', 8)
-            for valor, w, al in zip(fila, anchos, alineaciones):
-                self.cell(w, 5.5, self._recortar(valor, w), 1, 0, al)
-            self.ln()
+
+            y0 = self.get_y()
+            x  = self.l_margin
+
+            for valor, w, al in zip(valores, anchos, alineaciones):
+                # Recuadro completo primero, para que el borde cubra todo el alto
+                self.rect(x, y0, w, alto)
+                self.set_xy(x + 1, y0 + 0.6)
+                self.multi_cell(w - 2, ALTO_LINEA, self._txt(valor), 0, al)
+                x += w
+
+            self.set_xy(self.l_margin, y0 + alto)
+
         self.ln(3)
 
     def _recortar(self, texto, ancho):
