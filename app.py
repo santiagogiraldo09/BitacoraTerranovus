@@ -2253,6 +2253,9 @@ def informe_obra(proyecto_id):
                     'nota':    n.get(cn['descripcion'], '')
                 })
 
+        print(f"[INFORME] Evidencias recolectadas: {len(evidencias)}")
+        for ev in evidencias:
+            print(f"   - {ev['origen']} | {ev['url'][:70]}")
         pdf.titulo_seccion('REGISTRO FOTOGRAFICO')
         pdf.bloque_evidencias(evidencias)
 
