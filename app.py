@@ -1629,6 +1629,507 @@ class _PDFTablero(FPDF):
         return str(s or '').encode('latin-1', 'ignore').decode('latin-1')
 
 
+# ══════════════════════════════════════════════════════════════════
+#  INFORME DE AVANCE DE OBRA
+#  Todo el mapeo de ids vive aquí: si se renombra o recrea un campo,
+#  este es el único punto a tocar.
+# ══════════════════════════════════════════════════════════════════
+
+INFORME_OBRA_CFG = {
+    # Campos del tipo de proyecto (proyectos.datos_tipo)
+    'proyecto': {
+        'nombre':     '127',
+        'estado':     '128',
+        'objeto':     '135',
+        'alcance':    '136',
+        'contratista':'138',
+        'contrato_no':'139',
+    },
+    # Formulario 14 — Apertura de frente
+    'apertura': {
+        'formulario_id':     14,
+        'frente':            '140',
+        'ubicacion':         '141',
+        'tramo':             '142',
+        'tipo_elemento':     '129',
+        'tipo_intervencion': '130',
+        'fecha_ini_prog':    '143',
+        'fecha_fin_prog':    '145',
+    },
+    # Formulario 18 — Corte mensual del frente
+    'corte': {
+        'formulario_id':   18,
+        'frente_codigo':   '180_codigo',
+        'sub_etapa':       '131',
+        'estado_frente':   '132',
+        'fecha_ini_real':  '144',
+        'fecha_fin_real':  '181',
+        'dias_atraso':     '159',
+        'pct_fin_prog':    '165',
+        'pct_fin_ejec':    '166',
+        'ejec_fin_prog':   '167',
+        'ejec_fin_real':   '168',
+        'grupo_meta':      'gmthh3i4n58jb',
+        'meta':            '160',
+        'meta_unidad':     '148',
+        'meta_prog':       '161',
+        'meta_ejec':       '162',
+        'meta_obs':        '163',
+    },
+    # Formulario 15 — Actividad ejecutada
+    'actividad': {
+        'formulario_id':  15,
+        'frente_codigo':  '180_codigo',
+        'descripcion':    '171',
+        'fecha':          '172',
+        'responsable':    '173',
+        'grupo_material': 'gmthgmyqsg5lc',
+        'mat_pavimento':  '149',
+        'mat_uso':        '169',
+        'mat_material':   '151',
+        'mat_cantidad':   '170',
+        'mat_unidad':     '148',
+    },
+    # Formulario 17 — Novedad / Imprevisto
+    'novedad': {
+        'formulario_id': 17,
+        'frente_codigo': '180_codigo',
+        'tipo':          '153',
+        'impacto':       '154',
+        'estado':        '155',
+        'descripcion':   '174',
+        'fecha':         '175',
+        'observacion':   '176',
+    },
+}
+
+
+def _io_num(valor, decimales=2):
+    """Convierte a float un valor de texto del JSONB. 0.0 si no es numérico."""
+    try:
+        return round(float(str(valor or '0').strip().replace(',', '.')), decimales)
+    except (ValueError, TypeError):
+        return 0.0
+
+
+def _io_money(valor):
+    """Formatea un valor monetario al estilo del informe: $ 51.127.264.471,00"""
+    n = _io_num(valor)
+    entero = f"{n:,.2f}"
+    # Cambia separadores al formato colombiano
+    entero = entero.replace(',', '@').replace('.', ',').replace('@', '.')
+    return f"$ {entero}"
+
+
+def _io_fecha(valor):
+    """Normaliza una fecha del JSONB a dd/mm/aaaa. Cadena vacía si no aplica."""
+    raw = str(valor or '').strip()
+    if not raw:
+        return ''
+    for fmt in ('%Y-%m-%d', '%d/%m/%Y', '%d-%m-%Y'):
+        try:
+            return datetime.strptime(raw[:10], fmt).strftime('%d/%m/%Y')
+        except ValueError:
+            continue
+    return raw
+
+
+class _PDFInformeObra(FPDF):
+    """Informe de avance de contrato de obra, con marca de la empresa."""
+
+    def __init__(self, contrato_no='', logo_path=None, rgb=(255, 175, 51), empresa=''):
+        super().__init__(orientation='P', unit='mm', format='A4')
+        self.contrato_no = contrato_no
+        self.logo_path   = logo_path
+        self.rgb         = rgb
+        self.empresa     = empresa
+        self.set_auto_page_break(auto=True, margin=18)
+
+    # ── Encabezado y pie ──
+    def header(self):
+        if self.logo_path:
+            try:
+                self.image(self.logo_path, 15, 8, 15)
+            except Exception:
+                pass
+        self.set_font('Helvetica', 'B', 9)
+        self.set_text_color(90, 90, 90)
+        self.set_xy(33, 11)
+        self.cell(0, 5, self._txt('INFORME DE AVANCE CONTRATO DE OBRA EN EJECUCION'), 0, 1)
+        self.set_font('Helvetica', '', 8)
+        self.set_xy(33, 16)
+        self.cell(0, 4, self._txt(self.contrato_no), 0, 1)
+        self.set_fill_color(*self.rgb)
+        self.rect(15, 23, 180, 0.8, 'F')
+        self.ln(9)
+
+    def footer(self):
+        self.set_y(-13)
+        self.set_font('Helvetica', '', 8)
+        self.set_text_color(150, 150, 150)
+        self.cell(0, 5, self._txt(self.empresa), 0, 0, 'L')
+        self.cell(0, 5, f'Pagina {self.page_no()} de {{nb}}', 0, 0, 'R')
+
+    # ── Utilidades ──
+    @staticmethod
+    def _txt(s):
+        return str(s or '').encode('latin-1', 'ignore').decode('latin-1')
+
+    def _espacio(self, alto):
+        """Salta de página si el bloque no cabe completo."""
+        if self.get_y() + alto > self.h - 22:
+            self.add_page()
+
+    def titulo_seccion(self, texto):
+        self._espacio(14)
+        self.ln(3)
+        self.set_fill_color(*self.rgb)
+        self.set_text_color(255, 255, 255)
+        self.set_font('Helvetica', 'B', 10)
+        self.cell(180, 7, '  ' + self._txt(texto), 0, 1, 'L', True)
+        self.set_text_color(40, 40, 40)
+        self.ln(2)
+
+    def campo_largo(self, etiqueta, valor):
+        if not valor:
+            return
+        self._espacio(16)
+        self.set_font('Helvetica', 'B', 9)
+        self.cell(0, 5, self._txt(etiqueta), 0, 1)
+        self.set_font('Helvetica', '', 9)
+        self.set_text_color(70, 70, 70)
+        self.multi_cell(180, 4.6, self._txt(valor))
+        self.set_text_color(40, 40, 40)
+        self.ln(2)
+
+    def tabla_pares(self, filas, ancho_etq=70):
+        """Tabla de dos columnas: etiqueta | valor."""
+        self.set_font('Helvetica', '', 9)
+        for etq, val in filas:
+            self._espacio(8)
+            self.set_font('Helvetica', 'B', 9)
+            self.cell(ancho_etq, 6, self._txt(etq), 1, 0, 'L')
+            self.set_font('Helvetica', '', 9)
+            self.cell(180 - ancho_etq, 6, self._txt(val), 1, 1, 'L')
+
+    def tabla(self, encabezados, anchos, filas, alineaciones=None):
+        """Tabla genérica con encabezado repetido al saltar de página."""
+        if not filas:
+            return
+        alineaciones = alineaciones or ['L'] * len(encabezados)
+
+        def pintar_encabezado():
+            self.set_font('Helvetica', 'B', 8)
+            self.set_fill_color(60, 60, 60)
+            self.set_text_color(255, 255, 255)
+            for h, w in zip(encabezados, anchos):
+                self.cell(w, 6.5, self._txt(h), 1, 0, 'C', True)
+            self.ln()
+            self.set_text_color(40, 40, 40)
+
+        self._espacio(20)
+        pintar_encabezado()
+        self.set_font('Helvetica', '', 8)
+        for fila in filas:
+            if self.get_y() + 5.5 > self.h - 22:
+                self.add_page()
+                pintar_encabezado()
+                self.set_font('Helvetica', '', 8)
+            for valor, w, al in zip(fila, anchos, alineaciones):
+                self.cell(w, 5.5, self._recortar(valor, w), 1, 0, al)
+            self.ln()
+        self.ln(3)
+
+    def _recortar(self, texto, ancho):
+        t = self._txt(texto)
+        if self.get_string_width(t) <= ancho - 2:
+            return t
+        while t and self.get_string_width(t + '...') > ancho - 2:
+            t = t[:-1]
+        return t + '...' if t else ''
+
+@app.route('/api/informe-obra/<int:proyecto_id>')
+def informe_obra(proyecto_id):
+    """Genera el informe de avance de obra en PDF.
+    Filtros: actividades y novedades por su campo de fecha propio;
+    los cortes por created_at, porque sus fechas son de ejecución de obra."""
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    desde     = request.args.get('desde') or None
+    hasta     = request.args.get('hasta') or None
+    planeado  = _io_num(request.args.get('planeado'))
+    ejecutado = _io_num(request.args.get('ejecutado'))
+    variacion = round(ejecutado - planeado, 2)
+
+    C = INFORME_OBRA_CFG
+
+    try:
+        with db_connection() as (conn, cursor):
+            # ── Datos del contrato (tipo de proyecto) ──
+            cursor.execute("""
+                SELECT p.nombre_proyecto, p.datos_tipo, e.nombre, e.logo_url, e.color_primario
+                FROM proyectos p
+                JOIN empresas e ON e.id = p.empresa_id
+                WHERE p.id = %s AND p.empresa_id = %s
+            """, (proyecto_id, session.get('empresa_id')))
+            fila = cursor.fetchone()
+            if not fila:
+                return jsonify({'error': 'Proyecto no encontrado'}), 404
+
+            nombre_proy, datos_tipo, empresa_nombre, logo_url, color = fila
+            datos_tipo = datos_tipo or {}
+            cp = C['proyecto']
+
+            # ── Frentes: todos los del proyecto, sin filtro de fecha ──
+            cursor.execute("""
+                SELECT id, respuestas FROM respuestas_formulario
+                WHERE id_proyecto = %s AND formulario_id = %s
+                ORDER BY created_at
+            """, (proyecto_id, C['apertura']['formulario_id']))
+            frentes = [{'id': r[0], 'r': r[1] or {}} for r in cursor.fetchall()]
+
+            # ── Cortes: filtrados por created_at ──
+            sql = """SELECT respuestas, created_at FROM respuestas_formulario
+                     WHERE id_proyecto = %s AND formulario_id = %s"""
+            par = [proyecto_id, C['corte']['formulario_id']]
+            if desde:
+                sql += " AND created_at::date >= %s"; par.append(desde)
+            if hasta:
+                sql += " AND created_at::date <= %s"; par.append(hasta)
+            sql += " ORDER BY created_at ASC"
+            cursor.execute(sql, par)
+            cortes_raw = cursor.fetchall()
+
+            # ── Actividades y novedades: por su campo de fecha propio ──
+            def por_fecha(cfg):
+                s = """SELECT respuestas FROM respuestas_formulario
+                       WHERE id_proyecto = %s AND formulario_id = %s"""
+                p = [proyecto_id, cfg['formulario_id']]
+                if desde:
+                    s += " AND COALESCE(NULLIF(respuestas->>%s,''),'9999-12-31')::date >= %s"
+                    p += [cfg['fecha'], desde]
+                if hasta:
+                    s += " AND COALESCE(NULLIF(respuestas->>%s,''),'1900-01-01')::date <= %s"
+                    p += [cfg['fecha'], hasta]
+                s += " ORDER BY created_at"
+                cursor.execute(s, p)
+                return [r[0] or {} for r in cursor.fetchall()]
+
+            actividades = por_fecha(C['actividad'])
+            novedades   = por_fecha(C['novedad'])
+
+        # ── Agrupar por frente usando 180_codigo (id del registro de apertura) ──
+        cc = C['corte']
+        cortes_por_frente = {}
+        for resp, _ in cortes_raw:
+            resp = resp or {}
+            cortes_por_frente[str(resp.get(cc['frente_codigo'], ''))] = resp  # el último gana
+
+        ca = C['actividad']
+        act_por_frente = {}
+        for a in actividades:
+            act_por_frente.setdefault(str(a.get(ca['frente_codigo'], '')), []).append(a)
+
+        # ── Construir el PDF ──
+        rgb  = _hex_a_rgb(color or '#FFAF33')
+        logo = _io_descargar_logo(logo_url)
+        contrato_no = datos_tipo.get(cp['contrato_no'], '')
+
+        pdf = _PDFInformeObra(contrato_no, logo, rgb, empresa_nombre or '')
+        pdf.alias_nb_pages()
+        pdf.add_page()
+
+        # Encabezado del contrato
+        pdf.set_font('Helvetica', 'B', 14)
+        pdf.multi_cell(180, 7, pdf._txt(datos_tipo.get(cp['nombre'], nombre_proy)), 0, 'C')
+        pdf.ln(2)
+        ahora = datetime.now(pytz.timezone('America/Bogota'))
+        rango = f"Del {_io_fecha(desde)} al {_io_fecha(hasta)}" if (desde and hasta) else 'Periodo completo'
+        pdf.set_font('Helvetica', '', 9)
+        pdf.set_text_color(110, 110, 110)
+        pdf.cell(180, 5, pdf._txt(f"{rango}  ·  Generado {ahora.strftime('%d/%m/%Y %I:%M %p')}"), 0, 1, 'C')
+        pdf.set_text_color(40, 40, 40)
+        pdf.ln(3)
+
+        pdf.campo_largo('OBJETO DEL CONTRATO', datos_tipo.get(cp['objeto'], ''))
+        pdf.campo_largo('ALCANCE', datos_tipo.get(cp['alcance'], ''))
+
+        pdf.tabla_pares([
+            ('CONTRATO No.',     contrato_no),
+            ('CONTRATISTA',      datos_tipo.get(cp['contratista'], '')),
+            ('ESTADO DEL CONTRATO', datos_tipo.get(cp['estado'], '')),
+            ('% PLANEADO',       f"{planeado:.2f}%"),
+            ('% EJECUTADO',      f"{ejecutado:.2f}%"),
+            ('% VARIACION',      f"{variacion:+.2f}%"),
+        ])
+
+        # ── Un bloque por frente ──
+        pdf.titulo_seccion('AVANCES POR FRENTE / COMPONENTE')
+        ap = C['apertura']
+
+        for fr in frentes:
+            r  = fr['r']
+            co = cortes_por_frente.get(str(fr['id']), {})
+
+            pdf._espacio(40)
+            pdf.ln(2)
+            pdf.set_font('Helvetica', 'B', 11)
+            pdf.cell(0, 6, pdf._txt(r.get(ap['frente'], 'Frente sin nombre')), 0, 1)
+            pdf.set_font('Helvetica', '', 8)
+            pdf.set_text_color(110, 110, 110)
+            ubic = ' · '.join(x for x in [r.get(ap['ubicacion'], ''), r.get(ap['tramo'], '')] if x)
+            if ubic:
+                pdf.cell(0, 4.5, pdf._txt(ubic), 0, 1)
+            pdf.set_text_color(40, 40, 40)
+            pdf.ln(1)
+
+            pdf.tabla(
+                ['TIPO DE ELEMENTO', 'TIPO DE INTERVENCION', 'SUB ETAPA ACTUAL', 'ESTADO ACTUAL'],
+                [45, 55, 40, 40],
+                [[r.get(ap['tipo_elemento'], ''), r.get(ap['tipo_intervencion'], ''),
+                  co.get(cc['sub_etapa'], ''), co.get(cc['estado_frente'], '')]]
+            )
+
+            # Fechas y avances lado a lado
+            pdf._espacio(34)
+            y0 = pdf.get_y()
+            pdf.set_font('Helvetica', 'B', 8)
+            pdf.cell(88, 5.5, 'FECHAS', 1, 0, 'C')
+            pdf.cell(4, 5.5, '', 0, 0)
+            pdf.cell(88, 5.5, 'AVANCES', 1, 1, 'C')
+
+            fechas = [
+                ('Inicio programada',      _io_fecha(r.get(ap['fecha_ini_prog']))),
+                ('Inicio real',            _io_fecha(co.get(cc['fecha_ini_real']))),
+                ('Finalizacion programada',_io_fecha(r.get(ap['fecha_fin_prog']))),
+                ('Finalizacion real',      _io_fecha(co.get(cc['fecha_fin_real']))),
+                ('Dias atraso (-) / adelanto (+)', co.get(cc['dias_atraso'], '')),
+            ]
+            avances = [
+                ('% Financiero programado acum.', f"{_io_num(co.get(cc['pct_fin_prog'])):.2f}" if co else ''),
+                ('% Financiero ejecutado acum.',  f"{_io_num(co.get(cc['pct_fin_ejec'])):.2f}" if co else ''),
+                ('Ejecucion financiera programada', _io_money(co.get(cc['ejec_fin_prog'])) if co else ''),
+                ('Ejecucion financiera real',       _io_money(co.get(cc['ejec_fin_real'])) if co else ''),
+                ('', ''),
+            ]
+            pdf.set_font('Helvetica', '', 7.5)
+            for (e1, v1), (e2, v2) in zip(fechas, avances):
+                yf = pdf.get_y()
+                pdf.cell(50, 5, pdf._recortar(e1, 50), 1, 0)
+                pdf.cell(38, 5, pdf._recortar(str(v1), 38), 1, 0)
+                pdf.cell(4, 5, '', 0, 0)
+                pdf.cell(52, 5, pdf._recortar(e2, 52), 1, 0)
+                pdf.cell(36, 5, pdf._recortar(str(v2), 36), 1, 1, 'R')
+            pdf.ln(3)
+
+            if not co:
+                pdf.set_font('Helvetica', 'I', 8)
+                pdf.set_text_color(150, 150, 150)
+                pdf.cell(0, 5, pdf._txt('Sin corte mensual registrado en el periodo.'), 0, 1)
+                pdf.set_text_color(40, 40, 40)
+                pdf.ln(2)
+
+            # Materiales: se agregan de todas las actividades del frente
+            acumulado = {}
+            for a in act_por_frente.get(str(fr['id']), []):
+                for b in (a.get('__repeticiones') or {}).get(ca['grupo_material'], []):
+                    clave = (b.get(ca['mat_pavimento'], ''), b.get(ca['mat_uso'], ''),
+                             b.get(ca['mat_material'], ''), b.get(ca['mat_unidad'], ''))
+                    if not any(clave):
+                        continue
+                    acumulado[clave] = acumulado.get(clave, 0) + _io_num(b.get(ca['mat_cantidad']))
+
+            if acumulado:
+                pdf.set_font('Helvetica', 'B', 9)
+                pdf.cell(0, 5.5, 'MATERIALES', 0, 1)
+                pdf.tabla(
+                    ['TIPO DE PAVIMENTO', 'USO DEL MATERIAL', 'MATERIAL', 'CANTIDAD', 'UNIDAD'],
+                    [42, 42, 46, 25, 25],
+                    [[k[0], k[1], k[2], f"{v:g}", k[3]] for k, v in sorted(acumulado.items())],
+                    ['L', 'L', 'L', 'R', 'L']
+                )
+
+            # Metas físicas del corte
+            metas = (co.get('__repeticiones') or {}).get(cc['grupo_meta'], []) if co else []
+            if metas:
+                pdf.set_font('Helvetica', 'B', 9)
+                pdf.cell(0, 5.5, 'AVANCES POR META FISICA', 0, 1)
+                pdf.tabla(
+                    ['META FISICA', 'UNIDAD', 'PROGRAMADO', 'EJECUTADO', 'OBSERVACION'],
+                    [58, 22, 25, 25, 50],
+                    [[m.get(cc['meta'], ''), m.get(cc['meta_unidad'], ''),
+                      f"{_io_num(m.get(cc['meta_prog'])):g}", f"{_io_num(m.get(cc['meta_ejec'])):g}",
+                      m.get(cc['meta_obs'], '')] for m in metas],
+                    ['L', 'L', 'R', 'R', 'L']
+                )
+
+            # Actividades del frente
+            acts = act_por_frente.get(str(fr['id']), [])
+            if acts:
+                pdf.set_font('Helvetica', 'B', 9)
+                pdf.cell(0, 5.5, 'ACTIVIDADES EJECUTADAS', 0, 1)
+                pdf.tabla(
+                    ['FECHA', 'DESCRIPCION', 'RESPONSABLE'],
+                    [25, 110, 45],
+                    [[_io_fecha(a.get(ca['fecha'])), a.get(ca['descripcion'], ''),
+                      a.get(ca['responsable'], '')] for a in acts]
+                )
+
+        # ── Novedades ──
+        cn = C['novedad']
+        pdf.titulo_seccion('NOVEDADES')
+        if novedades:
+            pdf.tabla(
+                ['FECHA', 'TIPO', 'IMPACTO', 'ESTADO', 'DESCRIPCION'],
+                [22, 32, 22, 28, 76],
+                [[_io_fecha(n.get(cn['fecha'])), n.get(cn['tipo'], ''), n.get(cn['impacto'], ''),
+                  n.get(cn['estado'], ''), n.get(cn['descripcion'], '')] for n in novedades]
+            )
+        else:
+            pdf.set_font('Helvetica', 'I', 9)
+            pdf.set_text_color(150, 150, 150)
+            pdf.cell(0, 6, pdf._txt('Sin novedades registradas en el periodo.'), 0, 1)
+            pdf.set_text_color(40, 40, 40)
+
+        salida = pdf.output(dest='S')
+        if isinstance(salida, str):
+            salida = salida.encode('latin-1')
+
+        if logo:
+            try:
+                os.remove(logo)
+            except OSError:
+                pass
+
+        return send_file(BytesIO(salida), mimetype='application/pdf',
+                         as_attachment=False,
+                         download_name=f"Informe_{contrato_no or proyecto_id}.pdf")
+
+    except Exception as e:
+        traceback.print_exc()
+        return jsonify({'error': f'Error generando el informe: {e}'}), 500
+
+
+def _io_descargar_logo(logo_url):
+    """Descarga el logo y lo normaliza a PNG sobre fondo blanco.
+    FPDF no maneja transparencia."""
+    if not logo_url:
+        return None
+    try:
+        r = requests.get(logo_url, timeout=8)
+        if not r.ok:
+            return None
+        tmp = NamedTemporaryFile(delete=False, suffix='.png')
+        im = Image.open(BytesIO(r.content)).convert('RGBA')
+        fondo = Image.new('RGBA', im.size, (255, 255, 255, 255))
+        fondo.alpha_composite(im)
+        fondo.convert('RGB').save(tmp.name, 'PNG')
+        return tmp.name
+    except Exception as e:
+        print(f"[INFORME] No se pudo cargar el logo: {e}")
+        return None
+
 # ── Utilidad: generar slug ──────────────────────────────────────
 def generar_slug(nombre_empresa):
     # Normalizar: quitar tildes, minúsculas, reemplazar espacios

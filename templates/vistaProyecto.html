@@ -63,6 +63,9 @@
                     title="Exportar a Excel" style="display:none;">
                 <i class="fas fa-download"></i>
             </button>
+            <button class="btn-exportar" onclick="abrirModalInforme()" title="Informe de avance">
+                <i class="fas fa-file-contract"></i>
+            </button>
         </div>
 
         <!-- Lista de registros -->
@@ -321,6 +324,55 @@
         document.getElementById('modal-seleccionar-form').classList.remove('active');
     }
 
+    function abrirModalInforme() {
+        ['inf-desde','inf-hasta','inf-planeado','inf-ejecutado']
+            .forEach(id => document.getElementById(id).value = '');
+        document.getElementById('inf-variacion').textContent = '';
+        document.getElementById('modal-informe').classList.add('active');
+    }
+
+    function cerrarModalInforme() {
+        document.getElementById('modal-informe').classList.remove('active');
+    }
+
+    /** La variación es un dato derivado: ejecutado - planeado. */
+    function calcularVariacion() {
+        const p = parseFloat(document.getElementById('inf-planeado').value);
+        const e = parseFloat(document.getElementById('inf-ejecutado').value);
+        const out = document.getElementById('inf-variacion');
+        if (isNaN(p) || isNaN(e)) { out.textContent = ''; return; }
+        const v = (e - p).toFixed(2);
+        out.textContent = `% Variación: ${v > 0 ? '+' : ''}${v}%`;
+    }
+
+    function descargarInforme() {
+        const desde     = document.getElementById('inf-desde').value;
+        const hasta     = document.getElementById('inf-hasta').value;
+        const planeado  = document.getElementById('inf-planeado').value;
+        const ejecutado = document.getElementById('inf-ejecutado').value;
+
+        if (desde && hasta && desde > hasta) {
+            mostrarToast('⚠️ La fecha "Desde" no puede ser posterior a "Hasta"');
+            return;
+        }
+
+        let url = `/api/informe-obra/${proyectoId}?`;
+        if (desde)     url += `desde=${desde}&`;
+        if (hasta)     url += `hasta=${hasta}&`;
+        if (planeado)  url += `planeado=${planeado}&`;
+        if (ejecutado) url += `ejecutado=${ejecutado}&`;
+
+        window.open(url, '_blank');
+        mostrarToast('✅ Generando informe...');
+        setTimeout(cerrarModalInforme, 500);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        ['inf-planeado','inf-ejecutado'].forEach(id =>
+            document.getElementById(id)?.addEventListener('input', calcularVariacion));
+    });
+
+
     // ── Abrir registro (modo edición) ──
     function abrirRegistro(registroId, formularioId) {
         window.location.href = `/formulario-dinamico?project_id=${proyectoId}&formulario_id=${formularioId}&registro_id=${registroId}`;
@@ -415,6 +467,50 @@
                 Cancelar
             </button>
         </div>
+    </div>
+</div>
+
+<!-- Modal informe de obra -->
+<div class="modal-overlay" id="modal-informe">
+    <div class="modal-box">
+        <h3 class="modal-title" style="margin-bottom:16px;">
+            <i class="fas fa-file-contract" style="color:var(--naranja);"></i>
+            Informe de avance de obra
+        </h3>
+
+        <div style="display:flex; gap:10px;">
+            <div style="flex:1;">
+                <label class="modal-label">Desde</label>
+                <input type="date" id="inf-desde" class="modal-input">
+            </div>
+            <div style="flex:1;">
+                <label class="modal-label">Hasta</label>
+                <input type="date" id="inf-hasta" class="modal-input">
+            </div>
+        </div>
+
+        <div style="display:flex; gap:10px; margin-top:12px;">
+            <div style="flex:1;">
+                <label class="modal-label">% Planeado</label>
+                <input type="number" id="inf-planeado" class="modal-input"
+                       step="0.01" min="0" max="100" placeholder="11.34">
+            </div>
+            <div style="flex:1;">
+                <label class="modal-label">% Ejecutado</label>
+                <input type="number" id="inf-ejecutado" class="modal-input"
+                       step="0.01" min="0" max="100" placeholder="9.04">
+            </div>
+        </div>
+
+        <p id="inf-variacion" style="font-size:12px;color:#6b7280;margin-top:10px;"></p>
+
+        <button class="modal-btn" onclick="descargarInforme()"
+                style="background:var(--naranja); color:white; width:100%; padding:12px;
+                       border-radius:8px; font-weight:600; margin-top:16px;">
+            <i class="fas fa-download"></i> Descargar informe
+        </button>
+        <button class="modal-btn" onclick="cerrarModalInforme()"
+                style="width:100%; padding:10px; margin-top:8px;">Cancelar</button>
     </div>
 </div>
 
