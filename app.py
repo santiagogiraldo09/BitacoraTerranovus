@@ -1738,15 +1738,29 @@ INFORME_OBRA_MAX_FOTOS     = 40                     # tope por informe (RAM en R
 
 
 def _io_urls(valor):
-    """El campo de imagen guarda una URL suelta o un array JSON de URLs."""
-    raw = str(valor or '').strip()
+    """El campo de imagen guarda una URL suelta, un array JSON, o —cuando
+    psycopg2 ya deserializó el JSONB— una lista de Python."""
+    if not valor:
+        return []
+
+    # Ya viene como lista/tupla desde el JSONB
+    if isinstance(valor, (list, tuple)):
+        return [str(u).strip() for u in valor if str(u or '').strip()]
+
+    raw = str(valor).strip()
     if not raw:
         return []
+
     if raw.startswith('['):
         try:
-            return [u for u in json.loads(raw) if isinstance(u, str) and u.strip()]
+            datos = json.loads(raw)
+            if isinstance(datos, list):
+                return [str(u).strip() for u in datos if str(u or '').strip()]
         except (ValueError, TypeError):
-            return []
+            # Respaldo: extraer URLs aunque el formato no sea JSON válido
+            return re.findall(r'https?://[^\s"\',\]]+', raw)
+        return []
+
     return [raw]
 
 
