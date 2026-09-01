@@ -2884,14 +2884,16 @@ def guardar_configuracion():
         data             = request.get_json()
         color_primario   = data.get('color_primario', '#FBAF33')
         color_secundario = data.get('color_secundario', '#E3E3E3')
-        logo             = data.get('logo', '')
+        logo = (data.get('logo') or '').strip()
 
         conn, cursor = get_db_connection()
         cursor.execute("""
             UPDATE empresas
             SET color_primario   = %s,
                 color_secundario = %s,
-                logo_url         = %s
+                -- Si no llega un logo en la petición, se conserva el actual:
+                -- guardar colores nunca debe borrar la marca.
+                logo_url         = COALESCE(NULLIF(%s, ''), logo_url)
             WHERE id = %s
         """, (color_primario, color_secundario, logo, session.get('empresa_id')))
         conn.commit()
@@ -6085,6 +6087,11 @@ def subir_logo():
                 INSERT INTO empresa_logos (empresa_id, url, creado_por)
                 VALUES (%s, %s, %s)
             """, (empresa_id, url_publica, session['user_id']))
+
+            # El logo recién subido pasa a ser el vigente para todos los PDF.
+            cursor.execute("""
+                UPDATE empresas SET logo_url = %s WHERE id = %s
+            """, (url_publica, empresa_id))
 
         return jsonify({'url': url_publica}), 200
 
