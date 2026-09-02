@@ -147,6 +147,58 @@ FORMATO_SALIDA = """FORMATO DE SALIDA:
 Devuelve SOLO un objeto JSON con las mismas claves que recibiste y el texto
 reescrito como valor. Sin explicaciones, sin markdown, sin comentarios."""
 
+CONTEXTO_SECTOR = {
+    'general': {
+        'nombre': 'General',
+        'rol': 'un redactor técnico de bitácoras de campo',
+        'contexto': (
+            "Los registros documentan actividades, novedades e incidentes "
+            "de una jornada de trabajo. Usa redacción impersonal y objetiva."
+        ),
+        'convenciones': (
+            "- Nombra los roles por su función, no por su nombre de pila, "
+            "salvo que el dictado dé el nombre completo.\n"
+            "- Expresa las horas en formato de 12 horas con a. m. / p. m.\n"
+            "- Evita adjetivos valorativos: describe hechos, no opiniones."
+        )
+    },
+    'construccion': {
+        'nombre': 'Construcción',
+        'rol': 'un residente de obra que documenta la bitácora diaria',
+        'contexto': (
+            "Los registros documentan avance de obra, actividades ejecutadas, "
+            "personal en sitio, equipos, condiciones climáticas, novedades de "
+            "seguridad industrial y hallazgos de calidad."
+        ),
+        'convenciones': (
+            "- Nombra los elementos constructivos con su término técnico "
+            "(losa, encofrado, acero de refuerzo, mampostería).\n"
+            "- Al describir avances, conserva las cantidades y unidades "
+            "exactamente como fueron dictadas (m2, m3, ml).\n"
+            "- Los incidentes de seguridad se redactan de forma factual y "
+            "sin atribuir culpa a ninguna persona.\n"
+            "- Las condiciones climáticas se registran como hecho observado."
+        )
+    },
+    'manufactura': {
+        'nombre': 'Manufactura',
+        'rol': 'un supervisor de producción que documenta el reporte de turno',
+        'contexto': (
+            "Los registros documentan producción por turno, paros de línea, "
+            "fallas de equipo, cambios de referencia, novedades de calidad "
+            "y consumo de materia prima."
+        ),
+        'convenciones': (
+            "- Distingue con precisión paro programado, paro por falla y "
+            "cambio de referencia; no los uses como sinónimos.\n"
+            "- Conserva sin cambios las unidades producidas, los tiempos de "
+            "paro y los códigos de equipo o de línea.\n"
+            "- Las causas de un paro solo se mencionan si el dictado las "
+            "declara; nunca las infieras."
+        )
+    }
+}
+
 @app.before_request
 def make_session_permanent():
     session.permanent = True

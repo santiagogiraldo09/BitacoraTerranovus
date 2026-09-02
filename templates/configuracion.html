@@ -581,36 +581,41 @@
                     <i class="fas fa-book cfg-icon-orange"></i>
                     Vocabulario técnico
                 </div>
-                <p class="cfg-card-desc">
-                    Define cómo el sistema convierte el habla coloquial de los dictados
-                    en redacción técnica. El sistema nunca agrega hechos que no se hayan
-                    dictado ni modifica cifras, nombres o fechas.
+                <p class="cfg-card-subtitle">
+                    Define cómo el sistema convierte el habla coloquial de los dictados en
+                    redacción técnica. Nunca agrega hechos que no se hayan dictado ni
+                    modifica cifras, nombres o fechas.
                 </p>
 
-                <div class="cfg-field">
+                <div class="cfg-inner-divider"></div>
+
+                <div class="invite-field">
                     <label for="voc-sector">Sector de la empresa</label>
                     <select id="voc-sector"></select>
-                    <small>Define el vocabulario y las convenciones de redacción base.</small>
+                    <span class="voc-hint">Define el vocabulario y las convenciones de redacción base.</span>
                 </div>
 
-                <div class="cfg-field">
-                    <label>
+                <div class="invite-field">
+                    <label>Reescritura profesional</label>
+                    <div class="voc-toggle-row">
                         <input type="checkbox" id="voc-activa">
-                        Reescritura profesional activa
-                    </label>
-                    <small>Si la desactivas, los dictados se guardan tal como se transcriben.</small>
+                        <span>Activa</span>
+                    </div>
+                    <span class="voc-hint">Si la desactivas, los dictados se guardan tal como se transcriben.</span>
                 </div>
 
-                <div class="cfg-field">
+                <div class="invite-field">
                     <label for="voc-instrucciones">Preferencias de redacción (opcional)</label>
                     <textarea id="voc-instrucciones" rows="3" maxlength="600"
                             placeholder="Ej: usar siempre 'colaborador' en lugar de 'trabajador'."></textarea>
-                    <small><span id="voc-contador">0</span>/600 caracteres</small>
+                    <span class="voc-hint"><span id="voc-contador">0</span>/600 caracteres</span>
                 </div>
 
-                <button class="btn-guardar" onclick="guardarVocabulario()">
-                    <i class="fas fa-save"></i> Guardar
-                </button>
+                <div class="cfg-actions">
+                    <button class="btn-guardar" onclick="guardarVocabulario()">
+                        <i class="fas fa-save"></i> Guardar
+                    </button>
+                </div>
             </div>
 
             <div class="cfg-card">
@@ -618,10 +623,20 @@
                     <i class="fas fa-play cfg-icon-orange"></i>
                     Probar el vocabulario
                 </div>
-                <textarea id="voc-prueba" rows="3"
-                        placeholder="Escribe una frase como la diría alguien en campo."></textarea>
-                <button class="btn-guardar" onclick="probarVocabulario()">Reescribir</button>
-                <div id="voc-resultado" style="display:none;"></div>
+                <p class="cfg-card-subtitle">
+                    Escribe una frase como la diría alguien en campo y comprueba el resultado.
+                </p>
+
+                <div class="invite-field">
+                    <textarea id="voc-prueba" rows="3"
+                            placeholder="Ehh, pues el man de la banda dijo que paró la línea porque se trabó."></textarea>
+                </div>
+
+                <div class="cfg-actions">
+                    <button class="btn-guardar" onclick="probarVocabulario()">Reescribir</button>
+                </div>
+
+                <div id="voc-resultado" class="voc-resultado" style="display:none;"></div>
             </div>
         </div>
 

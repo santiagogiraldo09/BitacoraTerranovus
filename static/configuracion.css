@@ -1598,3 +1598,56 @@ button { font-family: inherit; cursor: pointer; }
 @media screen and (min-width: 769px) {
     .drawer, .drawer-overlay { display: none !important; }
 }
+
+/* ─── Vocabulario técnico ────────────────────────────────────── */
+.invite-field textarea {
+    padding: 9px 12px;
+    border: 1.5px solid var(--gris-borde);
+    border-radius: 8px;
+    font-size: 13px;
+    outline: none;
+    font-family: 'DM Sans', sans-serif;
+    resize: vertical;
+    width: 100%;
+}
+
+.invite-field textarea:focus { border-color: var(--naranja); }
+
+.voc-hint {
+    font-size: 12px;
+    color: var(--gris-texto);
+    margin-top: 4px;
+}
+
+.voc-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--texto);
+}
+
+.voc-toggle-row input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--naranja);
+    cursor: pointer;
+}
+
+.voc-resultado {
+    background: var(--naranja-light);
+    border: 1px solid var(--naranja);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-top: 16px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--texto);
+}
+
+.voc-resultado strong {
+    display: block;
+    font-size: 12px;
+    color: var(--naranja-dark);
+    margin-bottom: 6px;
+}
