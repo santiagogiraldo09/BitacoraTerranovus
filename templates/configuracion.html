@@ -582,14 +582,46 @@
                     Vocabulario técnico
                 </div>
                 <p class="cfg-card-desc">
-                    Personaliza cómo el sistema traduce el habla coloquial de tus dictados
-                    a redacción técnica y profesional en los reportes.
+                    Define cómo el sistema convierte el habla coloquial de los dictados
+                    en redacción técnica. El sistema nunca agrega hechos que no se hayan
+                    dictado ni modifica cifras, nombres o fechas.
                 </p>
-                <div class="empty-users">
-                    <i class="fas fa-book empty-icon"></i>
-                    <p>Esta sección está en construcción.</p>
-                    <span>Aquí se configurará el sector y el vocabulario de la empresa.</span>
+
+                <div class="cfg-field">
+                    <label for="voc-sector">Sector de la empresa</label>
+                    <select id="voc-sector"></select>
+                    <small>Define el vocabulario y las convenciones de redacción base.</small>
                 </div>
+
+                <div class="cfg-field">
+                    <label>
+                        <input type="checkbox" id="voc-activa">
+                        Reescritura profesional activa
+                    </label>
+                    <small>Si la desactivas, los dictados se guardan tal como se transcriben.</small>
+                </div>
+
+                <div class="cfg-field">
+                    <label for="voc-instrucciones">Preferencias de redacción (opcional)</label>
+                    <textarea id="voc-instrucciones" rows="3" maxlength="600"
+                            placeholder="Ej: usar siempre 'colaborador' en lugar de 'trabajador'."></textarea>
+                    <small><span id="voc-contador">0</span>/600 caracteres</small>
+                </div>
+
+                <button class="btn-guardar" onclick="guardarVocabulario()">
+                    <i class="fas fa-save"></i> Guardar
+                </button>
+            </div>
+
+            <div class="cfg-card">
+                <div class="cfg-card-title">
+                    <i class="fas fa-play cfg-icon-orange"></i>
+                    Probar el vocabulario
+                </div>
+                <textarea id="voc-prueba" rows="3"
+                        placeholder="Escribe una frase como la diría alguien en campo."></textarea>
+                <button class="btn-guardar" onclick="probarVocabulario()">Reescribir</button>
+                <div id="voc-resultado" style="display:none;"></div>
             </div>
         </div>
 
@@ -1017,6 +1049,73 @@
             mostrarToast('❌ Error al eliminar');
         }
     }
+
+    async function cargarVocabulario() {
+        try {
+            const res  = await fetch('/api/vocabulario/config');
+            const data = await res.json();
+            if (!data.success) return;
+
+            const sel = document.getElementById('voc-sector');
+            sel.innerHTML = data.sectores
+                .map(s => `<option value="${s.slug}">${s.nombre}</option>`).join('');
+            sel.value = data.sector;
+
+            document.getElementById('voc-activa').checked   = data.activa;
+            document.getElementById('voc-instrucciones').value = data.instrucciones;
+            document.getElementById('voc-contador').textContent = data.instrucciones.length;
+        } catch {
+            mostrarToast('❌ No se pudo cargar el vocabulario', true);
+        }
+    }
+
+    async function guardarVocabulario() {
+        try {
+            const res = await fetch('/api/vocabulario/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sector:        document.getElementById('voc-sector').value,
+                    activa:        document.getElementById('voc-activa').checked,
+                    instrucciones: document.getElementById('voc-instrucciones').value
+                })
+            });
+            const data = await res.json();
+            mostrarToast(data.success ? '✅ Vocabulario guardado'
+                                    : '❌ ' + (data.error || 'Error'), !data.success);
+        } catch {
+            mostrarToast('❌ Error de conexión', true);
+        }
+    }
+
+    async function probarVocabulario() {
+        const caja = document.getElementById('voc-resultado');
+        const texto = document.getElementById('voc-prueba').value.trim();
+        if (texto.split(/\s+/).length < 4) {
+            mostrarToast('Escribe al menos una frase completa', true);
+            return;
+        }
+        caja.style.display = '';
+        caja.innerHTML = '<em>Reescribiendo…</em>';
+        try {
+            const res  = await fetch('/api/vocabulario/probar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ texto })
+            });
+            const data = await res.json();
+            caja.innerHTML = data.success
+                ? `<strong>Resultado</strong><p>${data.texto}</p>
+                <small>${data.ms} ms</small>`
+                : `<p>${data.error || 'Error al reescribir'}</p>`;
+        } catch {
+            caja.innerHTML = '<p>Error de conexión</p>';
+        }
+    }
+
+    document.getElementById('voc-instrucciones').addEventListener('input', function() {
+        document.getElementById('voc-contador').textContent = this.value.length;
+    });
 
     const tipoIconos = {
         texto_corto:    'fa-font',
@@ -1631,6 +1730,13 @@
 
         //Cargar Tipos de Proyecto
         cargarTiposProyecto();
+
+        //Cargar Vocabulario Técnico
+        cargarVocabulario();
+
+        document.getElementById('voc-instrucciones').addEventListener('input', function() {
+            document.getElementById('voc-contador').textContent = this.value.length;
+        });
     });
 
     // Subir logo nuevo

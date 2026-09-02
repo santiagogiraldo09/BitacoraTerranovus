@@ -114,6 +114,39 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 # Cliente de OpenAI para Whisper
 openai_client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
 
+# ── Reescritura profesional: capa núcleo (NO configurable) ──
+NUCLEO_REGLAS = """REGLAS ABSOLUTAS — su incumplimiento invalida el registro:
+
+1. NO INVENTES NADA. Formaliza únicamente lo que fue dicho. Está prohibido
+   agregar causas, diagnósticos, responsables o consecuencias que no
+   aparezcan en el texto original.
+
+2. NO ALTERES DATOS DUROS. Copia literalmente nombres, correos, cifras,
+   cantidades, medidas, unidades, fechas, horas, códigos y placas.
+
+3. CONSERVA LA INCERTIDUMBRE Y LA NEGACIÓN. Si el original dice "creo que",
+   el resultado debe decir "presuntamente". Nunca conviertas una hipótesis
+   en afirmación, ni afirmes algo que el original niega.
+
+4. NO AGREGUES NI QUITES INFORMACIÓN. Puedes reordenar para dar coherencia,
+   pero todos los hechos mencionados deben permanecer.
+
+QUÉ SÍ DEBES HACER:
+- Eliminar muletillas, repeticiones y autocorrecciones del hablante.
+- Completar frases truncadas usando solo lo que el contexto ya dice.
+- Cambiar la primera persona informal por redacción impersonal.
+- Puntuar y acentuar correctamente.
+- Mantener una extensión similar a la original: no resumas ni expandas.
+
+DEVUELVE EL TEXTO SIN CAMBIOS SI:
+- Ya está redactado formalmente.
+- Es tan breve o ambiguo que reescribirlo implicaría interpretar.
+- Es un dato suelto (un nombre, un número, una referencia)."""
+
+FORMATO_SALIDA = """FORMATO DE SALIDA:
+Devuelve SOLO un objeto JSON con las mismas claves que recibiste y el texto
+reescrito como valor. Sin explicaciones, sin markdown, sin comentarios."""
+
 @app.before_request
 def make_session_permanent():
     session.permanent = True
@@ -651,6 +684,93 @@ def opciones_dinamicas():
     except Exception as e:
         print(f"Error en opciones-dinamicas: {e}")
         return jsonify({'error': 'Error consultando opciones'}), 500
+
+
+@app.route('/api/vocabulario/config', methods=['GET'])
+def vocabulario_config():
+    """Configuración visible de reescritura. Nunca expone el núcleo."""
+    if session.get('user_rol') != 'admin':
+        return jsonify({'error': 'No autorizado'}), 403
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT COALESCE(NULLIF(sector, ''), 'general'),
+                       COALESCE(reescritura_activa, TRUE),
+                       COALESCE(instrucciones_reescritura, '')
+                FROM empresas WHERE id = %s
+            """, (session.get('empresa_id'),))
+            fila = cursor.fetchone()
+
+        sector, activa, instrucciones = fila if fila else ('general', True, '')
+        return jsonify({
+            'success': True,
+            'sector': sector,
+            'activa': activa,
+            'instrucciones': instrucciones,
+            # Solo los sectores implementados; el <select> se llena con esto.
+            'sectores': [{'slug': k, 'nombre': v['nombre']}
+                         for k, v in CONTEXTO_SECTOR.items()]
+        })
+    except Exception as e:
+        print(f"[VOCABULARIO] Error leyendo config: {e}")
+        return jsonify({'error': 'Error al cargar la configuración'}), 500
+
+
+@app.route('/api/vocabulario/config', methods=['POST'])
+def guardar_vocabulario_config():
+    if session.get('user_rol') != 'admin':
+        return jsonify({'error': 'No autorizado'}), 403
+    try:
+        data       = request.get_json() or {}
+        empresa_id = session.get('empresa_id')
+        sector     = (data.get('sector') or 'general').strip().lower()
+
+        # El sector se valida contra los implementados: quitamos el CHECK
+        # de la base, así que esta es la única barrera contra un valor
+        # que dejaría el glosario sin cargar.
+        if sector not in CONTEXTO_SECTOR:
+            return jsonify({'error': 'Sector no válido'}), 400
+
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                UPDATE empresas
+                SET sector = %s,
+                    reescritura_activa = %s,
+                    instrucciones_reescritura = %s
+                WHERE id = %s
+            """, (sector,
+                  bool(data.get('activa', True)),
+                  (data.get('instrucciones') or '').strip()[:600],
+                  empresa_id))
+            conn.commit()
+
+        invalidar_glosario(empresa_id)   # el cache de 5 min quedaría obsoleto
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"[VOCABULARIO] Error guardando config: {e}")
+        return jsonify({'error': 'Error al guardar'}), 500
+
+
+@app.route('/api/vocabulario/probar', methods=['POST'])
+def probar_reescritura():
+    """Probador de la sección. Usa exactamente el mismo camino que usará
+    el formulario, para que lo que ve el admin sea lo que verá el usuario."""
+    if session.get('user_rol') != 'admin':
+        return jsonify({'error': 'No autorizado'}), 403
+
+    texto = (request.get_json() or {}).get('texto', '').strip()
+    if len(texto.split()) < 4:
+        return jsonify({'error': 'Escribe al menos una frase completa'}), 400
+
+    resultado, ms, aplicado = reescribir_textos({'t': texto[:1500]},
+                                                session.get('empresa_id'))
+    return jsonify({
+        'success':  True,
+        'original': texto,
+        'texto':    resultado.get('t', texto),
+        'aplicado': aplicado,
+        'ms':       ms
+    })
 
 
 # ── BI: CRUD de tableros ─────────────────────────────────────────────
