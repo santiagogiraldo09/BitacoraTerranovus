@@ -45,6 +45,10 @@
                 <i class="fas fa-layer-group"></i>
                 <span>Proyectos</span>
             </button>
+            <button class="sidebar-nav-item" id="nav-vocabulario" onclick="mostrarSeccion('vocabulario')">
+                <i class="fas fa-book"></i>
+                <span>Vocabulario Técnico</span>
+            </button>
         </nav>
         <div class="sidebar-footer">
             <div class="sidebar-user">
@@ -570,6 +574,25 @@
             </div>
         </div>
 
+        <!-- ── SECCIÓN: VOCABULARIO TÉCNICO ── -->
+        <div id="seccion-vocabulario" class="cfg-seccion" style="display:none;">
+            <div class="cfg-card">
+                <div class="cfg-card-title">
+                    <i class="fas fa-book cfg-icon-orange"></i>
+                    Vocabulario técnico
+                </div>
+                <p class="cfg-card-desc">
+                    Personaliza cómo el sistema traduce el habla coloquial de tus dictados
+                    a redacción técnica y profesional en los reportes.
+                </p>
+                <div class="empty-users">
+                    <i class="fas fa-book empty-icon"></i>
+                    <p>Esta sección está en construcción.</p>
+                    <span>Aquí se configurará el sector y el vocabulario de la empresa.</span>
+                </div>
+            </div>
+        </div>
+
     </main>
 </div>
 
@@ -587,15 +610,39 @@
         <i class="fas fa-list-alt"></i>
         <span>Campos</span>
     </button>
-    <button class="nav-item" id="bnav-formularios" onclick="mostrarSeccion('formularios')">
-        <i class="fas fa-file-alt"></i>
-        <span>Formularios</span>
-    </button>
-    <button class="nav-item" id="bnav-proyectos" onclick="mostrarSeccion('proyectos')">
-        <i class="fas fa-layer-group"></i>
-        <span>Proyectos</span>
+    <button class="nav-item" id="bnav-mas" onclick="abrirDrawer()" aria-label="Más opciones"
+            aria-haspopup="true" aria-expanded="false">
+        <i class="fas fa-bars"></i>
+        <span>Más</span>
     </button>
 </nav>
+
+<!-- DRAWER PARA ABRIR CON EL OPCIÓN "MÁS"-->
+<div class="drawer-overlay" id="drawer-overlay" onclick="cerrarDrawer()"></div>
+ 
+<div class="drawer" id="drawer-mas" role="dialog" aria-modal="true"
+     aria-label="Más opciones de configuración" aria-hidden="true">
+    <div class="drawer-handle"></div>
+    <div class="drawer-title">Más opciones</div>
+ 
+    <button class="drawer-nav-item" id="drawer-formularios" onclick="mostrarSeccion('formularios')">
+        <i class="fas fa-file-alt"></i>
+        <span>Formularios</span>
+        <i class="fas fa-chevron-right drawer-chevron"></i>
+    </button>
+    <button class="drawer-nav-item" id="drawer-proyectos" onclick="mostrarSeccion('proyectos')">
+        <i class="fas fa-layer-group"></i>
+        <span>Proyectos</span>
+        <i class="fas fa-chevron-right drawer-chevron"></i>
+    </button>
+    <button class="drawer-nav-item" id="drawer-vocabulario" onclick="mostrarSeccion('vocabulario')">
+        <i class="fas fa-book"></i>
+        <span>Vocabulario Técnico</span>
+        <i class="fas fa-chevron-right drawer-chevron"></i>
+    </button>
+ 
+    <button class="drawer-cerrar" onclick="cerrarDrawer()">Cerrar</button>
+</div>
 
 <!-- MODAL: INVITAR / CREAR USUARIO -->
 <div class="invite-overlay" id="invite-overlay">
@@ -626,14 +673,19 @@
 
 <script>
 
-    const secciones = ['identidad', 'usuarios', 'campos', 'formularios', 'proyectos'];
+    const secciones = ['identidad', 'usuarios', 'campos', 'formularios', 'proyectos', 'vocabulario'];
     const titulos   = {
         'identidad':   'Identidad Visual',
         'usuarios':    'Gestión de Usuarios',
         'campos':      'Gestión de Campos',
         'formularios': 'Formularios',
-        'proyectos':   'Proyectos'
+        'proyectos':   'Proyectos',
+        'vocabulario': 'Vocabulario Técnico'
     };
+ 
+    // Secciones que en móvil viven dentro del drawer y no tienen
+    // botón propio en la barra inferior.
+    const seccionesDrawer = ['formularios', 'proyectos', 'vocabulario'];
 
     // ── Form Builder ──
     let builderCamposGlobales = [];
@@ -1463,21 +1515,56 @@
 
 
 
+    function abrirDrawer() {
+        document.getElementById('drawer-mas').classList.add('active');
+        document.getElementById('drawer-overlay').classList.add('active');
+        document.getElementById('drawer-mas').setAttribute('aria-hidden', 'false');
+        document.getElementById('bnav-mas').setAttribute('aria-expanded', 'true');
+        // Evita que el fondo se desplace mientras el drawer está abierto.
+        document.body.style.overflow = 'hidden';
+    }
+ 
+    function cerrarDrawer() {
+        document.getElementById('drawer-mas').classList.remove('active');
+        document.getElementById('drawer-overlay').classList.remove('active');
+        document.getElementById('drawer-mas').setAttribute('aria-hidden', 'true');
+        document.getElementById('bnav-mas').setAttribute('aria-expanded', 'false');
+        document.body.style.overflow = '';
+    }
+ 
     function mostrarSeccion(seccion) {
         secciones.forEach(s => {
-            document.getElementById(`seccion-${s}`).style.display = s === seccion ? '' : 'none';
-            document.getElementById(`nav-${s}`).classList.toggle('active', s === seccion);
+            const nodo = document.getElementById(`seccion-${s}`);
+            if (nodo) nodo.style.display = s === seccion ? '' : 'none';
+            const navItem = document.getElementById(`nav-${s}`);
+            if (navItem) navItem.classList.toggle('active', s === seccion);
         });
+ 
         document.getElementById('desktop-section-title').textContent = titulos[seccion];
         document.getElementById('mobile-section-title').textContent  = titulos[seccion];
         window.location.hash = seccion;
+ 
+        // Drawer: resalta el ítem elegido y cierra el panel.
         document.querySelectorAll('.drawer-nav-item').forEach(i => i.classList.remove('active'));
         const drawerItem = document.getElementById(`drawer-${seccion}`);
         if (drawerItem) drawerItem.classList.add('active');
-        document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+ 
+        // Barra inferior: si la sección vive en el drawer, el botón
+        // que queda marcado es "Más", no ninguno de los tres visibles.
+        document.querySelectorAll('.bottom-nav .nav-item').forEach(i => i.classList.remove('active'));
         const bnavItem = document.getElementById(`bnav-${seccion}`);
-        if (bnavItem) bnavItem.classList.add('active');
+        if (bnavItem) {
+            bnavItem.classList.add('active');
+        } else if (seccionesDrawer.includes(seccion)) {
+            document.getElementById('bnav-mas').classList.add('active');
+        }
+ 
+        cerrarDrawer();
     }
+ 
+    // Cierre con la tecla Escape.
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') cerrarDrawer();
 
     // ── Colores ──
     document.getElementById('color_primario').addEventListener('input', function() {

@@ -1493,3 +1493,108 @@ button { font-family: inherit; cursor: pointer; }
     border: 1px solid var(--color-primario, #FBAF33);
     border-radius: 10px; padding: 1px 7px; white-space: nowrap;
 }
+
+/* ─── Drawer "Más" (solo móvil) ──────────────────────────────── */
+.drawer-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 190;
+}
+
+.drawer-overlay.active { display: block; }
+
+.drawer {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--blanco);
+    border-radius: 20px 20px 0 0;
+    padding: 12px 20px calc(24px + env(safe-area-inset-bottom));
+    z-index: 200;
+    max-width: 440px;
+    margin: 0 auto;
+    box-shadow: var(--sombra);
+}
+
+/* Reutiliza el keyframe slideUp ya definido para .invite-modal */
+.drawer.active {
+    display: block;
+    animation: slideUp 0.28s ease;
+}
+
+.drawer-handle {
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--gris-borde);
+    margin: 0 auto 16px;
+}
+
+.drawer-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--gris-texto);
+    margin-bottom: 4px;
+}
+
+.drawer-nav-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 15px 2px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--gris-borde);
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--texto);
+    text-align: left;
+    transition: color 0.18s;
+}
+
+.drawer-nav-item i:first-child {
+    font-size: 18px;
+    width: 22px;
+    text-align: center;
+}
+
+.drawer-nav-item:last-of-type { border-bottom: none; }
+
+.drawer-nav-item.active {
+    color: var(--naranja);
+    font-weight: 600;
+}
+
+.drawer-chevron {
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--gris-borde);
+}
+
+.drawer-cerrar {
+    width: 100%;
+    margin-top: 12px;
+    padding: 13px;
+    border: 1.5px solid var(--gris-borde);
+    border-radius: 10px;
+    background: var(--blanco);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--gris-texto);
+    transition: all 0.18s;
+}
+
+.drawer-cerrar:hover {
+    color: var(--texto);
+    border-color: var(--texto);
+}
+
+/* En escritorio la navegación completa vive en el sidebar */
+@media screen and (min-width: 769px) {
+    .drawer, .drawer-overlay { display: none !important; }
+}
