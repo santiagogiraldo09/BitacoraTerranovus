@@ -273,6 +273,17 @@
                         </p>
                     </div>
                 </div>
+                <div style="margin-top:18px;padding-top:14px;border-top:1px solid #EEE;">
+                    <label style="display:flex;align-items:center;gap:8px;font-size:12px;
+                                  font-weight:600;color:#374151;cursor:pointer;">
+                        <input type="checkbox" id="viz-ancho-completo"
+                               style="accent-color:var(--naranja,#FFAF33);width:15px;height:15px;">
+                        Mostrar a ancho completo
+                    </label>
+                    <p style="font-size:11px;color:#9ca3af;margin-top:6px;line-height:1.45;">
+                        Ocupa todo el ancho del tablero en lugar de una sola columna.
+                    </p>
+                </div>
 
             </div>
         </div>
@@ -490,6 +501,12 @@
         card.className = 'tb-viz-card';
         card.dataset.tipo = viz.tipo;
         card.dataset.vizId = viz.id;
+
+        // Compatibilidad hacia atrás: las visualizaciones guardadas antes de
+        // este cambio no tienen la propiedad. Las tablas antiguas pasan a
+        // ancho completo y el resto queda en una columna, sin migrar datos.
+        const anchoCompleto = viz.config?.ancho_completo ?? (viz.tipo === 'tabla');
+        card.dataset.ancho = anchoCompleto ? 'completo' : 'normal';
         card.innerHTML = `
             <div class="tb-viz-header">
                 <h3 class="tb-viz-titulo">${viz.titulo}</h3>
@@ -1319,6 +1336,12 @@
         document.getElementById('viz-campo-serie-wrap').style.display = esBarras ? 'block' : 'none';
         document.getElementById('viz-columnas-wrap').style.display    = esTabla  ? 'block' : 'none';
 
+        // La tabla nace a ancho completo; los demás gráficos, en una columna.
+        // Solo al crear: editarViz restaura después lo que el usuario guardó.
+        if (vizEnEdicion === null) {
+            document.getElementById('viz-ancho-completo').checked = esTabla;
+        }
+
         // Ocultar campos que no aplican para tabla
         document.getElementById('viz-campo-valor').style.display      = esTabla ? 'none' : '';
         document.getElementById('label-campo-valor').style.display    = esTabla ? 'none' : '';
@@ -1761,7 +1784,13 @@
         };
 
         // ── Guardar en lista local ──
-        const nuevaViz = { tipo: tipoSeleccionado, titulo, config: { datasets: [dataset] } };
+        const anchoCompleto = document.getElementById('viz-ancho-completo').checked;
+
+        const nuevaViz = {
+            tipo: tipoSeleccionado,
+            titulo,
+            config: { datasets: [dataset], ancho_completo: anchoCompleto }
+        };
 
         if (vizEnEdicion !== null) {
             const idx = vizGuardadas.findIndex(v => v.id === vizEnEdicion);
@@ -1770,7 +1799,7 @@
                     ...vizGuardadas[idx],
                     tipo:   tipoSeleccionado,
                     titulo: titulo,
-                    config: { datasets: [dataset] }
+                    config: { datasets: [dataset], ancho_completo: anchoCompleto }
                 };
             }
         } else {
@@ -1815,8 +1844,13 @@
         document.getElementById('viz-titulo').value = viz.titulo;
         document.getElementById('modal-viz-titulo').textContent = 'Editar visualización';
 
-        // Seleccionar el tipo
+       // Seleccionar el tipo
         seleccionarTipo(viz.tipo);
+
+        // Va después de seleccionarTipo, que ya aplicó el valor por defecto
+        // según el tipo. Si se pusiera antes, esa función lo sobrescribiría.
+        document.getElementById('viz-ancho-completo').checked =
+            viz.config?.ancho_completo ?? (viz.tipo === 'tabla');
 
         // Seleccionar el formulario y cargar campos
         const selForm = document.getElementById('viz-formulario');

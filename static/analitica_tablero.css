@@ -841,3 +841,15 @@
     .col-handle { padding: 8px 10px; font-size: 15px; }
     .col-item   { padding: 8px 6px; }
 }
+
+/* ─── Visualización a ancho completo ──────────────────────── */
+.tb-viz-card[data-ancho="completo"] {
+    grid-column: 1 / -1;
+}
+
+/* Una tabla ancha aprovecha más alto; el scroll vertical debe
+   habilitarse aquí porque .tb-tabla-scroll solo tiene overflow-x. */
+.tb-viz-card[data-ancho="completo"][data-tipo="tabla"] .tb-tabla-scroll {
+    max-height: 520px;
+    overflow-y: auto;
+}
