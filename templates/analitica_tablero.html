@@ -1780,7 +1780,18 @@
             // Vacío = usar título automático (patrón Power BI)
             titulo_eje_x:            tituloEjeX,
             titulo_eje_y:            tituloEjeY,
-            mostrar_ejes:            mostrarEjes
+            mostrar_ejes:            mostrarEjes,
+
+            // ── Origen de cada campo ──
+            // Antes solo se guardaba el del campo a medir, y editarViz lo
+            // reutilizaba para los demás. Si venían de grupos distintos, el
+            // select quedaba en blanco al editar.
+            valor_parte:             !esTabla ? (campoValor?.parte || 'valor') : 'valor',
+            agrupacion_es_grupo:     (esLinea || esTabla) ? false : !!campoAgrupa?.es_grupo,
+            agrupacion_gid:          (esLinea || esTabla) ? '' : (campoAgrupa?.gid || ''),
+            serie_es_grupo:          esAgrupado ? !!campoSerie?.es_grupo : false,
+            serie_gid:               esAgrupado ? (campoSerie?.gid || '') : '',
+            serie_parte:             esAgrupado ? (campoSerie?.parte || 'valor') : 'valor'
         };
 
         // ── Guardar en lista local ──
@@ -1833,6 +1844,29 @@
         }
     }
 
+    /**
+     * Fija el valor de un select de campos tolerando datos incompletos.
+     * Las visualizaciones guardadas antes de este cambio no tienen el
+     * origen de cada campo, así que si la cadena exacta no existe entre
+     * las opciones se busca la primera que coincida por campo_id.
+     */
+    function fijarSelectCampo(selectId, campoId, origen, gid, parte) {
+        const sel = document.getElementById(selectId);
+        if (!sel) return;
+        if (!campoId) { sel.value = ''; return; }
+
+        const exacto = `${campoId}|${origen}|${gid || ''}|${parte || 'valor'}`;
+        if ([...sel.options].some(o => o.value === exacto)) {
+            sel.value = exacto;
+            return;
+        }
+
+        const aprox = [...sel.options].find(
+            o => o.value.split('|')[0] === String(campoId)
+        );
+        sel.value = aprox ? aprox.value : '';
+    }
+
     async function editarViz(vizId) {
         const viz = vizGuardadas.find(v => v.id === vizId);
         if (!viz) return;
@@ -1859,15 +1893,26 @@
             await cargarCampos(String(ds.formulario_id));
         }
 
-        // Restaurar selecciones de campos
-        const esGrupo  = ds.es_grupo ? 'grupo' : 'suelto';
-        const gidVal   = ds.gid || '';
-        const parteVal = ds.parte_agrupacion || 'valor';
+        // Restaurar selecciones de campos. Cada campo lleva su propio
+        // origen: usar el del campo a medir para todos dejaba los demás
+        // selects en blanco cuando venían de grupos distintos.
+        fijarSelectCampo('viz-campo-valor',
+            ds.campo_valor,
+            ds.es_grupo ? 'grupo' : 'suelto',
+            ds.gid,
+            ds.valor_parte || 'valor');
 
-        document.getElementById('viz-campo-valor').value =
-            `${ds.campo_valor}|${esGrupo}|${gidVal}|valor`;
-        document.getElementById('viz-campo-agrupacion').value =
-            `${ds.campo_agrupacion}|${esGrupo}|${gidVal}|${parteVal}`;
+        fijarSelectCampo('viz-campo-agrupacion',
+            ds.campo_agrupacion,
+            (ds.agrupacion_es_grupo ?? ds.es_grupo) ? 'grupo' : 'suelto',
+            ds.agrupacion_gid ?? ds.gid,
+            ds.parte_agrupacion || 'valor');
+
+        fijarSelectCampo('viz-campo-serie',
+            ds.campo_serie,
+            (ds.serie_es_grupo ?? ds.es_grupo) ? 'grupo' : 'suelto',
+            ds.serie_gid ?? ds.gid,
+            ds.serie_parte || 'valor');
         document.getElementById('viz-agregacion').value  = ds.agregacion || 'suma';
         document.getElementById('viz-campo-fecha').value = ds.campo_fecha_id || '';
 
