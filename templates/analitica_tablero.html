@@ -1555,47 +1555,91 @@
 
             const fila = document.createElement('div');
             fila.className = 'col-item';
-            fila.style.cssText =
-                'display:flex;align-items:center;gap:8px;font-size:13px;padding:3px 0;';
             fila.innerHTML = `
-                <label style="display:flex;align-items:center;gap:8px;flex:1;
-                              cursor:pointer;min-width:0;">
+                <span class="col-handle" title="Arrastrar para reordenar">
+                    <i class="fas fa-grip-vertical"></i>
+                </span>
+                <label class="col-label">
                     <input type="checkbox"
                         ${marcado ? 'checked' : ''}
                         data-campo-id="${c.id}"
                         data-campo-nombre="${c.nombre}"
                         data-campo-tipo="${c.tipo}"
                         data-es-grupo="${c.grupo ? 'true' : 'false'}"
-                        data-gid="${c.gid || ''}"
-                        style="width:15px;height:15px;cursor:pointer;flex-shrink:0;
-                               accent-color:var(--naranja,#FFAF33);">
-                    <span style="overflow:hidden;text-overflow:ellipsis;
-                                 white-space:nowrap;">${etq}</span>
-                </label>
-                <button type="button" onclick="moverColumna(this,-1)" title="Subir"
-                        style="background:none;border:none;cursor:pointer;color:#9ca3af;
-                               font-size:13px;padding:2px 5px;line-height:1;">▲</button>
-                <button type="button" onclick="moverColumna(this,1)" title="Bajar"
-                        style="background:none;border:none;cursor:pointer;color:#9ca3af;
-                               font-size:13px;padding:2px 5px;line-height:1;">▼</button>`;
+                        data-gid="${c.gid || ''}">
+                    <span class="col-nombre">${etq}</span>
+                </label>`;
             lista.appendChild(fila);
         });
+        inicializarDragColumnas();
     }
 
-    /** Mueve una columna una posición arriba (-1) o abajo (1). */
-    function moverColumna(btn, direccion) {
-        const fila = btn.closest('.col-item');
-        const destino = direccion === -1
-            ? fila.previousElementSibling
-            : fila.nextElementSibling;
-        if (!destino) return;
+    /**
+     * Reordenamiento por arrastre con Pointer Events: funciona igual con
+     * mouse, dedo y lápiz. Se usa un solo juego de listeners delegados en
+     * el contenedor, así que renderColumnasLista puede llamarse las veces
+     * que sea sin duplicarlos.
+     */
+    function inicializarDragColumnas() {
+        const lista = document.getElementById('viz-columnas-lista');
+        if (!lista || lista.dataset.dndListo) return;
+        lista.dataset.dndListo = '1';
 
-        if (direccion === -1) {
-            fila.parentNode.insertBefore(fila, destino);
-        } else {
-            fila.parentNode.insertBefore(destino, fila);
-        }
-        fila.scrollIntoView({ block: 'nearest' });
+        let fila = null;          // fila que se está arrastrando
+        let autoScroll = null;    // temporizador de desplazamiento en bordes
+
+        lista.addEventListener('pointerdown', e => {
+            const asa = e.target.closest('.col-handle');
+            if (!asa) return;                    // solo se arrastra desde el asa
+
+            fila = asa.closest('.col-item');
+            if (!fila) return;
+
+            // Captura el puntero para seguir recibiendo eventos aunque el
+            // dedo salga de la fila original.
+            asa.setPointerCapture(e.pointerId);
+            fila.classList.add('col-arrastrando');
+            e.preventDefault();
+        });
+
+        lista.addEventListener('pointermove', e => {
+            if (!fila) return;
+            e.preventDefault();
+
+            // elementFromPoint funciona igual para mouse y para dedo.
+            const bajo = document.elementFromPoint(e.clientX, e.clientY);
+            const destino = bajo && bajo.closest('.col-item');
+
+            if (destino && destino !== fila && destino.parentNode === lista) {
+                const rect  = destino.getBoundingClientRect();
+                const mitad = rect.top + rect.height / 2;
+                if (e.clientY < mitad) {
+                    lista.insertBefore(fila, destino);
+                } else {
+                    lista.insertBefore(fila, destino.nextSibling);
+                }
+            }
+
+            // La lista tiene max-height con scroll: si el puntero se acerca
+            // a un borde, se desplaza sola para alcanzar filas ocultas.
+            const caja = lista.getBoundingClientRect();
+            const zona = 28;
+            clearInterval(autoScroll);
+            if (e.clientY < caja.top + zona) {
+                autoScroll = setInterval(() => lista.scrollTop -= 6, 16);
+            } else if (e.clientY > caja.bottom - zona) {
+                autoScroll = setInterval(() => lista.scrollTop += 6, 16);
+            }
+        });
+
+        const soltar = () => {
+            clearInterval(autoScroll);
+            if (fila) fila.classList.remove('col-arrastrando');
+            fila = null;
+        };
+
+        lista.addEventListener('pointerup', soltar);
+        lista.addEventListener('pointercancel', soltar);
     }
 
     // Parsear el valor del selector de campo: "id|tipo|gid"
