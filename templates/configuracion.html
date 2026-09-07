@@ -590,12 +590,6 @@
                 <div class="cfg-inner-divider"></div>
 
                 <div class="invite-field">
-                    <label for="voc-sector">Sector de la empresa</label>
-                    <select id="voc-sector"></select>
-                    <span class="voc-hint">Define el vocabulario y las convenciones de redacción base.</span>
-                </div>
-
-                <div class="invite-field">
                     <label>Reescritura profesional</label>
                     <div class="voc-toggle-row">
                         <input type="checkbox" id="voc-activa">
@@ -605,10 +599,34 @@
                 </div>
 
                 <div class="invite-field">
+                    <label for="voc-sector">Sector de la empresa</label>
+                    <select id="voc-sector"></select>
+                    <span class="voc-hint">Define el vocabulario y las convenciones de redacción base.</span>
+                </div>
+
+                <div class="invite-field">
+                    <label for="voc-pais">País de operación</label>
+                    <select id="voc-pais">
+                        <option value="Colombia">Colombia</option>
+                        <option value="México">México</option>
+                        <option value="Ecuador">Ecuador</option>
+                        <option value="Perú">Perú</option>
+                        <option value="Chile">Chile</option>
+                        <option value="Argentina">Argentina</option>
+                        <option value="Panamá">Panamá</option>
+                        <option value="Costa Rica">Costa Rica</option>
+                        <option value="República Dominicana">República Dominicana</option>
+                        <option value="España">España</option>
+                        <option value="Estados Unidos">Estados Unidos</option>
+                    </select>
+                    <span class="voc-hint">Ajusta los modismos y las convenciones regionales del español.</span>
+                </div>
+
+                <div class="invite-field">
                     <label for="voc-instrucciones">Preferencias de redacción (opcional)</label>
-                    <textarea id="voc-instrucciones" rows="3" maxlength="600"
+                    <textarea id="voc-instrucciones" rows="5" maxlength="3000"
                             placeholder="Ej: usar siempre 'colaborador' en lugar de 'trabajador'."></textarea>
-                    <span class="voc-hint"><span id="voc-contador">0</span>/600 caracteres</span>
+                    <span class="voc-hint"><span id="voc-contador">0</span>/3000 caracteres</span>
                 </div>
 
                 <div class="cfg-actions">
@@ -1076,7 +1094,8 @@
                 .map(s => `<option value="${s.slug}">${s.nombre}</option>`).join('');
             sel.value = data.sector;
 
-            document.getElementById('voc-activa').checked   = data.activa;
+            document.getElementById('voc-activa').checked = data.activa;
+            document.getElementById('voc-pais').value     = data.pais || 'Colombia';
             document.getElementById('voc-instrucciones').value = data.instrucciones;
             document.getElementById('voc-contador').textContent = data.instrucciones.length;
         } catch {
@@ -1091,6 +1110,7 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     sector:        document.getElementById('voc-sector').value,
+                    pais:          document.getElementById('voc-pais').value,
                     activa:        document.getElementById('voc-activa').checked,
                     instrucciones: document.getElementById('voc-instrucciones').value
                 })

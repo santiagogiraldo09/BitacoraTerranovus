@@ -748,17 +748,19 @@ def vocabulario_config():
             cursor.execute("""
                 SELECT COALESCE(NULLIF(sector, ''), 'general'),
                        COALESCE(reescritura_activa, TRUE),
-                       COALESCE(instrucciones_reescritura, '')
+                       COALESCE(instrucciones_reescritura, ''),
+                       COALESCE(NULLIF(pais, ''), 'Colombia')
                 FROM empresas WHERE id = %s
             """, (session.get('empresa_id'),))
             fila = cursor.fetchone()
 
-        sector, activa, instrucciones = fila if fila else ('general', True, '')
+        sector, activa, instrucciones, pais = fila if fila else ('general', True, '', 'Colombia')
         return jsonify({
             'success': True,
             'sector': sector,
             'activa': activa,
             'instrucciones': instrucciones,
+            'pais': pais,
             # Solo los sectores implementados; el <select> se llena con esto.
             'sectores': [{'slug': k, 'nombre': v['nombre']}
                          for k, v in CONTEXTO_SECTOR.items()]
