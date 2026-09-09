@@ -199,6 +199,21 @@ CONTEXTO_SECTOR = {
     }
 }
 
+# Caché en memoria del glosario por empresa. Evita consultar Supabase en
+# cada dictado. TTL corto para que un término recién agregado se refleje
+# pronto sin reiniciar el servicio.
+_CACHE_GLOSARIO = {}
+_GLOSARIO_TTL   = 300  # segundos
+
+
+def invalidar_glosario(empresa_id):
+    """Descarta el glosario cacheado de una empresa.
+
+    Se llama al guardar la configuración o al modificar un término, para
+    que el siguiente dictado use la versión nueva y no la del caché.
+    """
+    _CACHE_GLOSARIO.pop(empresa_id, None)
+
 @app.before_request
 def make_session_permanent():
     session.permanent = True
