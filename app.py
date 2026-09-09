@@ -805,11 +805,13 @@ def guardar_vocabulario_config():
                 UPDATE empresas
                 SET sector = %s,
                     reescritura_activa = %s,
-                    instrucciones_reescritura = %s
+                    instrucciones_reescritura = %s,
+                    pais = COALESCE(NULLIF(%s, ''), pais)
                 WHERE id = %s
             """, (sector,
                   bool(data.get('activa', True)),
-                  (data.get('instrucciones') or '').strip()[:600],
+                  (data.get('instrucciones') or '').strip()[:3000],
+                  (data.get('pais') or '').strip(),
                   empresa_id))
             conn.commit()
 
