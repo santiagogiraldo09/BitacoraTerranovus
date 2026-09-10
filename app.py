@@ -329,20 +329,6 @@ app.secret_key = os.environ.get('SECRET_KEY', 'bitacora-iac-2026-fallback')
 #app.secret_key = '78787878tyg8987652vgdfdf3445'
 CORS(app)
 
-'''
-from flask_mail import Mail, Message
-import random, string
-
-# Configuración de correo (ajusta con tu cuenta SMTP)
-app.config['MAIL_SERVER']   = 'smtp.gmail.com'
-app.config['MAIL_PORT']     = 587
-app.config['MAIL_USE_TLS']  = True
-app.config['MAIL_USERNAME'] = 'muneragacias@gmail.com'      # ← tu correo
-app.config['MAIL_PASSWORD'] = 'rxghrdeqoupdkaex'         # ← contraseña de app Gmail
-app.config['MAIL_DEFAULT_SENDER'] = 'muneragacias@gmail.com'
-
-mail = Mail(app)
-'''
 import random, string
 import msal
 import requests
