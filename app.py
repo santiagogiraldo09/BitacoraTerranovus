@@ -1213,11 +1213,13 @@ def bi_datos():
                     if texto:
                         return texto
                 elif parte == 'codigo':
-                    val = bloque.get(cid)
+                    # El id del registro de origen se guarda en cid + '_codigo'
+                    val = bloque.get(cid + '_codigo')
                     if val is not None:
                         return val
                 else:
-                    texto = bloque.get(cid + '_codigo') or bloque.get(cid)
+                    # 'valor' debe devolver la etiqueta visible, que vive en cid
+                    texto = bloque.get(cid) or bloque.get(cid + '_codigo')
                     if texto is not None:
                         return texto
             return None
@@ -1233,9 +1235,9 @@ def bi_datos():
                 if parte == 'causa':
                     v = resp.get(cid + '_codigo')
                 elif parte == 'codigo':
-                    v = resp.get(cid)
+                    v = resp.get(cid + '_codigo')
                 else:
-                    v = resp.get(cid + '_codigo') or resp.get(cid)
+                    v = resp.get(cid) or resp.get(cid + '_codigo')
                 if v:
                     return str(v)
             return 'Sin dato'
