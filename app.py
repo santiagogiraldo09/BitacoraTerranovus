@@ -94,14 +94,6 @@ SYNCHRO_CONFIG = {
     'form_id': 'e4bQKVghekuuA8Y6dmHKWPFDh67WqydKr1vfz4Z0oAs'  # Formulario 1.09-00001
 }
 
-# Configura SharePoint (modifica con tus datos)
-SHAREPOINT_SITE_URL = "https://iacsas.sharepoint.com/sites/Pruebasproyectossantiago"
-LIST_NAME = "Proyectos"  # Nombre de la biblioteca
-LIST_NAME_REGISTROS = "RegistrosBitacora"
-SHAREPOINT_USER = "santiago.giraldo@iac.com.co"
-SHAREPOINT_PASSWORD = "rwrwerwer"
-
-
 # Cargar variables de entorno
 #load_dotenv('config/settings.env')  # Ruta relativa al archivo .env
 
@@ -6448,13 +6440,16 @@ def subir_logo():
         nombre_archivo = f"{uuid.uuid4()}.{ext}"
         ruta = f"logos/{empresa_id}/{nombre_archivo}"
 
-        supabase_client.storage.from_('fotos-bitacora').upload(
+        supabase_client.storage.from_('logos-bitacora').upload(
             ruta,
             imagen_bytes,
             {"content-type": f"image/{ext}"}
         )
 
-        url_publica = f"{SUPABASE_URL}/storage/v1/object/public/fotos-bitacora/{ruta}"
+        url_publica = (
+            f"{SUPABASE_URL}/storage/v1/object/public/"
+            f"logos-bitacora/{ruta}"
+        )       
 
         # Guardar en BD
         with db_connection() as (conn, cursor):

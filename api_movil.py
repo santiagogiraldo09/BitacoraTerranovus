@@ -248,7 +248,7 @@ def _proyectos_del_usuario(uid, empresa_id):
 # ----------------------------- RUTAS ---------------------------------
 
 # ⚠️ TEMPORAL: pon False cuando termines de depurar
-DEBUG_API = True
+DEBUG_API = False
 
 
 @api_movil.route("/api/login", methods=["POST"])
@@ -720,9 +720,17 @@ def api_movil_subir_logo():
         imagen_bytes = base64.b64decode(b64)
         nombre = f"{uuid.uuid4()}.{ext}"
         ruta = f"logos/{empresa_id}/{nombre}"
-        supabase_client.storage.from_("fotos-bitacora").upload(
-            ruta, imagen_bytes, {"content-type": f"image/{ext}"})
-        url_publica = f"{SUPABASE_URL}/storage/v1/object/public/fotos-bitacora/{ruta}"
+
+        supabase_client.storage.from_("logos-bitacora").upload(
+            ruta,
+            imagen_bytes,
+            {"content-type": f"image/{ext}"}
+        )
+
+        url_publica = (
+            f"{SUPABASE_URL}/storage/v1/object/public/"
+            f"logos-bitacora/{ruta}"
+        )
         supabase_client.table("empresa_logos").insert({
             "empresa_id": empresa_id, "url": url_publica,
             "creado_por": _num(u["uid"])}).execute()
