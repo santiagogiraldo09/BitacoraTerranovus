@@ -1064,32 +1064,96 @@ def api_movil_eliminar_usuario(uid):
 @api_movil.route("/api/movil/upload-foto", methods=["POST"])
 @requiere_token
 def api_movil_upload_foto():
-    """Sube una imagen en base64 a Supabase Storage."""
+    """
+    Sube una imagen a Supabase Storage.
+
+    La fotografía queda organizada por empresa:
+        registros/<empresa_id>/<uuid>.<ext>
+
+    Por ahora el bucket sigue siendo PUBLIC durante la migración.
+    Cuando terminemos la migración, fotos-bitacora será PRIVATE.
+    """
     from app import supabase_client, SUPABASE_URL
-    import base64, uuid
+    import base64
+    import uuid
+
+    # Usuario obtenido del token por @requiere_token
+    u = request.usuario
+    empresa_id = _num(u["empresa_id"])
+
     data = request.get_json(silent=True) or {}
-    file_data = data.get('file_data', '')
+    file_data = data.get("file_data", "")
+
     if not file_data:
         return jsonify({"error": "No se recibió imagen"}), 400
+
     try:
-        if ',' in file_data:
-            header, b64 = file_data.split(',', 1)
-            if 'png' in header:   ext, mime = 'png', 'image/png'
-            elif 'webp' in header: ext, mime = 'webp', 'image/webp'
-            else:                  ext, mime = 'jpg', 'image/jpeg'
+        # -------------------------------------------------------------
+        # 1. Detectar formato
+        # -------------------------------------------------------------
+        if "," in file_data:
+            header, b64 = file_data.split(",", 1)
+
+            if "png" in header:
+                ext = "png"
+                mime = "image/png"
+
+            elif "webp" in header:
+                ext = "webp"
+                mime = "image/webp"
+
+            else:
+                ext = "jpg"
+                mime = "image/jpeg"
+
         else:
-            b64, ext, mime = file_data, 'jpg', 'image/jpeg'
-        imagen_bytes   = base64.b64decode(b64)
+            b64 = file_data
+            ext = "jpg"
+            mime = "image/jpeg"
+
+        # -------------------------------------------------------------
+        # 2. Convertir Base64
+        # -------------------------------------------------------------
+        imagen_bytes = base64.b64decode(b64)
+
+        # -------------------------------------------------------------
+        # 3. Crear nombre único
+        # -------------------------------------------------------------
         nombre_archivo = f"{uuid.uuid4()}.{ext}"
-        ruta           = f"registros/{nombre_archivo}"
-        supabase_client.storage.from_('fotos-bitacora').upload(
-            ruta, imagen_bytes, {"content-type": mime}
+
+        # IMPORTANTE:
+        # ahora las fotografías quedan separadas por empresa.
+        ruta = f"registros/{empresa_id}/{nombre_archivo}"
+
+        # -------------------------------------------------------------
+        # 4. Subir a Supabase
+        # -------------------------------------------------------------
+        supabase_client.storage.from_("fotos-bitacora").upload(
+            ruta,
+            imagen_bytes,
+            {"content-type": mime}
         )
-        url_publica = f"{SUPABASE_URL}/storage/v1/object/public/fotos-bitacora/{ruta}"
-        return jsonify({"url": url_publica}), 200
+
+        # -------------------------------------------------------------
+        # 5. TEMPORAL DURANTE LA MIGRACIÓN
+        #
+        # fotos-bitacora todavía es PUBLIC.
+        # Seguimos devolviendo una URL pública para no romper la app.
+        # Esto se eliminará cuando hagamos privado el bucket.
+        # -------------------------------------------------------------
+        url_publica = (
+            f"{SUPABASE_URL}/storage/v1/object/public/"
+            f"fotos-bitacora/{ruta}"
+        )
+
+        return jsonify({
+            "url": url_publica,
+            "path": ruta
+        }), 200
+
     except Exception as e:
         current_app.logger.exception("api_movil_upload_foto")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "No fue posible subir la imagen"}), 500
 
 
 @api_movil.route("/api/ping", methods=["GET"])
