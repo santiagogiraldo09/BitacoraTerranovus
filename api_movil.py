@@ -363,6 +363,115 @@ def api_proyecto_registros(project_id):
         return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
 
 
+def _extraer_ruta_foto(valor):
+    """
+    Convierte una referencia de fotos-bitacora en su ruta interna.
+
+    Acepta:
+      - URL pública antigua
+      - URL pública nueva organizada por empresa
+      - ruta interna registros/...
+
+    Ejemplos:
+      https://.../public/fotos-bitacora/registros/abc.jpg
+          -> registros/abc.jpg
+
+      https://.../public/fotos-bitacora/registros/1/abc.jpg
+          -> registros/1/abc.jpg
+
+      registros/1/abc.jpg
+          -> registros/1/abc.jpg
+    """
+    if not isinstance(valor, str):
+        return None
+
+    valor = valor.strip()
+
+    if valor.startswith("registros/"):
+        return valor
+
+    marcador = "/fotos-bitacora/"
+
+    if marcador in valor:
+        ruta = valor.split(marcador, 1)[1]
+
+        if ruta.startswith("registros/"):
+            return ruta
+
+    return None
+
+
+def _crear_url_firmada_foto(ruta, expires_in=3600):
+    """
+    Genera una URL temporal para una fotografía privada.
+
+    expires_in está expresado en segundos.
+    3600 = 1 hora.
+    """
+    from app import supabase_client
+
+    resultado = (
+        supabase_client.storage
+        .from_("fotos-bitacora")
+        .create_signed_url(ruta, expires_in)
+    )
+
+    if isinstance(resultado, dict):
+        return (
+            resultado.get("signedURL")
+            or resultado.get("signedUrl")
+            or resultado.get("signed_url")
+        )
+
+    return None
+
+
+def _firmar_fotos_en_respuestas(valor):
+    """
+    Recorre recursivamente respuestas_formulario y sustituye referencias
+    de fotos-bitacora por URLs firmadas temporales.
+
+    Soporta:
+      - strings
+      - listas de fotografías
+      - diccionarios
+      - __repeticiones
+      - estructuras anidadas
+    """
+
+    if isinstance(valor, dict):
+        return {
+            k: _firmar_fotos_en_respuestas(v)
+            for k, v in valor.items()
+        }
+
+    if isinstance(valor, list):
+        return [
+            _firmar_fotos_en_respuestas(v)
+            for v in valor
+        ]
+
+    if isinstance(valor, str):
+        ruta = _extraer_ruta_foto(valor)
+
+        if ruta:
+            try:
+                url_firmada = _crear_url_firmada_foto(ruta)
+
+                if url_firmada:
+                    return url_firmada
+
+            except Exception:
+                current_app.logger.exception(
+                    "No se pudo generar URL firmada para %s",
+                    ruta
+                )
+
+        return valor
+
+    return valor
+
+
 def _preview_respuestas(respuestas):
     """Arma un texto corto con los primeros valores del registro."""
     if not isinstance(respuestas, dict):
@@ -596,7 +705,7 @@ def api_movil_registro(registro_id):
             "id": reg["id"],
             "formulario_id": reg["formulario_id"],
             "id_proyecto": reg["id_proyecto"],
-            "respuestas": reg.get("respuestas") or {},
+            "respuestas": _firmar_fotos_en_respuestas(reg.get("respuestas") or {}),
             "autor": autor,
             "es_autor": _num(reg.get("user_id")) == _num(u["uid"]),
             "created_at": reg.get("created_at"),
