@@ -386,11 +386,6 @@ def enviar_correo(destinatarios, asunto, cuerpo_html):
 
 projects = []
 
-# Conecta con el servicio de Blob Storage de Azure
-connection_string = "DefaultEndpointsProtocol=https;AccountName=registrobitacora;AccountKey=ZyHZAOvOBijiOfY3BR3ZEDZsCAHOu3swEPnS+D7AacR2Yr94HS+jBMa2/20sJpZ71decGXYHQxE2+AStBWI/wA==;EndpointSuffix=core.windows.net"
-container_name = "registros"
-
-
 # Inicializa el cliente de BlobServiceClient
 blob_service_client = BlobServiceClient.from_connection_string(connection_string)
 
