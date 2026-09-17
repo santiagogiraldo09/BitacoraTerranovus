@@ -387,7 +387,7 @@ def enviar_correo(destinatarios, asunto, cuerpo_html):
 projects = []
 
 # Inicializa el cliente de BlobServiceClient
-blob_service_client = BlobServiceClient.from_connection_string(connection_string)
+#blob_service_client = BlobServiceClient.from_connection_string(connection_string)
 
 def generar_password_temporal(longitud=10):
     caracteres = string.ascii_letters + string.digits
