@@ -1174,19 +1174,20 @@ def api_movil_eliminar_usuario(uid):
 @requiere_token
 def api_movil_upload_foto():
     """
-    Sube una imagen a Supabase Storage.
+    Sube una fotografía a Supabase Storage.
 
-    La fotografía queda organizada por empresa:
+    Estructura:
         registros/<empresa_id>/<uuid>.<ext>
 
-    Por ahora el bucket sigue siendo PUBLIC durante la migración.
-    Cuando terminemos la migración, fotos-bitacora será PRIVATE.
+    La BD recibe únicamente la ruta interna.
+    No se almacenan URLs públicas ni URLs firmadas.
     """
     from app import supabase_client
     import base64
     import uuid
 
-    # Usuario obtenido del token por @requiere_token
+    # La empresa NO viene del frontend.
+    # Se obtiene del token autenticado.
     u = request.usuario
     empresa_id = _num(u["empresa_id"])
 
@@ -1197,59 +1198,56 @@ def api_movil_upload_foto():
         return jsonify({"error": "No se recibió imagen"}), 400
 
     try:
-        # -------------------------------------------------------------
-        # 1. Detectar formato
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------
+        # 1. Determinar formato
+        # ---------------------------------------------------------
         if "," in file_data:
             header, b64 = file_data.split(",", 1)
 
             if "png" in header:
                 ext = "png"
                 mime = "image/png"
-
             elif "webp" in header:
                 ext = "webp"
                 mime = "image/webp"
-
             else:
                 ext = "jpg"
                 mime = "image/jpeg"
-
         else:
             b64 = file_data
             ext = "jpg"
             mime = "image/jpeg"
 
-        # -------------------------------------------------------------
-        # 2. Convertir Base64
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------
+        # 2. Decodificar imagen
+        # ---------------------------------------------------------
         imagen_bytes = base64.b64decode(b64)
 
-        # -------------------------------------------------------------
-        # 3. Crear nombre único
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------
+        # 3. Crear nombre y ruta aislada por empresa
+        # ---------------------------------------------------------
         nombre_archivo = f"{uuid.uuid4()}.{ext}"
 
-        # IMPORTANTE:
-        # ahora las fotografías quedan separadas por empresa.
-        ruta = f"registros/{empresa_id}/{nombre_archivo}"
+        ruta = (
+            f"registros/"
+            f"{empresa_id}/"
+            f"{nombre_archivo}"
+        )
 
-        # -------------------------------------------------------------
-        # 4. Subir a Supabase
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------
+        # 4. Subir a Storage
+        # ---------------------------------------------------------
         supabase_client.storage.from_("fotos-bitacora").upload(
             ruta,
             imagen_bytes,
-            {"content-type": mime}
+            {
+                "content-type": mime
+            }
         )
 
-        # -------------------------------------------------------------
-        # 5. TEMPORAL DURANTE LA MIGRACIÓN
-        #
-        # fotos-bitacora todavía es PUBLIC.
-        # Seguimos devolviendo una URL pública para no romper la app.
-        # Esto se eliminará cuando hagamos privado el bucket.
-        # -------------------------------------------------------------
+        # ---------------------------------------------------------
+        # 5. Devolver SOLAMENTE ruta interna
+        # ---------------------------------------------------------
         return jsonify({
             "url": ruta,
             "path": ruta
@@ -1257,7 +1255,9 @@ def api_movil_upload_foto():
 
     except Exception as e:
         current_app.logger.exception("api_movil_upload_foto")
-        return jsonify({"error": "No fue posible subir la imagen"}), 500
+        return jsonify({
+            "error": "No fue posible subir la imagen"
+        }), 500
 
 
 @api_movil.route("/api/ping", methods=["GET"])
