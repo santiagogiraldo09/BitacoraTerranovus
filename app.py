@@ -401,17 +401,36 @@ def generar_password_temporal(longitud=10):
 
 @app.route('/upload_foto', methods=['POST'])
 def upload_foto():
+    """
+    Sube una fotografía desde la versión web a Supabase Storage.
+
+    Estructura:
+        registros/<empresa_id>/<uuid>.<ext>
+
+    La BD recibe únicamente la ruta interna.
+    No se almacenan URLs públicas ni URLs firmadas.
+    """
+
     if 'user_id' not in session:
         return jsonify({"error": "No autorizado"}), 401
+
+    # La empresa se obtiene de la sesión autenticada.
+    empresa_id = session.get('empresa_id')
+
+    if not empresa_id:
+        return jsonify({"error": "Empresa no identificada"}), 403
+
     try:
-        data = request.json
+        data = request.get_json(silent=True) or {}
         file_data = data.get('file_data', '')
 
         if not file_data:
             return jsonify({"error": "No se recibió imagen"}), 400
 
+        # Determinar formato
         if ',' in file_data:
             header, b64 = file_data.split(',', 1)
+
             if 'png' in header:
                 ext, mime = 'png', 'image/png'
             elif 'webp' in header:
@@ -421,22 +440,33 @@ def upload_foto():
         else:
             b64, ext, mime = file_data, 'jpg', 'image/jpeg'
 
+        # Decodificar imagen
         imagen_bytes = base64.b64decode(b64)
-        nombre_archivo = f"{uuid.uuid4()}.{ext}"
-        ruta = f"registros/{nombre_archivo}"
 
+        # Crear nombre único
+        nombre_archivo = f"{uuid.uuid4()}.{ext}"
+
+        # Aislar físicamente por empresa
+        ruta = f"registros/{empresa_id}/{nombre_archivo}"
+
+        # Subir a Supabase Storage
         supabase_client.storage.from_('fotos-bitacora').upload(
             ruta,
             imagen_bytes,
             {"content-type": mime}
         )
 
-        url_publica = f"{SUPABASE_URL}/storage/v1/object/public/fotos-bitacora/{ruta}"
-        return jsonify({"url": url_publica}), 200
+        # Devolver únicamente la ruta interna
+        return jsonify({
+            "url": ruta,
+            "path": ruta
+        }), 200
 
-    except Exception as e:
-        print(f"Error subiendo foto: {e}")
-        return jsonify({"error": str(e)}), 500
+    except Exception:
+        app.logger.exception("Error subiendo foto web")
+        return jsonify({
+            "error": "No fue posible subir la imagen"
+        }), 500
 
 @app.route('/invitar-empresa', methods=['POST'])
 def invitar_empresa():
