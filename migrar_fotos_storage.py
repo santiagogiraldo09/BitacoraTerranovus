@@ -224,6 +224,48 @@ def main():
         print("Los archivos originales NO fueron eliminados.")
         print("La base de datos NO fue modificada.")
 
+def verificar_fotos_migradas():
+    fotos = obtener_fotos_a_migrar()
+
+    print()
+    print("==============================================")
+    print("VERIFICACION DE FOTOS MIGRADAS")
+    print("==============================================")
+    print(f"Esperadas: {len(fotos)}")
+    print()
+
+    correctas = 0
+    errores = 0
+
+    for i, foto in enumerate(fotos, start=1):
+        destino = foto["ruta_nueva"]
+
+        try:
+            contenido = (
+                supabase_client.storage
+                .from_(BUCKET)
+                .download(destino)
+            )
+
+            if not contenido:
+                raise RuntimeError("Archivo vacío")
+
+            correctas += 1
+            print(f"[{i}/{len(fotos)}] OK: {destino}")
+
+        except Exception as e:
+            errores += 1
+            print(f"[{i}/{len(fotos)}] ERROR: {destino}")
+            print(f"    {e}")
+
+    print()
+    print("==============================================")
+    print("RESULTADO VERIFICACION")
+    print("==============================================")
+    print(f"Esperadas : {len(fotos)}")
+    print(f"Correctas : {correctas}")
+    print(f"Errores   : {errores}")
+
 
 if __name__ == "__main__":
-    main()
+    verificar_fotos_migradas()
