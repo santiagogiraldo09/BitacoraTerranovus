@@ -1182,7 +1182,7 @@ def api_movil_upload_foto():
     Por ahora el bucket sigue siendo PUBLIC durante la migración.
     Cuando terminemos la migración, fotos-bitacora será PRIVATE.
     """
-    from app import supabase_client, SUPABASE_URL
+    from app import supabase_client
     import base64
     import uuid
 
@@ -1250,13 +1250,8 @@ def api_movil_upload_foto():
         # Seguimos devolviendo una URL pública para no romper la app.
         # Esto se eliminará cuando hagamos privado el bucket.
         # -------------------------------------------------------------
-        url_publica = (
-            f"{SUPABASE_URL}/storage/v1/object/public/"
-            f"fotos-bitacora/{ruta}"
-        )
-
         return jsonify({
-            "url": url_publica,
+            "url": ruta,
             "path": ruta
         }), 200
 
