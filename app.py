@@ -398,6 +398,81 @@ def generar_password_temporal(longitud=10):
     caracteres = string.ascii_letters + string.digits
     return ''.join(random.choices(caracteres, k=longitud))
 
+def generar_url_firmada_foto(ruta, expires_in=3600):
+    """
+    Genera una URL temporal para visualizar una fotografía privada
+    almacenada en fotos-bitacora.
+
+    La ruta original almacenada en PostgreSQL no se modifica.
+    """
+    if not ruta or not isinstance(ruta, str):
+        return ruta
+
+    if not ruta.startswith("registros/"):
+        return ruta
+
+    try:
+        resultado = (
+            supabase_client.storage
+            .from_("fotos-bitacora")
+            .create_signed_url(ruta, expires_in)
+        )
+
+        if isinstance(resultado, dict):
+            return (
+                resultado.get("signedURL")
+                or resultado.get("signedUrl")
+                or resultado.get("signed_url")
+                or ruta
+            )
+
+        return ruta
+
+    except Exception:
+        app.logger.exception(
+            "No se pudo generar URL firmada para %s",
+            ruta
+        )
+        return ruta
+
+def generar_url_firmada_foto(ruta, expires_in=3600):
+    """
+    Genera una URL temporal para visualizar una fotografía
+    almacenada en fotos-bitacora.
+
+    La ruta interna almacenada en PostgreSQL no se modifica.
+    """
+    if not ruta or not isinstance(ruta, str):
+        return ruta
+
+    # Solo firmamos rutas internas de fotografías.
+    if not ruta.startswith("registros/"):
+        return ruta
+
+    try:
+        resultado = (
+            supabase_client.storage
+            .from_("fotos-bitacora")
+            .create_signed_url(ruta, expires_in)
+        )
+
+        if isinstance(resultado, dict):
+            return (
+                resultado.get("signedURL")
+                or resultado.get("signedUrl")
+                or resultado.get("signed_url")
+                or ruta
+            )
+
+        return ruta
+
+    except Exception:
+        app.logger.exception(
+            "No se pudo generar URL firmada para %s",
+            ruta
+        )
+        return ruta
+
 
 @app.route('/upload_foto', methods=['POST'])
 def upload_foto():
@@ -4632,9 +4707,40 @@ def formulario_dinamico():
                     campo['requerido'] = requerido
                     # Pre-cargar valor si es edición
                     if registro:
-                        campo['valor'] = registro['respuestas'].get(str(cid)) or registro['respuestas'].get(cid) or ''
+                        campo['valor'] = (
+                            registro['respuestas'].get(str(cid))
+                            or registro['respuestas'].get(cid)
+                            or ''
+                        )
                     else:
                         campo['valor'] = ''
+
+                    # Para campos de imagen, mantener separadas:
+                    # - la ruta interna que se guarda en PostgreSQL
+                    # - la URL firmada temporal utilizada para visualizar
+                    if campo.get('tipo') == 'imagen' and campo['valor']:
+
+                        # El campo puede contener una sola imagen (string)
+                        # o varias imágenes (lista).
+                        if isinstance(campo['valor'], str):
+                            valores_imagen = [campo['valor']]
+                        elif isinstance(campo['valor'], list):
+                            valores_imagen = campo['valor']
+                        else:
+                            valores_imagen = []
+
+                        campo['imagenes_visualizacion'] = [
+                            {
+                                'ruta': ruta,
+                                'url_visualizacion': generar_url_firmada_foto(ruta)
+                            }
+                            for ruta in valores_imagen
+                            if isinstance(ruta, str) and ruta
+                        ]
+
+                    else:
+                        campo['imagenes_visualizacion'] = []
+
                     campos.append(campo)
 
             # ── Agrupar en secciones (para el render con grupos) ──

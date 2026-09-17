@@ -262,23 +262,27 @@
                 <div class="imagen-campo-wrap" data-campo-id="{{ campo.id }}">
 
                     <div class="imagen-preview-grid" id="previews-{{ campo.id }}">
-                        {% if valor %}
-                            {% if valor is string %}
-                                {% set urls = [valor] %}
-                            {% else %}
-                                {% set urls = valor %}
-                            {% endif %}
-                            {% for url in urls %}
+                        {% if campo.imagenes_visualizacion %}
+                            {% for imagen in campo.imagenes_visualizacion %}
                             <div class="imagen-preview-item">
-                                <img src="{{ url }}" class="imagen-preview-thumb"
-                                    onclick="window.open('{{ url }}', '_blank')">
-                                <button type="button" class="imagen-preview-delete"
-                                        onclick="eliminarImagenGuardada(this, '{{ campo.id }}', '{{ url }}')">
+
+                                <img src="{{ imagen.url_visualizacion }}"
+                                    class="imagen-preview-thumb"
+                                    onclick="window.open('{{ imagen.url_visualizacion }}', '_blank')">
+
+                                <button type="button"
+                                        class="imagen-preview-delete"
+                                        onclick="eliminarImagenGuardada(this, '{{ campo.id }}', '{{ imagen.ruta }}')">
                                     <i class="fas fa-times"></i>
                                 </button>
+
                                 <span class="imagen-preview-label">Guardada</span>
-                                <input type="hidden" class="imagen-url-guardada"
-                                    data-campo-id="{{ campo.id }}" value="{{ url }}">
+
+                                <input type="hidden"
+                                    class="imagen-url-guardada"
+                                    data-campo-id="{{ campo.id }}"
+                                    value="{{ imagen.ruta }}">
+
                             </div>
                             {% endfor %}
                         {% endif %}
