@@ -8,7 +8,7 @@ BUCKET = "fotos-bitacora"
 # ============================================================
 # True  = solo simula. NO copia archivos.
 # False = realiza las copias.
-DRY_RUN = True
+DRY_RUN = False
 
 
 def obtener_fotos_a_migrar():
