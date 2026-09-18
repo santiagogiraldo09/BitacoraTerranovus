@@ -3519,6 +3519,11 @@ def verify_user(email, password):
             (email,)
         )
         user = cursor.fetchone()
+        # Un usuario desactivado no puede iniciar sesión aunque su
+        # contraseña siga siendo válida.
+        if user and user[5] == 'inactivo':
+            return None
+
         if user and check_password_hash(user[1], password):
             return {
                 'user_id':    user[0],
@@ -5127,6 +5132,7 @@ def configuracion():
             SELECT user_id, name, apellido, email, rol, estado
             FROM usuario
             WHERE empresa_id = %s
+              AND COALESCE(estado, 'activo') <> 'inactivo'
             ORDER BY name ASC
         """, (session.get('empresa_id'),))
         
@@ -6583,7 +6589,20 @@ def eliminar_usuario(user_id):
         if not cursor.fetchone():
             return jsonify({'success': False, 'error': 'Usuario no encontrado en tu organización'})
 
-        cursor.execute("DELETE FROM usuario WHERE user_id = %s", (user_id,))
+        # Desactivación en lugar de borrado: la tabla usuario es referenciada
+        # por registros, respuestas_formulario, proyectos y contactos. Borrarla
+        # dejaría las bitácoras sin autor, y registros_lote está en CASCADE,
+        # así que esas filas se perderían en silencio.
+        cursor.execute("""
+            UPDATE usuario SET estado = 'inactivo'
+            WHERE user_id = %s
+        """, (user_id,))
+
+        # Se retiran sus asignaciones a proyectos para liberar el acceso.
+        cursor.execute("""
+            DELETE FROM proyecto_usuarios WHERE user_id = %s
+        """, (user_id,))
+
         conn.commit()
         return jsonify({'success': True})
 
