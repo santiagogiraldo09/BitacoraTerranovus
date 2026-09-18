@@ -2242,32 +2242,75 @@ def _io_evidencias_de(bloque):
 
 
 def _io_imagen_temp(url, ancho_px=900):
-    """Descarga una imagen y la redimensiona antes de insertarla.
-    Redimensionar es obligatorio: fotos de celular de 4 MB agotarían
-    los 512 MB de RAM del plan de Render."""
+    """Obtiene una imagen desde Supabase Storage o desde una URL antigua
+    y la redimensiona antes de insertarla en el informe PDF.
+
+    Las fotos nuevas se almacenan en la BD como rutas internas:
+        registros/<empresa_id>/<archivo>
+
+    También mantiene compatibilidad con URLs HTTP/HTTPS antiguas.
+    """
     try:
-        r = requests.get(url, timeout=12)
-        if not r.ok:
+        # ── 1. Obtener los bytes de la imagen ──
+        if isinstance(url, str) and url.startswith("registros/"):
+            # Nueva estructura: ruta interna de Supabase Storage
+            contenido = (
+                supabase_client.storage
+                .from_("fotos-bitacora")
+                .download(url)
+            )
+
+            if not contenido:
+                print(f"[INFORME] Imagen vacía o no encontrada: {url}")
+                return None
+
+        elif isinstance(url, str) and url.startswith(("http://", "https://")):
+            # Compatibilidad con URLs antiguas
+            r = requests.get(url, timeout=12)
+
+            if not r.ok:
+                print(
+                    f"[INFORME] No se pudo descargar imagen HTTP "
+                    f"{r.status_code}: {url}"
+                )
+                return None
+
+            contenido = r.content
+
+        else:
+            print(f"[INFORME] Ruta de imagen no reconocida: {url}")
             return None
-        im = Image.open(BytesIO(r.content))
-        if im.mode in ('RGBA', 'P', 'LA'):
-            fondo = Image.new('RGB', im.size, (255, 255, 255))
-            fondo.paste(im.convert('RGBA'), mask=im.convert('RGBA').split()[-1])
+
+        # ── 2. Abrir y normalizar la imagen ──
+        im = Image.open(BytesIO(contenido))
+
+        if im.mode in ("RGBA", "P", "LA"):
+            fondo = Image.new("RGB", im.size, (255, 255, 255))
+            rgba = im.convert("RGBA")
+            fondo.paste(rgba, mask=rgba.split()[-1])
+            im.close()
             im = fondo
         else:
-            im = im.convert('RGB')
+            im = im.convert("RGB")
 
+        # ── 3. Reducir resolución para no consumir demasiada RAM ──
         if im.width > ancho_px:
             alto = int(im.height * ancho_px / im.width)
             im = im.resize((ancho_px, alto), Image.LANCZOS)
 
-        tmp = NamedTemporaryFile(delete=False, suffix='.jpg')
-        im.save(tmp.name, 'JPEG', quality=80)
+        # ── 4. Crear JPG temporal para insertarlo en el PDF ──
+        tmp = NamedTemporaryFile(delete=False, suffix=".jpg")
+        tmp.close()
+
+        im.save(tmp.name, "JPEG", quality=80)
+
         ratio = im.height / im.width
         im.close()
+
         return tmp.name, ratio
+
     except Exception as e:
-        print(f"[INFORME] No se pudo cargar la imagen: {e}")
+        print(f"[INFORME] No se pudo cargar la imagen '{url}': {e}")
         return None
 
 class _PDFInformeObra(FPDF):
@@ -6920,7 +6963,7 @@ def transcribe_audio():
         finally:
             # Limpiar archivos temporales
             try:
-                if os.path.exists(temp_input.name):
+                if os.path.exists(temp_input.name):                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
                     os.remove(temp_input.name)
                 if os.path.exists(temp_wav.name):
                     os.remove(temp_wav.name)
