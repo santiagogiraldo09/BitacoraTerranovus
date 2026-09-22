@@ -465,6 +465,9 @@
                             <button class="btn-nuevo-campo" onclick="agregarGrupo()" title="Agregar grupo">
                                 <i class="fas fa-layer-group"></i> Nuevo grupo
                             </button>
+                            <button class="btn-nuevo-campo" onclick="agregarFinGrupo()" title="Cerrar el grupo abierto">
+                                <i class="fas fa-turn-down"></i> Fin de grupo
+                            </button>
                         </div>
                         <div id="canvas-formulario">
                             <div class="canvas-empty" id="canvas-empty">
@@ -1324,6 +1327,27 @@
         mostrarToast('✅ Grupo agregado — escribe su nombre');
     }
 
+    /**
+     * Marca el fin del grupo abierto. Lo que se agregue después vuelve a ser
+     * un campo suelto. Sin este marcador, todo lo que sigue a un grupo queda
+     * dentro de él hasta que aparezca otro grupo.
+     */
+    function agregarFinGrupo() {
+        // Se valida que haya un grupo abierto recorriendo hacia atrás:
+        // si lo último fue otro cierre, o no hay grupos, no tiene sentido.
+        let abierto = false;
+        for (const c of builderCamposForm) {
+            if (c.__grupo)    abierto = true;
+            if (c.__finGrupo) abierto = false;
+        }
+        if (!abierto) {
+            mostrarToast('No hay ningún grupo abierto que cerrar', true);
+            return;
+        }
+        builderCamposForm.push({ __finGrupo: true });
+        renderCanvas();
+    }
+
     function renombrarGrupo(idx, valor) {
         builderCamposForm[idx].nombre = valor;
         const div = document.querySelector(`.canvas-grupo[data-index="${idx}"]`);
@@ -1368,7 +1392,7 @@
         const canvas   = document.getElementById('canvas-formulario');
         const empty    = document.getElementById('canvas-empty');
         const contador = document.getElementById('contador-campos-form');
-        contador.textContent = builderCamposForm.filter(c => !c.__grupo).length;
+        contador.textContent = builderCamposForm.filter(c => !c.__grupo && !c.__finGrupo).length;
 
         if (builderCamposForm.length === 0) {
             canvas.innerHTML = '';
@@ -1406,6 +1430,22 @@
                     renderCanvas();
                 });
             };
+
+            if (campo.__finGrupo) {
+                enGrupo = false;
+                div.className = 'canvas-fin-grupo';
+                div.innerHTML = `
+                    <i class="fas fa-grip-vertical canvas-campo-handle"></i>
+                    <span class="canvas-fin-grupo-texto">Fin del grupo</span>
+                    <div class="canvas-campo-actions">
+                        <button class="icon-btn danger" onclick="quitarCampoForm(${idx})" title="Quitar marcador">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>`;
+                registrarDrag();
+                canvas.appendChild(div);
+                return;
+            }
 
             if (campo.__grupo) {
                 enGrupo = true;
@@ -1551,7 +1591,7 @@
             mostrarToast('❌ El nombre del formulario es obligatorio', true);
             return;
         }
-        if (builderCamposForm.filter(c => !c.__grupo).length === 0) {
+        if (builderCamposForm.filter(c => !c.__grupo && !c.__finGrupo).length === 0) {
             mostrarToast('❌ Agrega al menos un campo', true);
             return;
         }
@@ -1566,14 +1606,17 @@
         const payload = {
             nombre,
             descripcion,
-            campos: builderCamposForm.map(c => c.__grupo
-                ? {
-                    tipo:      'grupo',
-                    gid:       c.gid || nuevoGid(),
-                    nombre:    (c.nombre || '').trim() || 'Grupo',
-                    repetible: c.repetible || false
-                }
-                : { id: c.id, requerido: c.requerido || false })
+            campos: builderCamposForm.map(c =>
+                c.__finGrupo
+                    ? { tipo: 'fin_grupo' }
+                    : c.__grupo
+                        ? {
+                            tipo:      'grupo',
+                            gid:       c.gid || nuevoGid(),
+                            nombre:    (c.nombre || '').trim() || 'Grupo',
+                            repetible: c.repetible || false
+                        }
+                        : { id: c.id, requerido: c.requerido || false })
         };
 
         try {

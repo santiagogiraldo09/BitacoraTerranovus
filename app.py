@@ -705,20 +705,43 @@ def invitar_usuarios_core(data, admin_user_id, empresa_id, _reintento=0):
                     continue
 
                 cursor.execute(
-                    "SELECT user_id FROM usuario WHERE email = %s", (correo,)
+                    "SELECT user_id, estado, empresa_id FROM usuario WHERE email = %s",
+                    (correo,)
                 )
-                if cursor.fetchone():
+                existente = cursor.fetchone()
+
+                # Solo se reactiva a alguien desactivado de la MISMA empresa.
+                # Sin esa condición, invitar un correo inactivo de otra
+                # organización lo movería de empresa sin querer.
+                reactivar = (
+                    existente
+                    and existente[1] == 'inactivo'
+                    and existente[2] == empresa_id
+                )
+
+                if existente and not reactivar:
                     omitidos.append(correo)
                     continue
 
                 password_temp = generar_password_temporal()
                 hashed        = generate_password_hash(password_temp)
 
-                cursor.execute("""
-                    INSERT INTO usuario
-                        (name, apellido, email, password, cargo, rol, empresa_id, estado)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, 'pendiente')
-                """, (nombre, apellido, correo, hashed, cargo, rol, empresa_id))
+                if reactivar:
+                    # Vuelve al punto de partida: contraseña temporal nueva y
+                    # estado 'pendiente', igual que una invitación de cero.
+                    # Sus registros históricos siguen asociados a este user_id.
+                    cursor.execute("""
+                        UPDATE usuario
+                        SET name = %s, apellido = %s, password = %s,
+                            cargo = %s, rol = %s, estado = 'pendiente'
+                        WHERE user_id = %s
+                    """, (nombre, apellido, hashed, cargo, rol, existente[0]))
+                else:
+                    cursor.execute("""
+                        INSERT INTO usuario
+                            (name, apellido, email, password, cargo, rol, empresa_id, estado)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, 'pendiente')
+                    """, (nombre, apellido, correo, hashed, cargo, rol, empresa_id))
 
                 try:
                     cuerpo_html = f"""
@@ -1152,6 +1175,12 @@ def bi_campos():
 
         for item in campos_raw:
             if not isinstance(item, dict):
+                continue
+
+            if item.get('tipo') == 'fin_grupo':
+                if grupo_actual and grupo_actual['campos']:
+                    grupos.append(grupo_actual)
+                grupo_actual = None
                 continue
 
             if item.get('tipo') == 'grupo':
@@ -4713,7 +4742,7 @@ def formulario_dinamico():
 
             # Obtener campos globales
             def es_grupo(item):
-                return isinstance(item, dict) and item.get('tipo') == 'grupo'
+                return isinstance(item, dict) and item.get('tipo') in ('grupo', 'fin_grupo')
 
             campo_ids = [
                 (item['id'] if isinstance(item, dict) else item)
@@ -4735,6 +4764,9 @@ def formulario_dinamico():
                 } for r in cursor.fetchall()}
 
             for item in formulario['campos_config']:
+                if isinstance(item, dict) and item.get('tipo') == 'fin_grupo':
+                    campos.append({'tipo': 'fin_grupo'})
+                    continue
                 if es_grupo(item):
                     campos.append({
                         'tipo':      'grupo',
@@ -4791,8 +4823,13 @@ def formulario_dinamico():
             if registro:
                 reps_guardadas = (registro['respuestas'] or {}).get('__repeticiones') or {}
 
+            
             actual = None
             for c in campos:
+                if c.get('tipo') == 'fin_grupo':
+                    # Cierra la sección abierta: lo que siga vuelve a ser suelto.
+                    actual = None
+                    continue
                 if c.get('tipo') == 'grupo':
                     actual = {
                         'tipo':      'grupo',

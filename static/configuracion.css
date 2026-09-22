@@ -1651,3 +1651,17 @@ button { font-family: inherit; cursor: pointer; }
     color: var(--naranja-dark);
     margin-bottom: 6px;
 }
+
+.canvas-fin-grupo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    margin: 4px 0 10px;
+    border: 1px dashed var(--gris-borde);
+    border-radius: 8px;
+    background: var(--gris-fondo);
+    font-size: 12px;
+    color: var(--gris-texto);
+}
+.canvas-fin-grupo-texto { flex: 1; font-weight: 600; letter-spacing: 0.3px; }
