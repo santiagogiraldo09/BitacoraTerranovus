@@ -275,6 +275,7 @@
                         <option value="numero">Número</option>
                         <option value="imagen">Imagen</option>
                         <option value="fecha">Fecha</option>
+                        <option value="hora">Hora</option>
                         <option value="seleccion">Selección múltiple</option>
                         <option value="seleccion_unica">Selección única</option>
                         <option value="seleccion_dinamica">Selección dinámica</option>
@@ -1534,6 +1535,8 @@
                 return `<input type="number" placeholder="0" disabled style="width:80px;padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;">`;
             case 'fecha':
                 return `<input type="date" disabled style="padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;">`;
+            case 'hora':
+                return `<input type="time" disabled style="padding:4px 8px;border:1px solid #e5e7eb;border-radius:4px;font-size:11px;background:#f9f9f9;">`;
             case 'imagen':
                 return `<span style="${baseSpan}"><i class="fas fa-image"></i> Campo de imagen</span>`;
             case 'seleccion': {

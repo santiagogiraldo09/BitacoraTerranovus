@@ -3010,6 +3010,7 @@ Extrae el valor que corresponde al campo. Devuelve SOLO un JSON:
 
 Reglas:
 - Si el tipo es fecha, devuelve en formato YYYY-MM-DD.
+- Si el tipo es hora, devuelve en formato HH:MM de 24 horas. "siete de la mañana" es 07:00, "tres y media de la tarde" es 15:30.
 - Si el tipo es numero/moneda/porcentaje, devuelve solo el número.
 - Si el tipo es booleano, devuelve true o false.
 - Si no puedes extraer un valor claro, devuelve {{"valor": ""}}
@@ -7164,6 +7165,11 @@ REGLAS GENERALES:
    usa SIEMPRE el año de la fecha actual. 
    Si el usuario especifica el año explícitamente (ej: "dos de febrero del 2025", "el 3 de enero de 2024"), 
    usa ese año exacto sin modificarlo.
+7b. Para tipo hora: formato HH:MM en 24 horas, con cero a la izquierda.
+   "a las siete" o "7 am" es 07:00; "a las 3 de la tarde" es 15:00;
+   "seis y media de la tarde" es 18:30. Si el usuario no distingue
+   mañana o tarde y el campo se llama "entrada", asume mañana; si se
+   llama "salida", asume tarde. Ante duda real, omite el campo.
 8. Extrae de forma inteligente: el usuario puede no decir el nombre exacto del campo pero sí dar el dato.
 9. Limpia el texto: capitaliza nombres propios, corrige puntuación básica.
 10. Para texto_largo u observaciones: resume y redacta de forma profesional y concisa, pero NUNCA omitas datos específicos como correos, nombres de personas, teléfonos, cantidades o direcciones.

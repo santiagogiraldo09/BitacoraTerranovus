@@ -173,6 +173,14 @@
                     data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"{{ extra }}
                     value="{{ valor }}">
 
+                {% elif campo.tipo == 'hora' %}
+                {# type="time" abre el selector nativo de hora en móvil y
+                   garantiza el formato HH:MM sin validación adicional. #}
+                <input type="time" class="field-input campo-respuesta"
+                    data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                    data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"{{ extra }}
+                    value="{{ valor }}">
+
                 {% elif campo.tipo == 'seleccion' or campo.tipo == 'seleccion_unica' %}
                 {% set conf = campo.configuracion or {} %}
                 {% set con_valor = conf.get('con_valor_asociado', false) %}
