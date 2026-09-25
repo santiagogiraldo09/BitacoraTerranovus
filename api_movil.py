@@ -328,7 +328,9 @@ def api_login():
     import traceback
 
     datos = request.get_json(silent=True) or {}
-    email = (datos.get("email") or "").strip()
+    # .lower() además del .strip(): los teclados móviles capitalizan la
+    # primera letra, y el correo se guarda y compara en minúsculas.
+    email = (datos.get("email") or "").strip().lower()
     password = datos.get("password") or ""
 
     if not email or not password:

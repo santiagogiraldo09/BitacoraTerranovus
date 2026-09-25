@@ -696,7 +696,11 @@ def invitar_usuarios_core(data, admin_user_id, empresa_id, _reintento=0):
             for p in personas:
                 nombre   = p.get('nombre', '')
                 apellido = p.get('apellido', '')
-                correo   = p.get('correo', '')
+                # Se normaliza antes de la verificación de duplicados: sin esto,
+                # "Juan@iac.com" y "juan@iac.com" pasarían como dos usuarios
+                # distintos y el segundo nunca podría iniciar sesión, porque
+                # el login normaliza a minúsculas.
+                correo   = (p.get('correo') or '').strip().lower()
                 cargo    = p.get('cargo', 'Sin asignar')
                 rol      = p.get('rol', 'viewer')
 
@@ -3991,7 +3995,10 @@ def paginaprincipal():
 @app.route('/login', methods=['POST'])
 def login():
     t0 = time.time()
-    email    = request.form.get('email')
+    # Los correos no distinguen mayúsculas. Se normaliza aquí porque los
+    # teclados móviles capitalizan la primera letra y suelen dejar un
+    # espacio al final tras el autocompletado.
+    email    = (request.form.get('email') or '').strip().lower()
     password = request.form.get('password')
 
     if not email or not password:
