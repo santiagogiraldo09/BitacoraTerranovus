@@ -5080,7 +5080,8 @@ def actualizar_respuesta_formulario(registro_id):
                         FROM proyectos
                         WHERE empresa_id = %s
                     )
-            """, (json.dumps(respuestas), user_id, registro_id, session.get('empresa_id'))
+            """, (json.dumps(respuestas), user_id, registro_id, session.get('empresa_id')))
+            conn.commit()
 
             return jsonify({'success': True})
 
