@@ -384,3 +384,24 @@ textarea.field-input { resize: vertical; min-height: 90px; }
     align-items: center;
     justify-content: center;
 }
+
+.campo-multiple {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 0;
+}
+.campo-multiple-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 4px;
+    font-size: 15px;
+    cursor: pointer;
+}
+.campo-multiple-item input[type="checkbox"] {
+    width: 19px;
+    height: 19px;
+    flex-shrink: 0;
+    accent-color: var(--naranja, #FFAF33);
+}

@@ -181,7 +181,25 @@
                     data-nombre="{{ campo.nombre }}" data-tipo="{{ campo.tipo }}"{{ extra }}
                     value="{{ valor }}">
 
-                {% elif campo.tipo == 'seleccion' or campo.tipo == 'seleccion_unica' %}
+                {% elif campo.tipo == 'seleccion' %}
+                {# Casillas, no <select multiple>: en móvil el select múltiple
+                   nativo es casi inusable. El contenedor es el .campo-respuesta;
+                   valorDe() lo reconoce por data-tipo y arma el arreglo. #}
+                <div class="campo-multiple campo-respuesta"
+                     data-campo-id="{{ campo.id }}" data-requerido="{{ campo.requerido }}"
+                     data-nombre="{{ campo.nombre }}" data-tipo="seleccion"{{ extra }}>
+                    {% for op in campo.opciones %}
+                        {% set etiqueta = op.izquierda if op is mapping else op %}
+                        <label class="campo-multiple-item">
+                            <input type="checkbox" value="{{ etiqueta }}"
+                                   {% if valor is iterable and valor is not string and etiqueta in valor %}checked
+                                   {% elif valor is string and etiqueta in valor.split(', ') %}checked{% endif %}>
+                            <span>{{ etiqueta }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+
+                {% elif campo.tipo == 'seleccion_unica' %}
                 {% set conf = campo.configuracion or {} %}
                 {% set con_valor = conf.get('con_valor_asociado', false) %}
                 {% set mostrar = conf.get('mostrar_como', 'izquierda') %}
@@ -1448,7 +1466,15 @@
             const input = scope.querySelector(`.campo-respuesta[data-campo-id="${campoId}"]`);
             if (!input) return;
 
-            if (input.type === 'checkbox') {
+            if (input.dataset.tipo === 'seleccion') {
+                // El modelo puede devolver arreglo o texto separado por comas.
+                const elegidos = (Array.isArray(valor) ? valor : String(valor).split(','))
+                    .map(v => v.trim().toLowerCase())
+                    .filter(Boolean);
+                input.querySelectorAll('input[type="checkbox"]').forEach(c => {
+                    if (elegidos.includes(c.value.toLowerCase())) c.checked = true;
+                });
+            } else if (input.type === 'checkbox') {
                 input.checked = valor === true || valor === 'true';
             } else if (input.tagName === 'SELECT') {
                 const opciones  = Array.from(input.options).filter(o => o.value);
@@ -1538,7 +1564,9 @@
         mostrarEstado('idle');
         // Limpiar campos que se llenaron
         document.querySelectorAll('.campo-respuesta').forEach(input => {
-            if (input.type === 'checkbox') {
+            if (input.dataset.tipo === 'seleccion') {
+                input.querySelectorAll('input[type="checkbox"]').forEach(c => c.checked = false);
+            } else if (input.type === 'checkbox') {
                 input.checked = false;
             } else if (input.type !== 'file') {
                 input.value = '';
@@ -1548,12 +1576,21 @@
 
     // ── Grupos repetibles ──────────────────────────────────────
     function valorDe(input) {
+        // Selección múltiple: el nodo es un contenedor, no un input.
+        // Devuelve siempre un arreglo, incluso vacío, para que el formato
+        // en base de datos sea consistente.
+        if (input.dataset.tipo === 'seleccion') {
+            return Array.from(
+                input.querySelectorAll('input[type="checkbox"]:checked')
+            ).map(c => c.value);
+        }
         if (input.type === 'checkbox') return input.checked;
         if (input.type === 'file')     return input.files.length > 0 ? input.files[0].name : '';
         return input.value.trim ? input.value.trim() : input.value;
     }
 
     function tieneValor(v) {
+        if (Array.isArray(v)) return v.length > 0;
         if (v === true) return true;
         if (v === false || v === null || v === undefined) return false;
         if (typeof v === 'string') return v.trim() !== '';
@@ -1609,9 +1646,11 @@
 
         // 1. Vaciar todos los campos (sueltos y de grupos)
         document.querySelectorAll('.campo-respuesta').forEach(input => {
-            if (input.type === 'checkbox') {
+            if (input.dataset.tipo === 'seleccion') {
+                input.querySelectorAll('input[type="checkbox"]').forEach(c => c.checked = false);
+            } else if (input.type === 'checkbox') {
                 input.checked = false;
-            } else {
+            } else if (input.type !== 'file') {
                 input.value = '';
             }
             input.classList.remove('campo-lleno');

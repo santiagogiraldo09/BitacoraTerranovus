@@ -215,6 +215,43 @@ def _proyectos_del_usuario(uid, empresa_id):
                  .execute())
         catalogo = {f["id"]: f for f in (forms.data or [])}
 
+    # 3b. Última actividad por (proyecto, formulario) y conteo de hoy.
+    # El cliente de Supabase no hace GROUP BY, así que se agrega en Python.
+    # Se piden solo tres columnas para no traer las respuestas completas.
+    from datetime import datetime, timezone
+
+    ultimo_por_par = {}   # (pid, fid) -> datetime
+    hoy_por_par    = {}   # (pid, fid) -> int
+    ultimo_por_proy = {}  # pid -> datetime
+
+    try:
+        act = (supabase_client.table("respuestas_formulario")
+               .select("id_proyecto, formulario_id, created_at")
+               .in_("id_proyecto", ids)
+               .order("created_at", desc=True)
+               .limit(5000)
+               .execute())
+
+        hoy = datetime.now(timezone.utc).date()
+        for r in (act.data or []):
+            pid = r["id_proyecto"]
+            fid = r["formulario_id"]
+            ts  = r["created_at"]
+            if not ts:
+                continue
+            fecha = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+            par = (pid, fid)
+
+            # Como viene ordenado descendente, el primero de cada par es el más reciente.
+            if par not in ultimo_por_par:
+                ultimo_por_par[par] = fecha
+            if pid not in ultimo_por_proy:
+                ultimo_por_proy[pid] = fecha
+            if fecha.date() == hoy:
+                hoy_por_par[par] = hoy_por_par.get(par, 0) + 1
+    except Exception as e:
+        print(f"[MOVIL] No se pudo calcular la actividad reciente: {e}")
+
     # 4. Construir formularios por proyecto con booleano activo
     por_proyecto = {}
     for a in (asignados.data or []):
@@ -222,26 +259,61 @@ def _proyectos_del_usuario(uid, empresa_id):
         fid = a["formulario_id"]
         f = catalogo.get(fid, {})
         activo = (pid, fid) in activos_set
+        ultimo = ultimo_por_par.get((pid, fid))
+        hoy_n  = hoy_por_par.get((pid, fid), 0)
+
+        if hoy_n:
+            subtexto = f'{hoy_n} {"registro" if hoy_n == 1 else "registros"} hoy'
+        elif ultimo:
+            subtexto = f'Último uso: {ultimo.strftime("%d/%m/%Y")}'
+        else:
+            subtexto = f.get("descripcion") or "Sin registros aún"
+
         por_proyecto.setdefault(pid, []).append({
             "id": str(fid),
             "nombre": f.get("nombre") or "Formulario",
-            "subtexto": f.get("descripcion") or "",
+            "subtexto": subtexto,
             "activo": activo,
+            "_ultimo": ultimo,          # temporal, se retira más abajo
         })
 
     salida = []
     for p in (proy.data or []):
         pid = p["id"]
+        forms = por_proyecto.get(pid, [])
+
+        # Formularios: el usado más recientemente primero; los nunca usados
+        # al final, desempatados por nombre para que el orden sea estable.
+        forms.sort(key=lambda f: (
+            f["_ultimo"] is None,
+            -(f["_ultimo"].timestamp() if f["_ultimo"] else 0),
+            f["nombre"].lower()
+        ))
+
+        # Solo el primero con actividad lleva la estrella.
+        for i, f in enumerate(forms):
+            f["es_ultimo"] = (i == 0 and f["_ultimo"] is not None)
+            f.pop("_ultimo", None)
+
         salida.append({
             "id_proyecto": str(pid),
             "name": _primer_valor(p, "nombre_proyecto", "name", "nombre",
                                   default="Sin nombre"),
             "estado": _primer_valor(p, "estado", "status", "estado_proyecto",
                                     default="Activo"),
-            "formularios": por_proyecto.get(pid, []),
+            "formularios": forms,
+            "_ultimo": ultimo_por_proy.get(pid),
         })
 
-    salida.sort(key=lambda x: x["name"].lower())
+    # Proyectos: por actividad reciente; los sin registros al final, por nombre.
+    salida.sort(key=lambda x: (
+        x["_ultimo"] is None,
+        -(x["_ultimo"].timestamp() if x["_ultimo"] else 0),
+        x["name"].lower()
+    ))
+    for s in salida:
+        s.pop("_ultimo", None)
+
     return salida
 
 

@@ -979,6 +979,17 @@ def _obtener_glosario(empresa_id):
     _CACHE_GLOSARIO[empresa_id] = (ahora, terminos, sector, pais, instrucciones, activa)
     return terminos, sector, pais, instrucciones, activa
 
+def formatear_respuesta(valor):
+    """Convierte un valor de respuesta en texto legible.
+
+    Los campos de selección múltiple se guardan como lista; el resto
+    como texto. Esta función unifica ambos para PDF, Excel y pantallas.
+    """
+    if isinstance(valor, list):
+        return ', '.join(str(v) for v in valor if v not in (None, ''))
+    if valor is None:
+        return ''
+    return str(valor)
 
 def _formatear_glosario(terminos):
     if not terminos:
@@ -1326,6 +1337,18 @@ def bi_datos():
         empresa_id = session.get('empresa_id')
         acumulado  = {}
 
+        if proyecto:
+            with db_connection() as (conn, cursor):
+                cursor.execute("""
+                    SELECT 1
+                    FROM proyectos
+                    WHERE id = %s
+                    AND empresa_id = %s
+                """, (proyecto, empresa_id))
+
+                if not cursor.fetchone():
+                    return jsonify({'error': 'Proyecto no encontrado'}), 404
+
         def buscar_valor_en_bloque(bloque, ids_posibles):
             """Para campos numéricos — devuelve el valor crudo."""
             for cid in ids_posibles:
@@ -1354,22 +1377,45 @@ def bi_datos():
             return None
 
         def obtener_label(resp, bloque, ids_posibles, parte, label_raiz=''):
-            """Obtiene el label de agrupación desde raíz o desde el bloque."""
+            """Obtiene el label de agrupación desde raíz o desde el bloque.
+
+            Puede devolver una lista cuando el campo es de selección múltiple.
+            Los puntos de acumulación se encargan de desdoblarla: un registro
+            con tres opciones marcadas cuenta en las tres categorías.
+            """
             if label_raiz:
                 return label_raiz
+
             if bloque:
-                return str(buscar_label_en_bloque(bloque, ids_posibles, parte) or 'Sin dato')
+                v = buscar_label_en_bloque(bloque, ids_posibles, parte)
+                if isinstance(v, list):
+                    return v or 'Sin dato'
+                return str(v) if v is not None else 'Sin dato'
+
             # Nivel raíz sin bloque
             for cid in ids_posibles:
                 if parte == 'causa':
                     v = resp.get(cid + '_codigo')
                 elif parte == 'codigo':
-                    v = resp.get(cid + '_codigo')
+                    v = resp.get(cid)
                 else:
-                    v = resp.get(cid) or resp.get(cid + '_codigo')
+                    v = resp.get(cid + '_codigo') or resp.get(cid)
                 if v:
-                    return str(v)
+                    # La lista se devuelve sin convertir a texto; str() la
+                    # volvería "['A', 'B']" y crearía una categoría inútil.
+                    return v if isinstance(v, list) else str(v)
             return 'Sin dato'
+
+        def etiquetas(label):
+            """Desdobla un label en las categorías a las que contribuye.
+
+            Un campo de selección múltiple devuelve lista: el registro cuenta
+            una vez por cada opción marcada. Cualquier otro tipo devuelve una
+            sola categoría, así que el resto del código no cambia de forma.
+            """
+            vals = label if isinstance(label, list) else [label]
+            vals = [str(v) for v in vals if v not in (None, '')]
+            return vals or ['Sin dato']
 
         for ds in datasets:
             formulario_id           = ds.get('formulario_id')
@@ -1557,9 +1603,10 @@ def bi_datos():
                             try:    val = float(val_raw or 0)
                             except: continue
 
-                            if label not in acumulado:
-                                acumulado[label] = {}
-                            acumulado[label][serie] = acumulado[label].get(serie, 0) + val
+                            for lb in etiquetas(label):
+                                if lb not in acumulado:
+                                    acumulado[lb] = {}
+                                acumulado[lb][serie] = acumulado[lb].get(serie, 0) + val
                     else:
                         label = obtener_label(resp, None, ids_posibles_agrupacion, parte_agrupacion)
                         serie = str(
@@ -1571,9 +1618,10 @@ def bi_datos():
                         try:    val = float(val_raw or 0)
                         except: continue
 
-                        if label not in acumulado:
-                            acumulado[label] = {}
-                        acumulado[label][serie] = acumulado[label].get(serie, 0) + val
+                        for lb in etiquetas(label):
+                            if lb not in acumulado:
+                                acumulado[lb] = {}
+                            acumulado[lb][serie] = acumulado[lb].get(serie, 0) + val
 
                 # ── Modo normal: una sola serie ──
                 else:
@@ -1596,28 +1644,30 @@ def bi_datos():
                             try:    val = float(val_raw or 0)
                             except: continue
 
-                            if agregacion == 'promedio':
-                                if label not in acumulado:
-                                    acumulado[label] = {'suma': 0, 'n': 0}
-                                acumulado[label]['suma'] += val
-                                acumulado[label]['n']    += 1
-                            else:
-                                acumulado[label] = acumulado.get(label, 0) + val
+                            for lb in etiquetas(label):
+                                if agregacion == 'promedio':
+                                    if lb not in acumulado:
+                                        acumulado[lb] = {'suma': 0, 'n': 0}
+                                    acumulado[lb]['suma'] += val
+                                    acumulado[lb]['n']    += 1
+                                else:
+                                    acumulado[lb] = acumulado.get(lb, 0) + val
                     else:
                         label = obtener_label(resp, None, ids_posibles_agrupacion, parte_agrupacion)
                         val_raw = resp.get(campo_valor)
                         try:    val = float(val_raw or 0)
                         except: continue
 
-                        if agregacion == 'conteo':
-                            acumulado[label] = acumulado.get(label, 0) + 1
-                        elif agregacion == 'promedio':
-                            if label not in acumulado:
-                                acumulado[label] = {'suma': 0, 'n': 0}
-                            acumulado[label]['suma'] += val
-                            acumulado[label]['n']    += 1
-                        else:
-                            acumulado[label] = acumulado.get(label, 0) + val
+                        for lb in etiquetas(label):
+                            if agregacion == 'conteo':
+                                acumulado[lb] = acumulado.get(lb, 0) + 1
+                            elif agregacion == 'promedio':
+                                if lb not in acumulado:
+                                    acumulado[lb] = {'suma': 0, 'n': 0}
+                                acumulado[lb]['suma'] += val
+                                acumulado[lb]['n']    += 1
+                            else:
+                                acumulado[lb] = acumulado.get(lb, 0) + val
 
         # ── Calcular promedios finales (modo normal) ──
         if any(isinstance(v, dict) and 'suma' in v for v in acumulado.values()):
@@ -3938,33 +3988,6 @@ def paginaprincipal():
         print(f"Error: {e}")
         return redirect(url_for('history'))
 
-'''
-@app.route('/registro', methods=['GET', 'POST'])
-def registro():
-    if request.method == 'POST':
-        nombre = request.form.get('nombre')
-        apellido = request.form.get('apellido')
-        email = request.form.get('email')
-        password = request.form.get('password')
-        confirm_password = request.form.get('confirm_password')
-        empresa = request.form.get('empresa')
-        cargo = request.form.get('cargo')
-        rol = request.form.get('rol')
-        
-        if password != confirm_password:
-            flash('Las contraseñas no coinciden', 'error')
-            return redirect(url_for('registro'))
-        
-        user_id = create_user(nombre, apellido, email, password, cargo, rol, empresa)
-        if user_id:
-            flash('Registro exitoso. Por favor inicie sesión.', 'success')
-            return redirect(url_for('principalscreen'))
-        else:
-            flash('Error al registrar el usuario', 'error')
-    
-    return render_template('registro.html')
-'''
-
 @app.route('/login', methods=['POST'])
 def login():
     t0 = time.time()
@@ -4037,8 +4060,8 @@ def index():
             cursor.execute("""
                 SELECT nombre_proyecto, cliente, contratista, orden_de_trabajo, ubicacion 
                 FROM proyectos 
-                WHERE id = %s
-            """, (project_id,))
+                WHERE id = %s AND empresa_id = %s
+            """, (project_id, session.get('empresa_id')))
             row = cursor.fetchone()
             if row:
                 project_info = {
@@ -4318,8 +4341,19 @@ def api_registros_proyecto(project_id):
                 INNER JOIN formularios f ON f.id = rf.formulario_id
                 LEFT JOIN usuario u ON u.user_id = rf.user_id
                 WHERE rf.id_proyecto = %s
+                AND f.empresa_id = %s
+                AND EXISTS (
+                    SELECT 1
+                    FROM proyectos p
+                    WHERE p.id = rf.id_proyecto
+                    AND p.empresa_id = %s
+                )
             """
-            params = [project_id]
+            params = [
+                project_id,
+                session.get('empresa_id'),
+                session.get('empresa_id')
+            ]
             if formulario_id:
                 base_query += " AND rf.formulario_id = %s"
                 params.append(formulario_id)
@@ -4379,6 +4413,25 @@ def toggle_formulario_activo(project_id, formulario_id):
         user_id    = session['user_id']
 
         with db_connection() as (conn, cursor):
+
+            cursor.execute("""
+                SELECT 1
+                FROM proyectos p
+                INNER JOIN formularios f
+                    ON f.id = %s
+                WHERE p.id = %s
+                AND p.empresa_id = %s
+                AND f.empresa_id = %s
+            """, (
+                formulario_id,
+                project_id,
+                empresa_id,
+                empresa_id
+            ))
+
+            if not cursor.fetchone():
+                return jsonify({'error': 'Proyecto o formulario no autorizado'}), 403
+
             if activar:
                 cursor.execute("""
                     INSERT INTO proyecto_formularios_activos 
@@ -4724,9 +4777,25 @@ def formulario_dinamico():
                 cursor.execute("""
                     SELECT rf.id, rf.respuestas, rf.user_id, u.rol
                     FROM respuestas_formulario rf
-                    LEFT JOIN usuario u ON u.user_id = %s
+                    INNER JOIN formularios f
+                        ON f.id = rf.formulario_id
+                    INNER JOIN proyectos p
+                        ON p.id = rf.id_proyecto
+                    LEFT JOIN usuario u
+                        ON u.user_id = %s
                     WHERE rf.id = %s
-                """, (session['user_id'], registro_id))
+                    AND rf.id_proyecto = %s
+                    AND rf.formulario_id = %s
+                    AND f.empresa_id = %s
+                    AND p.empresa_id = %s
+                """, (
+                    session['user_id'],
+                    registro_id,
+                    project_id,
+                    formulario_id,
+                    session.get('empresa_id'),
+                    session.get('empresa_id')
+                ))
                 reg = cursor.fetchone()
                 if reg:
                     registro = {
@@ -4897,6 +4966,27 @@ def guardar_respuesta_formulario(_reintento=0):
             return jsonify({'error': 'Faltan datos obligatorios'}), 400
 
         with db_connection() as (conn, cursor):
+            # Verificar que proyecto y formulario pertenecen a la empresa
+            cursor.execute("""
+                SELECT 1
+                FROM proyectos p
+                INNER JOIN formularios f
+                    ON f.id = %s
+                WHERE p.id = %s
+                AND p.empresa_id = %s
+                AND f.empresa_id = %s
+            """, (
+                formulario_id,
+                project_id,
+                session.get('empresa_id'),
+                session.get('empresa_id')
+            ))
+
+            if not cursor.fetchone():
+                return jsonify({
+                    'error': 'Proyecto o formulario no autorizado'
+                }), 403
+
             cursor.execute("""
                 INSERT INTO respuestas_formulario
                     (formulario_id, id_proyecto, user_id, respuestas)
@@ -4952,9 +5042,21 @@ def actualizar_respuesta_formulario(registro_id):
             cursor.execute("""
                 SELECT rf.user_id, u.rol
                 FROM respuestas_formulario rf
-                LEFT JOIN usuario u ON u.user_id = %s
+                INNER JOIN proyectos p
+                    ON p.id = rf.id_proyecto
+                INNER JOIN formularios f
+                    ON f.id = rf.formulario_id
+                LEFT JOIN usuario u
+                    ON u.user_id = %s
                 WHERE rf.id = %s
-            """, (user_id, registro_id))
+                AND p.empresa_id = %s
+                AND f.empresa_id = %s
+            """, (
+                user_id,
+                registro_id,
+                session.get('empresa_id'),
+                session.get('empresa_id')
+            ))
             row = cursor.fetchone()
             if not row:
                 return jsonify({'error': 'Registro no encontrado'}), 404
@@ -4973,7 +5075,12 @@ def actualizar_respuesta_formulario(registro_id):
                     updated_by = %s,
                     updated_at = NOW()
                 WHERE id = %s
-            """, (json.dumps(respuestas), user_id, registro_id))
+                    AND id_proyecto IN (
+                        SELECT id
+                        FROM proyectos
+                        WHERE empresa_id = %s
+                    )
+            """, (json.dumps(respuestas), user_id, registro_id, session.get('empresa_id'))
 
             return jsonify({'success': True})
 
@@ -5054,9 +5161,14 @@ def informe_diario():
             if project_id:
                 cursor.execute("""
                     SELECT nombre_proyecto, cliente, contratista,
-                           orden_de_trabajo, ubicacion
-                    FROM proyectos WHERE id = %s
-                """, (project_id,))
+                        orden_de_trabajo, ubicacion
+                    FROM proyectos
+                    WHERE id = %s
+                    AND empresa_id = %s
+                """, (
+                    project_id,
+                    session.get('empresa_id')
+                ))
                 row = cursor.fetchone()
                 if row:
                     project = {
@@ -5231,7 +5343,15 @@ def historialregistro(id_proyecto):
         with db_connection() as (conn, cursor):
 
             # Info del proyecto
-            cursor.execute('SELECT nombre_proyecto, cliente FROM proyectos WHERE id = %s', (id_proyecto,))
+            cursor.execute("""
+                SELECT nombre_proyecto, cliente
+                FROM proyectos
+                WHERE id = %s
+                AND empresa_id = %s
+            """, (
+                id_proyecto,
+                session.get('empresa_id')
+            ))
             proyecto_info = cursor.fetchone()
             if not proyecto_info:
                 return redirect(url_for('history'))
@@ -5442,7 +5562,17 @@ def exportar_formulario(project_id, formulario_id):
 
         with db_connection() as (conn, cursor):
             # Obtener nombre del proyecto
-            cursor.execute("SELECT nombre_proyecto FROM proyectos WHERE id = %s", (project_id,))
+            cursor.execute("""
+                SELECT nombre_proyecto
+                FROM proyectos
+                WHERE id = %s AND empresa_id = %s
+            """, (project_id, session.get('empresa_id')))
+
+            proyecto_row = cursor.fetchone()
+            if not proyecto_row:
+                return jsonify({'error': 'Proyecto no encontrado'}), 404
+
+            nombre_proyecto = proyecto_row[0]
             proyecto_row = cursor.fetchone()
             nombre_proyecto = proyecto_row[0] if proyecto_row else 'Proyecto'
 
@@ -6177,14 +6307,46 @@ def add_project():
                     miembros = [session['user_id']]
 
                 for uid in miembros:
+
+                    # Validar que el usuario pertenece a la empresa actual
+                    cursor.execute("""
+                        SELECT 1
+                        FROM usuario
+                        WHERE user_id = %s
+                        AND empresa_id = %s
+                    """, (uid, empresa_id))
+
+                    if not cursor.fetchone():
+                        return jsonify({
+                            "status": "error",
+                            "error": "Usuario no autorizado para esta empresa"
+                        }), 403
+
                     cursor.execute("""
                         INSERT INTO proyecto_usuarios (id_proyecto, user_id, empresa_id)
                         VALUES (%s, %s, %s)
                     """, (nuevo_id, uid, empresa_id))
 
+
                 # Formularios asociados
                 formularios_ids = data.get('formularios', [])
+
                 for fid in formularios_ids:
+
+                    # Validar que el formulario pertenece a la empresa actual
+                    cursor.execute("""
+                        SELECT 1
+                        FROM formularios
+                        WHERE id = %s
+                        AND empresa_id = %s
+                    """, (fid, empresa_id))
+
+                    if not cursor.fetchone():
+                        return jsonify({
+                            "status": "error",
+                            "error": "Formulario no autorizado para esta empresa"
+                        }), 403
+
                     cursor.execute("""
                         INSERT INTO proyecto_formularios (proyecto_id, formulario_id, empresa_id)
                         VALUES (%s, %s, %s)
@@ -6324,6 +6486,20 @@ def edit_project(project_id):
                     miembros = [session['user_id']]
 
                 for uid in miembros:
+                    # Validar que el usuario pertenece a la empresa actual
+                    cursor.execute("""
+                        SELECT 1
+                        FROM usuario
+                        WHERE user_id = %s
+                        AND empresa_id = %s
+                    """, (uid, empresa_id))
+
+                    if not cursor.fetchone():
+                        return jsonify({
+                            "status": "error",
+                            "error": "Usuario no autorizado para esta empresa"
+                        }), 403
+
                     cursor.execute("""
                         INSERT INTO proyecto_usuarios (id_proyecto, user_id, empresa_id)
                         VALUES (%s, %s, %s)
@@ -6336,6 +6512,20 @@ def edit_project(project_id):
                 """, (project_id,))
 
                 for fid in data.get('formularios', []):
+                    # Validar que el formulario pertenece a la empresa actual
+                    cursor.execute("""
+                        SELECT 1
+                        FROM formularios
+                        WHERE id = %s
+                        AND empresa_id = %s
+                    """, (fid, empresa_id))
+
+                    if not cursor.fetchone():
+                        return jsonify({
+                            "status": "error",
+                            "error": "Formulario no autorizado para esta empresa"
+                        }), 403
+
                     cursor.execute("""
                         INSERT INTO proyecto_formularios (proyecto_id, formulario_id, empresa_id)
                         VALUES (%s, %s, %s)
@@ -6767,6 +6957,18 @@ def analitica_pareto():
 
     try:
         with db_connection() as (conn, cursor):
+
+            if project_id:
+                cursor.execute("""
+                    SELECT 1
+                    FROM proyectos
+                    WHERE id = %s
+                    AND empresa_id = %s
+                """, (project_id, session.get('empresa_id')))
+
+                if not cursor.fetchone():
+                    return jsonify({'error': 'Proyecto no encontrado'}), 404
+
             cursor.execute("""
                 SELECT campos FROM formularios
                 WHERE id = %s AND empresa_id = %s
@@ -7158,7 +7360,10 @@ REGLAS GENERALES:
 2. Las claves de los campos son SOLO el ID numérico como string ("1", "3", "15"). Nunca prefijos como "campo_".
 3. NO incluyas los campos de los que el usuario no habló. Si no escuchaste nada para un campo, OMÍTELO del JSON. Nunca devuelvas "" para rellenar.
 4. Para tipo numero, moneda o porcentaje: solo el número, sin símbolos.
-5. Para tipo seleccion o seleccion_unica: elige la opción más cercana. Si ninguna coincide, omite el campo.
+5. Para tipo seleccion_unica: elige la opción más cercana. Si ninguna coincide, omite el campo.
+5b. Para tipo seleccion (múltiple): devuelve un ARREGLO con todas las opciones
+   que el usuario mencionó, con el texto exacto de la opción. Ejemplo: ["Casco", "Arnés"].
+   Si mencionó una sola, devuelve un arreglo de un elemento. Si ninguna coincide, omite el campo.
 6. Para tipo booleano: true o false.
 7. Para tipo fecha: formato YYYY-MM-DD. La fecha actual es {fecha_hoy}. 
    Si el usuario menciona una fecha SIN especificar el año (ej: "el dos de agosto", "el 15 de marzo"), 
@@ -7692,9 +7897,11 @@ def exportar_contactos_pdf():
 
         # Info del proyecto
         cursor.execute("""
-            SELECT nombre_proyecto, cliente, contratista, orden_de_trabajo, ubicacion
-            FROM proyectos WHERE id = %s
-        """, (id_proyecto,))
+            SELECT nombre_proyecto, cliente, contratista,
+                orden_de_trabajo, ubicacion
+            FROM proyectos
+            WHERE id = %s AND empresa_id = %s
+        """, (id_proyecto, session.get('empresa_id')))
         proyecto = cursor.fetchone()
         if not proyecto:
             return "Proyecto no encontrado", 404
@@ -7901,9 +8108,11 @@ def exportar_contactos_excel():
 
         # Info del proyecto
         cursor.execute("""
-            SELECT nombre_proyecto, cliente, contratista, orden_de_trabajo, ubicacion
-            FROM proyectos WHERE id = %s
-        """, (id_proyecto,))
+            SELECT nombre_proyecto, cliente, contratista,
+                orden_de_trabajo, ubicacion
+            FROM proyectos
+            WHERE id = %s AND empresa_id = %s
+        """, (id_proyecto, session.get('empresa_id')))
         proyecto = cursor.fetchone()
         if not proyecto:
             return "Proyecto no encontrado", 404
