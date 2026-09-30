@@ -7151,6 +7151,12 @@ def api_proyectos_usuario():
 
 @app.route('/transcribe-audio', methods=['POST'])
 def transcribe_audio():
+    # Tope de tamaño: un dictado de campo no pasa de unos minutos.
+    # Un archivo mayor suele ser un micrófono que quedó abierto, y
+    # procesarlo compromete la instancia para todos los usuarios.
+    MAX_AUDIO_BYTES = 25 * 1024 * 1024
+
+    temp_input = None
     try:
         if 'audio' not in request.files:
             print("🔴 [WHISPER] No se recibió archivo de audio.")
@@ -7159,46 +7165,31 @@ def transcribe_audio():
         file = request.files['audio']
         print(f"📥 [WHISPER] Recibido archivo: {file.filename}")
 
-        # Guardar el archivo temporalmente
-        temp_input = tempfile.NamedTemporaryFile(delete=False, suffix=".webm")
+        # El archivo se envía tal cual a OpenAI: gpt-4o-transcribe acepta
+        # webm, mp4, m4a, mp3 y wav. Antes se decodificaba con pydub para
+        # obtener la duración, pero eso cargaba el audio descomprimido en
+        # memoria —unos 10 MB por cada MB de webm— y el proceso no devolvía
+        # esa memoria al sistema, haciendo crecer el consumo hasta el reinicio.
+        sufijo = os.path.splitext(file.filename or '')[1] or '.webm'
+        temp_input = tempfile.NamedTemporaryFile(delete=False, suffix=sufijo)
         file.save(temp_input.name)
-        print(f"💾 [WHISPER] Guardado en: {temp_input.name}")
 
-        temp_wav = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
-        formato_detectado = None
+        tam = os.path.getsize(temp_input.name)
+        if tam > MAX_AUDIO_BYTES:
+            print(f"🔴 [WHISPER] Audio demasiado grande: {tam} bytes")
+            return jsonify({
+                "error": "La grabación es demasiado larga. Divídela en partes más cortas."
+            }), 413
 
-        try:
-            print("🔍 [WHISPER] Intentando decodificar como webm...")
-            audio = AudioSegment.from_file(temp_input.name, format="webm")
-            print("✅ [WHISPER] Decodificado como webm.")
-            formato_detectado = "webm"
-        except Exception as e_webm:
-            print("⚠️ [WHISPER] Falla al decodificar como webm:", str(e_webm))
-            try:
-                print("🔁 [WHISPER] Intentando decodificar como mp4...")
-                audio = AudioSegment.from_file(temp_input.name, format="mp4")
-                print("✅ [WHISPER] Decodificado como mp4.")
-                formato_detectado = "mp4"
-            except Exception as e_mp4:
-                print("❌ [WHISPER] Fallo total al decodificar audio.")
-                traceback.print_exc()
-                return jsonify({
-                    "error": "No se pudo procesar el audio.",
-                    "error_webm": str(e_webm),
-                    "error_mp4": str(e_mp4)
-                }), 500
-
-        # Exportar a WAV (Whisper acepta mp3, mp4, mpeg, mpga, m4a, wav, webm)
-        audio.export(temp_wav.name, format="wav")
-        # Duración real del audio (pydub la expone en ms)
-        duracion_audio_ms = len(audio)
-        print(f"⏱️ [WHISPER] Duración del audio: {duracion_audio_ms} ms")
-        print("🔄 [WHISPER] Exportado a WAV:", temp_wav.name)
+        # La duración la reporta el navegador, que ya la conoce.
+        duracion_audio_ms = int(request.form.get('duracion_ms') or 0)
+        formato_detectado = sufijo.lstrip('.')
+        print(f"💾 [WHISPER] {tam} bytes en {temp_input.name} ({formato_detectado})")
 
         # Transcribir con Whisper API de OpenAI
         try:
             t_inicio = time.time()
-            with open(temp_wav.name, 'rb') as f:
+            with open(temp_input.name, 'rb') as f:
                 transcription = openai_client.audio.transcriptions.create(
                     model="gpt-4o-transcribe",
                     file=f,
@@ -7228,12 +7219,10 @@ def transcribe_audio():
             }), 500
 
         finally:
-            # Limpiar archivos temporales
+            # Ya no hay archivo WAV intermedio que borrar.
             try:
-                if os.path.exists(temp_input.name):                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    
+                if temp_input and os.path.exists(temp_input.name):
                     os.remove(temp_input.name)
-                if os.path.exists(temp_wav.name):
-                    os.remove(temp_wav.name)
             except Exception as e_cleanup:
                 print(f"⚠️ [WHISPER] Error limpiando temporales: {e_cleanup}")
 

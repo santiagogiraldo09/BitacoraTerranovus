@@ -570,6 +570,7 @@
     // ── Voz central: variables ──
     let mediaRecorder = null;
     let audioChunks   = [];
+    let inicioGrabacion = 0;
     // ── Preguntas por faltantes ──
     let faltantesPendientes = [];
     let faltanteActual      = null;
@@ -709,6 +710,7 @@
 
     // ── Paso 1: Grabar audio ──
     function iniciarGrabacion() {
+        
         navigator.mediaDevices.getUserMedia({ audio: true })
             .then(stream => {
                 audioChunks   = [];
@@ -724,6 +726,7 @@
                     procesarAudio();
                 };
 
+                inicioGrabacion = Date.now();
                 mediaRecorder.start();
             })
             .catch(() => mostrarToast('❌ No se pudo acceder al micrófono'));
@@ -743,6 +746,7 @@
         const blob     = new Blob(audioChunks, { type: 'audio/webm' });
         const formData = new FormData();
         formData.append('audio', blob, 'audio.webm');
+        formData.append('duracion_ms', inicioGrabacion ? Date.now() - inicioGrabacion : 0);
 
         try {
             const res  = await fetch('/transcribe-audio', { method: 'POST', body: formData });
