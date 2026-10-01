@@ -7181,6 +7181,30 @@ def transcribe_audio():
                 "error": "La grabación es demasiado larga. Divídela en partes más cortas."
             }), 413
 
+        # El nombre del archivo puede mentir sobre el formato: iOS graba en mp4
+        # aunque el cliente lo llame webm, y OpenAI rechaza el archivo si la
+        # extensión no corresponde. Se verifica por los bytes iniciales.
+        with open(temp_input.name, 'rb') as fh:
+            cabecera = fh.read(12)
+
+        if cabecera[:4] == b'\x1a\x45\xdf\xa3':
+            real = '.webm'
+        elif cabecera[4:8] == b'ftyp':
+            real = '.mp4'
+        elif cabecera[:4] == b'OggS':
+            real = '.ogg'
+        elif cabecera[:3] == b'ID3' or cabecera[:2] == b'\xff\xfb':
+            real = '.mp3'
+        else:
+            real = sufijo
+
+        if real != sufijo:
+            nuevo = temp_input.name.rsplit('.', 1)[0] + real
+            os.rename(temp_input.name, nuevo)
+            temp_input.name = nuevo
+            print(f"🔧 [WHISPER] Formato corregido: {sufijo} → {real}")
+            sufijo = real
+
         # La duración la reporta el navegador, que ya la conoce.
         duracion_audio_ms = int(request.form.get('duracion_ms') or 0)
         formato_detectado = sufijo.lstrip('.')

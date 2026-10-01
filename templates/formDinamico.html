@@ -571,6 +571,7 @@
     let mediaRecorder = null;
     let audioChunks   = [];
     let inicioGrabacion = 0;
+    let mimeGrabacion = 'audio/webm';
     // ── Preguntas por faltantes ──
     let faltantesPendientes = [];
     let faltanteActual      = null;
@@ -714,7 +715,11 @@
         navigator.mediaDevices.getUserMedia({ audio: true })
             .then(stream => {
                 audioChunks   = [];
+                // Safari en iOS no soporta webm: graba en mp4. Se deja que el
+                // navegador elija y se recuerda el formato real.
                 mediaRecorder = new MediaRecorder(stream);
+                mimeGrabacion = mediaRecorder.mimeType || 'audio/webm';
+
                 mostrarEstado('recording');
 
                 mediaRecorder.ondataavailable = e => {
@@ -743,9 +748,11 @@
         mostrarEstado('processing');
         document.getElementById('voice-processing-text').textContent = 'Transcribiendo audio...';
 
-        const blob     = new Blob(audioChunks, { type: 'audio/webm' });
+        const ext      = mimeGrabacion.includes('mp4') ? 'mp4'
+                : mimeGrabacion.includes('ogg') ? 'ogg' : 'webm';
+        const blob     = new Blob(audioChunks, { type: mimeGrabacion });
         const formData = new FormData();
-        formData.append('audio', blob, 'audio.webm');
+        formData.append('audio', blob, `audio.${ext}`);
         formData.append('duracion_ms', inicioGrabacion ? Date.now() - inicioGrabacion : 0);
 
         try {
@@ -967,6 +974,7 @@
             .then(stream => {
                 questionChunks   = [];
                 questionRecorder = new MediaRecorder(stream);
+                mimeGrabacion    = questionRecorder.mimeType || 'audio/webm';
 
                 // Detección de silencio
                 const audioContext = new AudioContext();
@@ -1117,9 +1125,11 @@
         document.getElementById('question-recording').style.display = 'none';
         document.getElementById('question-processing').style.display = 'flex';
 
-        const blob     = new Blob(questionChunks, { type: 'audio/webm' });
+        const ext      = mimeGrabacion.includes('mp4') ? 'mp4'
+                : mimeGrabacion.includes('ogg') ? 'ogg' : 'webm';
+        const blob     = new Blob(questionChunks, { type: mimeGrabacion });
         const formData = new FormData();
-        formData.append('audio', blob, 'audio.webm');
+        formData.append('audio', blob, `audio.${ext}`);
 
         try {
             // Transcribir respuesta
@@ -1264,6 +1274,7 @@
             .then(stream => {
                 questionChunks   = [];
                 questionRecorder = new MediaRecorder(stream);
+                mimeGrabacion    = questionRecorder.mimeType || 'audio/webm';
 
                 // ── Detección de silencio ──
                 const audioContext = new AudioContext();
@@ -1354,9 +1365,11 @@
         document.getElementById('question-recording').style.display = 'none';
         document.getElementById('question-processing').style.display = 'flex';
 
-        const blob     = new Blob(questionChunks, { type: 'audio/webm' });
+        const ext      = mimeGrabacion.includes('mp4') ? 'mp4'
+                : mimeGrabacion.includes('ogg') ? 'ogg' : 'webm';
+        const blob     = new Blob(questionChunks, { type: mimeGrabacion });
         const formData = new FormData();
-        formData.append('audio', blob, 'audio.webm');
+        formData.append('audio', blob, `audio.${ext}`);
 
         try {
             // Transcribir respuesta
