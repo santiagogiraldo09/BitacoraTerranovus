@@ -102,7 +102,7 @@
                     <span class="plan-consumo-limite" id="plan-limite"></span>
                 </div>
 
-                <div class="plan-barra">
+                <div class="plan-barra" id="plan-barra">
                     <div class="plan-barra-fill" id="plan-barra-fill"></div>
                 </div>
 
@@ -237,10 +237,17 @@
 
             // La barra se topa en 100%: pasado el límite el dato que importa
             // es el monto del excedente, no cuánto se desborda la barra.
-            const barra = document.getElementById('plan-barra-fill');
-            const pct   = data.limite ? Math.min(100, (data.registros / data.limite) * 100) : 0;
-            barra.style.width = pct + '%';
-            barra.classList.toggle('excedido', data.extras > 0);
+            // Sin límite no hay nada que medir: una barra vacía sugeriría
+            // un tope que el plan no tiene.
+            const barraWrap = document.getElementById('plan-barra');
+            const barra     = document.getElementById('plan-barra-fill');
+            if (data.limite) {
+                barraWrap.style.display = '';
+                barra.style.width = Math.min(100, (data.registros / data.limite) * 100) + '%';
+                barra.classList.toggle('excedido', data.extras > 0);
+            } else {
+                barraWrap.style.display = 'none';
+            }
 
             const extra = document.getElementById('plan-extra');
             if (data.extras > 0) {
