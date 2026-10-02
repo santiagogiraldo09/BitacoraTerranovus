@@ -79,11 +79,10 @@
                     <div>
                         <span class="plan-etiqueta">Plan actual</span>
                         <div class="plan-nombre" id="plan-nombre">—</div>
-                        <span class="plan-desde" id="plan-desde"></span>
                     </div>
-                    <div class="plan-precio">
-                        <span id="plan-valor">—</span>
-                        <small>/ mes</small>
+                    <div class="plan-precio-wrap">
+                        <div class="plan-precio" id="plan-valor">—</div>
+                        <span class="plan-precio-nota" id="plan-precio-nota">Cargo fijo mensual</span>
                     </div>
                 </div>
             </div>
@@ -217,9 +216,14 @@
                 { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
             document.getElementById('plan-nombre').textContent = data.plan;
-            document.getElementById('plan-valor').textContent  = fmt(data.valor);
-            document.getElementById('plan-desde').textContent  =
-                data.desde ? `Activo desde ${data.desde}` : '';
+
+            // Un plan sin costo no debe mostrar "USD 0,00": confunde más
+            // de lo que informa.
+            const esGratis = Number(data.valor) === 0;
+            document.getElementById('plan-valor').textContent =
+                esGratis ? 'Sin costo' : fmt(data.valor);
+            document.getElementById('plan-precio-nota').textContent =
+                esGratis ? 'Plan de evaluación' : 'Cargo fijo mensual';
 
             const hoy = new Date();
             document.getElementById('plan-mes-actual').textContent =
@@ -239,10 +243,12 @@
             barra.classList.toggle('excedido', data.extras > 0);
 
             const extra = document.getElementById('plan-extra');
-            if (data.extras > 0 && data.costo_extra > 0) {
+            if (data.extras > 0) {
                 document.getElementById('plan-extra-texto').textContent =
-                    `${data.extras} respuestas adicionales · ${fmt(data.costo_extra)} ` +
-                    `· Total estimado del mes: ${fmt(data.facturable)}`;
+                    data.costo_extra > 0
+                        ? `${data.extras} respuestas adicionales · ${fmt(data.costo_extra)}` +
+                          ` · Total estimado del mes: ${fmt(data.facturable)}`
+                        : `${data.extras} respuestas por encima del plan · sin costo adicional`;
                 extra.style.display = '';
             } else {
                 extra.style.display = 'none';
