@@ -45,9 +45,15 @@
                 <i class="fas fa-layer-group"></i>
                 <span>Proyectos</span>
             </button>
+            <!--
             <button class="sidebar-nav-item" id="nav-vocabulario" onclick="mostrarSeccion('vocabulario')">
                 <i class="fas fa-book"></i>
                 <span>Vocabulario Técnico</span>
+            </button> -->
+            <button class="drawer-nav-item" id="drawer-plan" onclick="mostrarSeccion('plan')">
+                <i class="fas fa-gauge-high"></i>
+                <span>Plan y Consumo</span>
+                <i class="fas fa-chevron-right drawer-chevron"></i>
             </button>
         </nav>
         <div class="sidebar-footer">
@@ -742,7 +748,7 @@
 
 <script>
 
-    const secciones = ['identidad', 'usuarios', 'campos', 'formularios', 'proyectos', 'vocabulario'];
+    const secciones = ['identidad', 'usuarios', 'campos', 'formularios', 'proyectos', 'vocabulario', 'plan'];
     const titulos   = {
         'identidad':   'Identidad Visual',
         'usuarios':    'Gestión de Usuarios',

@@ -7300,6 +7300,78 @@ def _log_transcripcion(data, resultado, ms_interpretacion):
     except Exception as e:
         print(f"[LOG-TRANS] No se pudo registrar la transcripción: {e}")
 
+@app.route('/api/plan-consumo', methods=['GET'])
+def plan_consumo():
+    """Consumo del mes calendario y datos del plan contratado."""
+    if session.get('user_rol') != 'admin':
+        return jsonify({'error': 'No autorizado'}), 403
+
+    empresa_id = session.get('empresa_id')
+    TZ = 'America/Bogota'   # el corte del mes sigue la hora local del cliente
+
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT pl.nombre, pl.valor_mensual, pl.moneda,
+                       pl.limite_registros, pl.valor_excedente, e.plan_desde,
+                       (SELECT COUNT(*) FROM respuestas_formulario rf
+                          JOIN proyectos p ON p.id = rf.id_proyecto
+                         WHERE p.empresa_id = e.id
+                           AND date_trunc('month', rf.created_at AT TIME ZONE %s)
+                             = date_trunc('month', CURRENT_DATE)
+                       ) AS registros_mes,
+                       (SELECT COUNT(*) FROM proyectos WHERE empresa_id = e.id) AS proyectos,
+                       (SELECT COUNT(*) FROM usuario
+                         WHERE empresa_id = e.id
+                           AND COALESCE(estado, 'activo') <> 'inactivo') AS usuarios
+                FROM empresas e
+                LEFT JOIN planes pl ON pl.id = e.plan_id
+                WHERE e.id = %s
+            """, (TZ, empresa_id))
+            fila = cursor.fetchone()
+
+            if not fila:
+                return jsonify({'error': 'Empresa no encontrada'}), 404
+
+            (nombre, valor, moneda, limite, excedente,
+             desde, registros_mes, proyectos, usuarios) = fila
+
+            # Histórico de 6 meses para la gráfica.
+            cursor.execute("""
+                SELECT to_char(date_trunc('month', rf.created_at AT TIME ZONE %s), 'YYYY-MM') AS mes,
+                       COUNT(*) AS total
+                FROM respuestas_formulario rf
+                JOIN proyectos p ON p.id = rf.id_proyecto
+                WHERE p.empresa_id = %s
+                  AND rf.created_at >= date_trunc('month', CURRENT_DATE) - INTERVAL '5 months'
+                GROUP BY 1 ORDER BY 1
+            """, (TZ, empresa_id))
+            historico = [{'mes': m, 'total': t} for m, t in cursor.fetchall()]
+
+        # El excedente solo se cobra si el plan define un límite y un precio.
+        extras = max(0, registros_mes - limite) if limite else 0
+        costo_extra = round(extras * float(excedente or 0), 2)
+
+        return jsonify({
+            'success':   True,
+            'plan':      nombre or 'Sin plan asignado',
+            'valor':     float(valor or 0),
+            'moneda':    moneda or 'USD',
+            'desde':     desde.strftime('%d/%m/%Y') if desde else None,
+            'limite':    limite,
+            'registros': registros_mes,
+            'extras':    extras,
+            'costo_extra': costo_extra,
+            'facturable': round(float(valor or 0) + costo_extra, 2),
+            'proyectos': proyectos,
+            'usuarios':  usuarios,
+            'historico': historico
+        })
+
+    except Exception as e:
+        print(f"[PLAN] Error consultando consumo: {e}")
+        return jsonify({'error': 'Error al cargar el consumo'}), 500
+
 @app.route('/api/distribuir-campos', methods=['POST'])
 def distribuir_campos():
     # La web valida por sesión; la lógica vive en distribuir_campos_core.
