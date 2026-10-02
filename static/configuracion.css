@@ -1665,3 +1665,141 @@ button { font-family: inherit; cursor: pointer; }
     color: var(--gris-texto);
 }
 .canvas-fin-grupo-texto { flex: 1; font-weight: 600; letter-spacing: 0.3px; }
+
+/* ─── Plan y Consumo ─────────────────────────────────────────── */
+.plan-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.plan-etiqueta {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gris-texto);
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 6px;
+}
+
+.plan-nombre {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--texto);
+    line-height: 1.1;
+}
+
+.plan-precio-wrap { text-align: right; }
+
+.plan-precio {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--naranja);
+    line-height: 1.1;
+    white-space: nowrap;
+}
+
+.plan-precio-nota {
+    font-size: 12px;
+    color: var(--gris-texto);
+    margin-top: 4px;
+    display: block;
+}
+
+.plan-consumo-cifra {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    margin: 16px 0 10px;
+}
+.plan-consumo-cifra > span:first-child {
+    font-size: 34px;
+    font-weight: 700;
+    color: var(--texto);
+    line-height: 1;
+}
+.plan-consumo-limite { font-size: 14px; color: var(--gris-texto); }
+
+.plan-barra {
+    height: 10px;
+    border-radius: 5px;
+    background: var(--gris-borde);
+    overflow: hidden;
+}
+.plan-barra-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 5px;
+    background: var(--naranja);
+    transition: width 0.5s ease;
+}
+/* El excedente no es un error: es consumo facturable, no alarma roja. */
+.plan-barra-fill.excedido { background: #E8A13A; }
+
+.plan-extra {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    margin-top: 14px;
+    padding: 11px 14px;
+    border-radius: 10px;
+    background: var(--naranja-light);
+    font-size: 13px;
+    color: var(--texto);
+}
+.plan-extra i { color: var(--naranja-dark); flex-shrink: 0; }
+
+.plan-metricas {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 16px;
+}
+.plan-metrica {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    text-align: center;
+}
+.plan-metrica i { font-size: 20px; color: var(--naranja); margin-bottom: 6px; }
+.plan-metrica-valor { font-size: 30px; font-weight: 700; color: var(--texto); line-height: 1; }
+.plan-metrica-label { font-size: 12px; color: var(--gris-texto); margin-top: 4px; }
+
+.plan-historico {
+    display: flex;
+    align-items: flex-end;
+    gap: 12px;
+    height: 170px;
+    padding-top: 12px;
+}
+.plan-hist-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    height: 100%;
+}
+.plan-hist-barra {
+    width: 100%;
+    max-width: 48px;
+    min-height: 4px;
+    border-radius: 6px 6px 0 0;
+    background: var(--naranja);
+}
+/* El mes en curso se distingue: aún no ha terminado. */
+.plan-hist-col:last-child .plan-hist-barra { background: var(--naranja-dark); }
+.plan-hist-valor { font-size: 12px; font-weight: 600; color: var(--texto); }
+.plan-hist-mes   { font-size: 11px; color: var(--gris-texto); }
+
+@media screen and (max-width: 600px) {
+    .plan-header { justify-content: flex-start; }
+    .plan-precio-wrap { text-align: left; }
+    .plan-nombre, .plan-precio { font-size: 23px; }
+    .plan-historico { height: 140px; gap: 7px; }
+}
