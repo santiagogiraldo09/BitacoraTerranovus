@@ -40,6 +40,10 @@
                     <i class="fas fa-chart-bar"></i>
                     <span>Dashboard</span>
                 </a>
+                <a href="{{ url_for('plan') }}" class="nav-item">
+                    <i class="fas fa-gauge-high"></i>
+                    <span>Plan y Consumo</span>
+                </a>
                 {% if session.get('empresa_id') == 1 %}
                 <a href="#" class="nav-item" onclick="event.preventDefault(); abrirModalEmpresa()">
                     <i class="fas fa-building"></i>
@@ -191,6 +195,10 @@
         <a href="{{ url_for('analitica') }}" class="bottom-nav-item">
             <i class="fas fa-chart-bar"></i>
             <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('plan') }}" class="bottom-nav-item">
+            <i class="fas fa-gauge-high"></i>
+            <span>Plan</span>
         </a>
         {% if session.get('empresa_id') == 1 %}
         <button class="bottom-nav-item btn-nav-accion" onclick="abrirModalEmpresa()">

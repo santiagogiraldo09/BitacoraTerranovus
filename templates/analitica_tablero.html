@@ -41,6 +41,10 @@
                 <i class="fas fa-chart-bar"></i>
                 <span>Analítica</span>
             </a>
+            <a href="{{ url_for('plan') }}" class="nav-item">
+                <i class="fas fa-gauge-high"></i>
+                <span>Plan y Consumo</span>
+            </a>
             {% endif %}
         </nav>
         <div class="sidebar-footer">
@@ -131,6 +135,10 @@
     <a href="{{ url_for('analitica') }}" class="bottom-nav-item active">
         <i class="fas fa-chart-bar"></i>
         <span>Analítica</span>
+    </a>
+    <a href="{{ url_for('plan') }}" class="bottom-nav-item">
+        <i class="fas fa-gauge-high"></i>
+        <span>Plan</span>
     </a>
     {% endif %}
 </nav>

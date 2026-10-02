@@ -7372,6 +7372,21 @@ def plan_consumo():
         print(f"[PLAN] Error consultando consumo: {e}")
         return jsonify({'error': 'Error al cargar el consumo'}), 500
 
+@app.route('/plan')
+def plan():
+    """Panel de plan contratado y consumo del mes. Solo administradores."""
+    if 'user_id' not in session:
+        return redirect(url_for('index'))
+    if session.get('user_rol') != 'admin':
+        return redirect(url_for('registros'))
+
+    return render_template(
+        'plan.html',
+        logo_actual     = session.get('logo_url'),
+        color_primario  = session.get('color_primario', '#FFAF33'),
+        nombre_empresa  = session.get('nombre_empresa', '')
+    )
+
 @app.route('/api/distribuir-campos', methods=['POST'])
 def distribuir_campos():
     # La web valida por sesión; la lógica vive en distribuir_campos_core.
