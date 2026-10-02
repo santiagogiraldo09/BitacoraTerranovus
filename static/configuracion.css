@@ -1803,3 +1803,77 @@ button { font-family: inherit; cursor: pointer; }
     .plan-nombre, .plan-precio { font-size: 23px; }
     .plan-historico { height: 140px; gap: 7px; }
 }
+
+/* ─── Integraciones ──────────────────────────────────────────── */
+.integraciones-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 16px;
+}
+
+.integracion-card {
+    border: 1px solid var(--gris-borde);
+    border-radius: 12px;
+    padding: 18px;
+    background: var(--blanco);
+    display: flex;
+    flex-direction: column;
+}
+
+.integracion-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.integracion-logo {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: var(--naranja-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 19px;
+    color: var(--naranja-dark);
+    flex-shrink: 0;
+}
+
+.integracion-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: var(--gris-fondo);
+    color: var(--gris-texto);
+    white-space: nowrap;
+}
+
+.integracion-nombre {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--texto);
+    margin: 0 0 6px;
+}
+
+.integracion-desc {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--gris-texto);
+    margin: 0 0 16px;
+    flex: 1;
+}
+
+.integracion-btn {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--gris-borde);
+    background: var(--gris-fondo);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--gris-texto);
+    cursor: not-allowed;
+}

@@ -45,6 +45,10 @@
                 <i class="fas fa-layer-group"></i>
                 <span>Proyectos</span>
             </button>
+            <button class="sidebar-nav-item" id="nav-integraciones" onclick="mostrarSeccion('integraciones')">
+                <i class="fas fa-plug"></i>
+                <span>Integraciones</span>
+            </button>
             <!--
             <button class="sidebar-nav-item" id="nav-vocabulario" onclick="mostrarSeccion('vocabulario')">
                 <i class="fas fa-book"></i>
@@ -663,6 +667,42 @@
             </div>
         </div>
 
+        <!-- ── SECCIÓN: INTEGRACIONES ── -->
+        <div id="seccion-integraciones" class="cfg-seccion" style="display:none;">
+            <div class="cfg-card">
+                <div class="cfg-card-title">
+                    <i class="fas fa-plug cfg-icon-orange"></i>
+                    <span>Integraciones</span>
+                </div>
+                <p class="cfg-card-subtitle">
+                    Conecta Bitácora con las herramientas que ya usa tu equipo.
+                </p>
+
+                <div class="cfg-inner-divider"></div>
+
+                <div class="integraciones-grid">
+
+                    <div class="integracion-card">
+                        <div class="integracion-head">
+                            <div class="integracion-logo">
+                                <i class="fas fa-chart-column"></i>
+                            </div>
+                            <span class="integracion-badge">Próximamente</span>
+                        </div>
+                        <h4 class="integracion-nombre">Power BI</h4>
+                        <p class="integracion-desc">
+                            Consume los datos de tus formularios directamente en Power BI
+                            para construir tus propios tableros y reportes.
+                        </p>
+                        <button class="integracion-btn" disabled>
+                            <i class="fas fa-clock"></i> En desarrollo
+                        </button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
     </main>
 </div>
 
@@ -705,9 +745,15 @@
         <span>Proyectos</span>
         <i class="fas fa-chevron-right drawer-chevron"></i>
     </button>
+    <!--
     <button class="drawer-nav-item" id="drawer-vocabulario" onclick="mostrarSeccion('vocabulario')">
         <i class="fas fa-book"></i>
         <span>Vocabulario Técnico</span>
+        <i class="fas fa-chevron-right drawer-chevron"></i>
+    </button> -->
+    <button class="drawer-nav-item" id="drawer-integraciones" onclick="mostrarSeccion('integraciones')">
+        <i class="fas fa-plug"></i>
+        <span>Integraciones</span>
         <i class="fas fa-chevron-right drawer-chevron"></i>
     </button>
  
@@ -743,19 +789,20 @@
 
 <script>
 
-    const secciones = ['identidad', 'usuarios', 'campos', 'formularios', 'proyectos', 'vocabulario'];
+    const secciones = ['identidad', 'usuarios', 'campos', 'formularios', 'proyectos', 'vocabulario', 'integraciones'];
     const titulos   = {
-        'identidad':   'Identidad Visual',
-        'usuarios':    'Gestión de Usuarios',
-        'campos':      'Gestión de Campos',
-        'formularios': 'Formularios',
-        'proyectos':   'Proyectos',
-        'vocabulario': 'Vocabulario Técnico'
+        'identidad':     'Identidad Visual',
+        'usuarios':      'Gestión de Usuarios',
+        'campos':        'Gestión de Campos',
+        'formularios':   'Formularios',
+        'proyectos':     'Proyectos',
+        'vocabulario':   'Vocabulario Técnico',
+        'integraciones': 'Integraciones'
     };
- 
+
     // Secciones que en móvil viven dentro del drawer y no tienen
     // botón propio en la barra inferior.
-    const seccionesDrawer = ['formularios', 'proyectos', 'vocabulario'];
+    const seccionesDrawer = ['formularios', 'proyectos', 'vocabulario', 'integraciones'];
 
     // ── Form Builder ──
     let builderCamposGlobales = [];
