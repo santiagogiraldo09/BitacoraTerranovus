@@ -49,6 +49,10 @@
                 <i class="fas fa-plug"></i>
                 <span>Integraciones</span>
             </button>
+            <button class="sidebar-nav-item" id="nav-reportes" onclick="mostrarSeccion('reportes')">
+                <i class="fas fa-paper-plane"></i>
+                <span>Reportes Automáticos</span>
+            </button>
             <!--
             <button class="sidebar-nav-item" id="nav-vocabulario" onclick="mostrarSeccion('vocabulario')">
                 <i class="fas fa-book"></i>
@@ -703,6 +707,33 @@
             </div>
         </div>
 
+        <!-- ── SECCIÓN: REPORTES AUTOMÁTICOS ── -->
+        <div id="seccion-reportes" class="cfg-seccion" style="display:none;">
+            <div class="cfg-card">
+                <div class="cfg-card-title">
+                    <i class="fas fa-paper-plane cfg-icon-orange"></i>
+                    <span>Reportes Automáticos</span>
+                </div>
+                <p class="cfg-card-subtitle">
+                    Programa resúmenes periódicos que se envían por correo, sin que
+                    nadie tenga que entrar al portal.
+                </p>
+
+                <div class="buscador-seccion">
+                    <i class="fas fa-search buscador-icon"></i>
+                    <input type="text" id="buscar-reportes" class="buscador-input"
+                        placeholder="Buscar reporte o proyecto..."
+                        oninput="filtrarReportes(this.value)">
+                </div>
+
+                <button class="btn-nuevo-campo" onclick="abrirModalReporte(null)">
+                    <i class="fas fa-plus"></i> Nuevo reporte
+                </button>
+
+                <div id="lista-reportes"></div>
+            </div>
+        </div>
+
     </main>
 </div>
 
@@ -756,8 +787,205 @@
         <span>Integraciones</span>
         <i class="fas fa-chevron-right drawer-chevron"></i>
     </button>
+        <button class="drawer-nav-item" id="drawer-reportes" onclick="mostrarSeccion('reportes')">
+        <i class="fas fa-paper-plane"></i>
+        <span>Reportes Automáticos</span>
+        <i class="fas fa-chevron-right drawer-chevron"></i>
+    </button>
  
     <button class="drawer-cerrar" onclick="cerrarDrawer()">Cerrar</button>
+</div>
+
+
+<!-- MODAL: CREAR / EDITAR REPORTE AUTOMÁTICO -->
+<div class="invite-overlay" id="modal-reporte">
+    <div class="invite-modal">
+        <div class="invite-header">
+            <h3><i class="fas fa-paper-plane"></i> <span id="modal-reporte-titulo">Nuevo reporte</span></h3>
+            <button class="invite-close" onclick="cerrarModalReporte()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <p class="invite-subtitle">Define qué se informa, cuándo se envía y a quién.</p>
+
+        <!-- ── Bloque 1: QUÉ ── -->
+        <div class="rep-bloque-titulo">Qué se informa</div>
+
+        <div class="invite-field">
+            <label>Nombre del reporte *</label>
+            <input type="text" id="rep-nombre" placeholder="Ej: Resumen gerencial de obra">
+        </div>
+
+        <div class="invite-field">
+            <label>Proyecto *</label>
+            <select id="rep-proyecto" onchange="cargarDatosProyecto()">
+                <option value="">Selecciona un proyecto</option>
+            </select>
+            <span class="rep-hint" id="rep-proyecto-hint"></span>
+        </div>
+
+        <div class="invite-field">
+            <label>Formularios incluidos</label>
+            <div id="rep-formularios-lista" class="rep-lista-check">
+                <p class="rep-vacio">Elige primero un proyecto.</p>
+            </div>
+            <span class="rep-hint">
+                Si no marcas ninguno, se incluyen todos los del proyecto,
+                incluidos los que se agreguen después.
+            </span>
+        </div>
+
+        <div class="cfg-inner-divider"></div>
+
+        <!-- ── Bloque 2: CUÁNDO ── -->
+        <div class="rep-bloque-titulo">Cuándo se envía</div>
+
+        <div class="invite-field">
+            <label>Periodo que cubre *</label>
+            <select id="rep-periodo" onchange="onPeriodoReporteChange()">
+                <option value="diario">Diario — resume el día anterior</option>
+                <option value="semanal">Semanal — resume la semana anterior</option>
+                <option value="mensual">Mensual — resume el mes anterior</option>
+            </select>
+        </div>
+
+        <!-- Solo para periodo diario -->
+        <div class="invite-field" id="rep-dias-wrap">
+            <label>Días en que llega</label>
+            <div class="rep-dias">
+                <label class="rep-dia"><input type="checkbox" value="1" checked><span>L</span></label>
+                <label class="rep-dia"><input type="checkbox" value="2" checked><span>M</span></label>
+                <label class="rep-dia"><input type="checkbox" value="3" checked><span>M</span></label>
+                <label class="rep-dia"><input type="checkbox" value="4" checked><span>J</span></label>
+                <label class="rep-dia"><input type="checkbox" value="5" checked><span>V</span></label>
+                <label class="rep-dia"><input type="checkbox" value="6"><span>S</span></label>
+                <label class="rep-dia"><input type="checkbox" value="7"><span>D</span></label>
+            </div>
+        </div>
+
+        <!-- Solo para periodo semanal -->
+        <div class="invite-field" id="rep-dia-semana-wrap" style="display:none;">
+            <label>Día de envío</label>
+            <select id="rep-dia-semana">
+                <option value="1">Lunes</option>
+                <option value="2">Martes</option>
+                <option value="3">Miércoles</option>
+                <option value="4">Jueves</option>
+                <option value="5">Viernes</option>
+                <option value="6">Sábado</option>
+                <option value="7">Domingo</option>
+            </select>
+        </div>
+
+        <!-- Solo para periodo mensual -->
+        <div class="invite-field" id="rep-dia-mes-wrap" style="display:none;">
+            <label>Día del mes</label>
+            <input type="number" id="rep-dia-mes" min="1" max="28" value="1">
+            <span class="rep-hint">Hasta 28, para que el envío ocurra todos los meses.</span>
+        </div>
+
+        <div class="rep-fila-doble">
+            <div class="invite-field">
+                <label>Hora</label>
+                <select id="rep-hora"></select>
+            </div>
+            <div class="invite-field">
+                <label>Zona horaria</label>
+                <select id="rep-zona">
+                    <option value="America/Bogota">Colombia (Bogotá)</option>
+                    <option value="America/Mexico_City">México (Ciudad de México)</option>
+                    <option value="America/Tijuana">México (Tijuana)</option>
+                    <option value="America/Lima">Perú (Lima)</option>
+                    <option value="America/Guayaquil">Ecuador (Guayaquil)</option>
+                    <option value="America/Santiago">Chile (Santiago)</option>
+                    <option value="America/Argentina/Buenos_Aires">Argentina (Buenos Aires)</option>
+                    <option value="America/Panama">Panamá</option>
+                    <option value="America/Costa_Rica">Costa Rica</option>
+                    <option value="America/Santo_Domingo">República Dominicana</option>
+                    <option value="Europe/Madrid">España (Madrid)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="invite-field">
+            <label>Empieza a enviarse desde</label>
+            <input type="date" id="rep-fecha-inicio">
+        </div>
+
+        <div class="cfg-inner-divider"></div>
+
+        <!-- ── Bloque 3: QUIÉN ── -->
+        <div class="rep-bloque-titulo">Quién lo recibe</div>
+
+        <div class="invite-field">
+            <label>Usuarios del proyecto</label>
+            <div class="rep-agregar-row">
+                <select id="rep-usuario-sel">
+                    <option value="">Elige primero un proyecto</option>
+                </select>
+                <button type="button" class="rep-btn-agregar" onclick="agregarDestinatarioUsuario()">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="invite-field">
+            <label>Correo externo</label>
+            <div class="rep-agregar-row">
+                <input type="email" id="rep-email-externo"
+                       placeholder="cliente@empresa.com"
+                       autocapitalize="none" autocorrect="off" spellcheck="false">
+                <button type="button" class="rep-btn-agregar" onclick="agregarDestinatarioEmail()">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+            <span class="rep-hint">
+                Los destinatarios externos reciben bitácoras del proyecto. Cada correo
+                incluye un enlace para darse de baja.
+            </span>
+        </div>
+
+        <div class="invite-field">
+            <label>Destinatarios</label>
+            <div id="rep-destinatarios-lista" class="rep-chips">
+                <p class="rep-vacio">Aún no has agregado destinatarios.</p>
+            </div>
+        </div>
+
+        <div class="cfg-inner-divider"></div>
+
+        <!-- ── Opciones ── -->
+        <div class="invite-field">
+            <label class="rep-toggle">
+                <input type="checkbox" id="rep-incluir-resumen" checked>
+                <span>Incluir resumen escrito con inteligencia artificial</span>
+            </label>
+            <span class="rep-hint">
+                Sintetiza las observaciones del periodo. Las cifras siempre se calculan
+                de los datos, nunca las redacta el modelo.
+            </span>
+        </div>
+
+        <div class="invite-field">
+            <label class="rep-toggle">
+                <input type="checkbox" id="rep-sin-actividad" checked>
+                <span>Enviar aunque no haya actividad en el periodo</span>
+            </label>
+            <span class="rep-hint">
+                Un periodo sin registros suele ser información relevante para el gerente.
+            </span>
+        </div>
+
+        <p class="invite-feedback" id="rep-feedback"></p>
+
+        <button class="rep-btn-prueba" onclick="probarReporte()">
+            <i class="fas fa-vial"></i> Enviarme una prueba ahora
+        </button>
+
+        <button class="send-invite-btn" onclick="guardarReporte()">
+            <i class="fas fa-save"></i> <span id="rep-btn-guardar-texto">Crear reporte</span>
+        </button>
+    </div>
 </div>
 
 <!-- MODAL: INVITAR / CREAR USUARIO -->
@@ -789,7 +1017,8 @@
 
 <script>
 
-    const secciones = ['identidad', 'usuarios', 'campos', 'formularios', 'proyectos', 'vocabulario', 'integraciones'];
+    const secciones = ['identidad', 'usuarios', 'campos', 'formularios', 'proyectos',
+                       'vocabulario', 'integraciones', 'reportes'];
     const titulos   = {
         'identidad':     'Identidad Visual',
         'usuarios':      'Gestión de Usuarios',
@@ -797,12 +1026,14 @@
         'formularios':   'Formularios',
         'proyectos':     'Proyectos',
         'vocabulario':   'Vocabulario Técnico',
-        'integraciones': 'Integraciones'
+        'integraciones': 'Integraciones',
+        'reportes':      'Reportes Automáticos'
     };
 
     // Secciones que en móvil viven dentro del drawer y no tienen
     // botón propio en la barra inferior.
-    const seccionesDrawer = ['formularios', 'proyectos', 'vocabulario', 'integraciones'];
+    const seccionesDrawer = ['formularios', 'proyectos', 'vocabulario',
+                             'integraciones', 'reportes'];
 
     // ── Form Builder ──
     let builderCamposGlobales = [];

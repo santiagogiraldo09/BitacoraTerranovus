@@ -1877,3 +1877,166 @@ button { font-family: inherit; cursor: pointer; }
     color: var(--gris-texto);
     cursor: not-allowed;
 }
+
+/* ─── Reportes automáticos ───────────────────────────────────── */
+.rep-bloque-titulo {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--naranja-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin: 4px 0 12px;
+}
+
+.rep-hint {
+    display: block;
+    font-size: 12px;
+    color: var(--gris-texto);
+    line-height: 1.45;
+    margin-top: 5px;
+}
+
+.rep-fila-doble {
+    display: grid;
+    grid-template-columns: 1fr 1.6fr;
+    gap: 10px;
+}
+
+/* Días de la semana como fichas */
+.rep-dias { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.rep-dia input { display: none; }
+
+.rep-dia span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    border: 1.5px solid var(--gris-borde);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gris-texto);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.rep-dia input:checked + span {
+    background: var(--naranja);
+    border-color: var(--naranja);
+    color: #fff;
+}
+
+/* Fila de agregar destinatario */
+.rep-agregar-row { display: flex; gap: 8px; }
+.rep-agregar-row select,
+.rep-agregar-row input { flex: 1; min-width: 0; }
+
+.rep-btn-agregar {
+    flex-shrink: 0;
+    width: 40px;
+    border-radius: 8px;
+    border: 1.5px solid var(--naranja);
+    background: var(--naranja-light);
+    color: var(--naranja-dark);
+    font-size: 14px;
+    cursor: pointer;
+}
+.rep-btn-agregar:hover { background: var(--naranja); color: #fff; }
+
+/* Lista de formularios con casillas */
+.rep-lista-check {
+    border: 1.5px solid var(--gris-borde);
+    border-radius: 8px;
+    max-height: 180px;
+    overflow-y: auto;
+    padding: 6px;
+}
+
+.rep-check-item {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+}
+.rep-check-item:hover { background: var(--gris-fondo); }
+.rep-check-item input { width: 15px; height: 15px; accent-color: var(--naranja); }
+
+/* Destinatarios como fichas removibles */
+.rep-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+
+.rep-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 10px;
+    border-radius: 20px;
+    background: var(--gris-fondo);
+    border: 1px solid var(--gris-borde);
+    font-size: 12.5px;
+    color: var(--texto);
+}
+.rep-chip.externo { background: var(--naranja-light); border-color: var(--naranja); }
+.rep-chip i { cursor: pointer; color: var(--gris-texto); font-size: 11px; }
+.rep-chip i:hover { color: var(--danger); }
+
+.rep-vacio { font-size: 12.5px; color: var(--gris-texto); margin: 6px; }
+
+.rep-toggle {
+    display: flex !important;
+    align-items: center;
+    gap: 9px;
+    font-size: 13.5px;
+    text-transform: none !important;
+    color: var(--texto) !important;
+    cursor: pointer;
+}
+.rep-toggle input { width: 16px; height: 16px; accent-color: var(--naranja); }
+
+.rep-btn-prueba {
+    width: 100%;
+    padding: 11px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    border: 1.5px dashed var(--naranja);
+    background: transparent;
+    color: var(--naranja-dark);
+    font-size: 13.5px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+}
+.rep-btn-prueba:hover { background: var(--naranja-light); }
+
+/* Filas del listado */
+.rep-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--gris-borde);
+    border-radius: 10px;
+    margin-bottom: 9px;
+    background: var(--blanco);
+}
+.rep-item.inactivo { opacity: 0.55; }
+
+.rep-item-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+
+.rep-item-nombre { font-size: 14px; font-weight: 600; color: var(--texto); }
+.rep-item-proyecto { font-size: 12px; color: var(--naranja-dark); font-weight: 500; }
+.rep-item-meta { font-size: 12px; color: var(--gris-texto); }
+
+.rep-item-envio { font-size: 11.5px; color: var(--gris-texto); margin-top: 2px; }
+.rep-item-envio.error { color: var(--danger); }
+
+.rep-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+@media screen and (max-width: 600px) {
+    .rep-fila-doble { grid-template-columns: 1fr; }
+    .rep-dia span { width: 34px; height: 34px; font-size: 12px; }
+}
