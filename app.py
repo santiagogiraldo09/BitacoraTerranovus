@@ -53,6 +53,8 @@ from flask import Response
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from api_movil import api_movil
+from zoneinfo import ZoneInfo
+from datetime import time as dt_time   # 'time' a secas ya está tomado por import time
 
 
 connection_pool = None
@@ -7615,17 +7617,306 @@ def eliminar_reporte_api(reporte_id):
         print(f"[REPORTES] Error eliminando: {e}")
         return jsonify({'error': str(e)}), 500
 
+MESES_ES = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+            'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
+
+
+def _periodo_reporte(periodo, zona_horaria, referencia=None):
+    """Rango que cubre el reporte, en la zona horaria de la operación.
+
+    Devuelve (desde, hasta, clave, etiqueta). 'hasta' es exclusivo.
+    La zona importa dos veces: decide cuándo se envía y qué registros
+    entran — un registro de las 7pm en Bogotá es del día siguiente en UTC.
+    """
+    tz    = ZoneInfo(zona_horaria)
+    ahora = referencia.astimezone(tz) if referencia else datetime.now(tz)
+    hoy   = ahora.date()
+
+    if periodo == 'diario':
+        d1, d2   = hoy - timedelta(days=1), hoy
+        clave    = d1.strftime('%Y-%m-%d')
+        etiqueta = d1.strftime('%d/%m/%Y')
+
+    elif periodo == 'semanal':
+        lunes_actual = hoy - timedelta(days=hoy.weekday())
+        d1, d2 = lunes_actual - timedelta(days=7), lunes_actual
+        iso      = d1.isocalendar()
+        clave    = f"{iso[0]}-W{iso[1]:02d}"
+        etiqueta = f"{d1.strftime('%d/%m')} al {(d2 - timedelta(days=1)).strftime('%d/%m/%Y')}"
+
+    else:  # mensual
+        primero_actual = hoy.replace(day=1)
+        d2 = primero_actual
+        d1 = (primero_actual - timedelta(days=1)).replace(day=1)
+        clave    = d1.strftime('%Y-%m')
+        etiqueta = f"{MESES_ES[d1.month]} de {d1.year}"
+
+    desde = datetime.combine(d1, dt_time.min, tzinfo=tz)
+    hasta = datetime.combine(d2, dt_time.min, tzinfo=tz)
+    return desde, hasta, clave, etiqueta
+
+def _cifras_reporte(cursor, proyecto_id, formulario_ids, desde, hasta):
+    """Métricas del periodo. Todo sale de SQL: estos números nunca
+    los redacta el modelo."""
+
+    # Formularios que cubre el reporte. Lista vacía = todos los del proyecto.
+    cursor.execute("""
+        SELECT DISTINCT f.id, f.nombre
+        FROM proyecto_formularios pf
+        JOIN formularios f ON f.id = pf.formulario_id
+        WHERE pf.proyecto_id = %s
+        ORDER BY f.nombre
+    """, (proyecto_id,))
+    todos = cursor.fetchall()
+    if formulario_ids:
+        incluidos = [(fid, nom) for fid, nom in todos if fid in formulario_ids]
+    else:
+        incluidos = todos
+
+    ids = [f[0] for f in incluidos]
+    if not ids:
+        return {'total': 0, 'total_previo': 0, 'por_formulario': [],
+                'sin_registros': [], 'por_usuario': [], 'sin_reportar': [],
+                'observaciones': []}
+
+    # Registros por formulario en el periodo
+    cursor.execute("""
+        SELECT rf.formulario_id, COUNT(*)
+        FROM respuestas_formulario rf
+        WHERE rf.id_proyecto = %s
+          AND rf.formulario_id = ANY(%s)
+          AND rf.created_at >= %s AND rf.created_at < %s
+        GROUP BY rf.formulario_id
+    """, (proyecto_id, ids, desde, hasta))
+    conteo = dict(cursor.fetchall())
+
+    por_formulario = [{'nombre': nom, 'cantidad': conteo.get(fid, 0)}
+                      for fid, nom in incluidos]
+    sin_registros  = [f['nombre'] for f in por_formulario if f['cantidad'] == 0]
+    total          = sum(conteo.values())
+
+    # Mismo conteo en el periodo anterior, para la comparación
+    duracion = hasta - desde
+    cursor.execute("""
+        SELECT COUNT(*) FROM respuestas_formulario rf
+        WHERE rf.id_proyecto = %s AND rf.formulario_id = ANY(%s)
+          AND rf.created_at >= %s AND rf.created_at < %s
+    """, (proyecto_id, ids, desde - duracion, desde))
+    total_previo = cursor.fetchone()[0]
+
+    # Quién reportó
+    cursor.execute("""
+        SELECT u.user_id, u.name, u.apellido, COUNT(*)
+        FROM respuestas_formulario rf
+        JOIN usuario u ON u.user_id = rf.user_id
+        WHERE rf.id_proyecto = %s AND rf.formulario_id = ANY(%s)
+          AND rf.created_at >= %s AND rf.created_at < %s
+        GROUP BY u.user_id, u.name, u.apellido
+        ORDER BY COUNT(*) DESC
+    """, (proyecto_id, ids, desde, hasta))
+    filas = cursor.fetchall()
+    por_usuario    = [{'nombre': f"{r[1]} {r[2] or ''}".strip(), 'cantidad': r[3]}
+                      for r in filas]
+    ids_reportaron = {r[0] for r in filas}
+
+    # Quién NO reportó: la ausencia suele ser la señal más útil
+    cursor.execute("""
+        SELECT u.user_id, u.name, u.apellido
+        FROM proyecto_usuarios pu
+        JOIN usuario u ON u.user_id = pu.user_id
+        WHERE pu.id_proyecto = %s
+          AND COALESCE(u.estado, 'activo') = 'activo'
+    """, (proyecto_id,))
+    sin_reportar = [f"{r[1]} {r[2] or ''}".strip()
+                    for r in cursor.fetchall() if r[0] not in ids_reportaron]
+
+    # Observaciones de texto libre, materia prima del resumen narrativo
+    cursor.execute("""
+        SELECT rf.respuestas
+        FROM respuestas_formulario rf
+        WHERE rf.id_proyecto = %s AND rf.formulario_id = ANY(%s)
+          AND rf.created_at >= %s AND rf.created_at < %s
+        ORDER BY rf.created_at DESC
+        LIMIT 200
+    """, (proyecto_id, ids, desde, hasta))
+
+    observaciones = []
+    for (resp,) in cursor.fetchall():
+        for valor in (resp or {}).values():
+            if isinstance(valor, str) and len(valor.split()) >= 5:
+                observaciones.append(valor.strip())
+
+    return {
+        'total': total, 'total_previo': total_previo,
+        'por_formulario': por_formulario, 'sin_registros': sin_registros,
+        'por_usuario': por_usuario, 'sin_reportar': sin_reportar,
+        'observaciones': observaciones[:120]
+    }
+
+def _html_reporte(datos, marca):
+    """Correo HTML con la marca de la empresa. 'marca' es
+    (nombre_empresa, logo_url, color_primario)."""
+    empresa, logo, color = marca
+    c = datos
+
+    def bloque_vacio():
+        comparacion = (f"En el periodo anterior se registraron "
+                       f"<strong>{c['total_previo']}</strong>."
+                       if c['total_previo'] else "")
+        return f"""
+        <p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 10px;">
+            No se registraron actividades en <strong>{c['etiqueta']}</strong>.
+        </p>
+        <p style="font-size:14px;color:#6b7280;margin:0;">{comparacion}</p>"""
+
+    def fila(nombre, cantidad):
+        return f"""
+        <tr>
+            <td style="padding:9px 0;border-bottom:1px solid #f1f1f1;font-size:14px;color:#374151;">{nombre}</td>
+            <td style="padding:9px 0;border-bottom:1px solid #f1f1f1;font-size:14px;
+                       color:#111827;font-weight:600;text-align:right;">{cantidad}</td>
+        </tr>"""
+
+    if c['total'] == 0:
+        cuerpo = bloque_vacio()
+    else:
+        dif = c['total'] - c['total_previo']
+        if c['total_previo']:
+            signo = '▲' if dif > 0 else ('▼' if dif < 0 else '=')
+            comp  = (f"<span style='font-size:14px;color:#6b7280;'>"
+                     f"{signo} {abs(dif)} frente al periodo anterior ({c['total_previo']})</span>")
+        else:
+            comp = "<span style='font-size:14px;color:#6b7280;'>Primer periodo con registros</span>"
+
+        cuerpo = f"""
+        <div style="margin-bottom:26px;">
+            <div style="font-size:42px;font-weight:700;color:{color};line-height:1;">{c['total']}</div>
+            <div style="font-size:14px;color:#6b7280;margin-top:4px;">registros en el periodo</div>
+            <div style="margin-top:8px;">{comp}</div>
+        </div>
+
+        <p style="font-size:12px;font-weight:700;color:#9ca3af;letter-spacing:.5px;
+                  text-transform:uppercase;margin:0 0 6px;">Por formulario</p>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+            {''.join(fila(f['nombre'], f['cantidad']) for f in c['por_formulario'])}
+        </table>
+
+        <p style="font-size:12px;font-weight:700;color:#9ca3af;letter-spacing:.5px;
+                  text-transform:uppercase;margin:0 0 6px;">Quién reportó</p>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
+            {''.join(fila(u['nombre'], u['cantidad']) for u in c['por_usuario'])}
+        </table>"""
+
+        # Lo que NO pasó: para un gerente suele ser lo más accionable.
+        alertas = []
+        if c['sin_reportar']:
+            alertas.append(f"Sin reportar: {', '.join(c['sin_reportar'])}")
+        if c['sin_registros']:
+            alertas.append(f"Formularios sin uso: {', '.join(c['sin_registros'])}")
+        if alertas:
+            cuerpo += f"""
+            <div style="background:#FFF8EE;border-left:3px solid {color};
+                        padding:14px 16px;border-radius:0 8px 8px 0;margin-bottom:24px;">
+                <p style="font-size:12px;font-weight:700;color:{color};margin:0 0 6px;
+                          text-transform:uppercase;letter-spacing:.5px;">Puntos de atención</p>
+                {''.join(f'<p style="font-size:13.5px;color:#374151;margin:0 0 4px;line-height:1.5;">{a}</p>'
+                         for a in alertas)}
+            </div>"""
+
+    if c.get('resumen_ia'):
+        cuerpo += f"""
+        <div style="background:#F9FAFB;border-radius:10px;padding:16px 18px;margin-bottom:24px;">
+            <p style="font-size:12px;font-weight:700;color:#9ca3af;margin:0 0 8px;
+                      text-transform:uppercase;letter-spacing:.5px;">Resumen del periodo</p>
+            <p style="font-size:14px;color:#374151;line-height:1.65;margin:0;">{c['resumen_ia']}</p>
+        </div>"""
+
+    logo_html = (f'<img src="{logo}" alt="{empresa}" style="height:38px;margin-bottom:14px;">'
+                 if logo else '')
+
+    return f"""
+    <div style="font-family:'DM Sans',Arial,sans-serif;max-width:600px;margin:auto;
+                background:#fff;border-radius:14px;overflow:hidden;
+                box-shadow:0 2px 16px rgba(0,0,0,.07);">
+        <div style="background:#0f0f0f;padding:26px 32px;">
+            {logo_html}
+            <div style="color:#fff;font-size:19px;font-weight:700;">{c['nombre_reporte']}</div>
+            <div style="color:#9ca3af;font-size:13.5px;margin-top:3px;">
+                {c['proyecto']} · {c['etiqueta']}
+            </div>
+        </div>
+
+        <div style="padding:28px 32px;">
+            {cuerpo}
+            <a href="https://bitacora.iaclatam.com/registros"
+               style="display:block;text-align:center;background:{color};color:#fff;
+                      padding:13px;border-radius:9px;text-decoration:none;
+                      font-weight:600;font-size:14.5px;">Ver el detalle en Bitácora</a>
+        </div>
+
+        <div style="background:#f9fafb;padding:18px 32px;border-top:1px solid #eee;text-align:center;">
+            <p style="font-size:11.5px;color:#9ca3af;margin:0;">
+                {empresa} · Reporte automático de Bitácora
+            </p>
+        </div>
+    </div>"""
 
 @app.route('/api/reportes/probar', methods=['POST'])
 def probar_reporte():
-    """Pendiente: requiere el generador del reporte, que viene en el
-    siguiente paso junto con el script del cron."""
+    """Genera el reporte con la configuración en pantalla y lo envía
+    solo al administrador. No toca a los destinatarios configurados."""
     if session.get('user_rol') != 'admin':
         return jsonify({'error': 'No autorizado'}), 403
-    return jsonify({
-        'success': False,
-        'error': 'La prueba estará disponible cuando se active el envío automático.'
-    })
+
+    data        = request.get_json() or {}
+    empresa_id  = session.get('empresa_id')
+    proyecto_id = data.get('proyecto_id')
+    if not proyecto_id:
+        return jsonify({'success': False, 'error': 'Selecciona un proyecto'}), 400
+
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT p.nombre_proyecto, e.nombre, e.logo_url,
+                       COALESCE(NULLIF(e.color_primario, ''), '#FFAF33')
+                FROM proyectos p
+                JOIN empresas e ON e.id = p.empresa_id
+                WHERE p.id = %s AND p.empresa_id = %s
+            """, (proyecto_id, empresa_id))
+            fila = cursor.fetchone()
+            if not fila:
+                return jsonify({'success': False, 'error': 'Proyecto no válido'}), 404
+            proyecto_nombre, emp_nombre, logo, color = fila
+
+            cursor.execute("SELECT email FROM usuario WHERE user_id = %s",
+                           (session.get('user_id'),))
+            destino = cursor.fetchone()[0]
+
+            desde, hasta, clave, etiqueta = _periodo_reporte(
+                data.get('periodo', 'diario'),
+                data.get('zona_horaria', 'America/Bogota')
+            )
+
+            cifras = _cifras_reporte(cursor, proyecto_id,
+                                     data.get('formularios') or [], desde, hasta)
+
+        cifras.update({
+            'nombre_reporte': (data.get('nombre') or 'Reporte').strip(),
+            'proyecto': proyecto_nombre,
+            'etiqueta': etiqueta
+        })
+
+        enviar_correo(
+            destinatarios=destino,
+            asunto=f"[Prueba] {cifras['nombre_reporte']} — {proyecto_nombre}",
+            cuerpo_html=_html_reporte(cifras, (emp_nombre, logo, color))
+        )
+        return jsonify({'success': True})
+
+    except Exception as e:
+        print(f"[REPORTES] Error en la prueba: {e}")
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/plan-consumo', methods=['GET'])
 def plan_consumo():
