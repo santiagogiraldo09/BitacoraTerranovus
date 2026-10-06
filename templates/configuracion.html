@@ -2372,29 +2372,35 @@
         }
     }
 
-
-
-
     function abrirDrawer() {
-        document.getElementById('drawer-mas').classList.add('active');
-        document.getElementById('drawer-overlay').classList.add('active');
-        document.getElementById('drawer-mas').setAttribute('aria-hidden', 'false');
-        document.getElementById('bnav-mas').setAttribute('aria-expanded', 'true');
-        // Evita que el fondo se desplace mientras el drawer está abierto.
+        const drawer  = document.getElementById('drawer-mas');
+        const overlay = document.getElementById('drawer-overlay');
+        const btnMas  = document.getElementById('bnav-mas');
+        if (!drawer || !overlay) return;
+
+        drawer.classList.add('active');
+        overlay.classList.add('active');
+        drawer.setAttribute('aria-hidden', 'false');
+        if (btnMas) btnMas.setAttribute('aria-expanded', 'true');
         document.body.style.overflow = 'hidden';
     }
- 
+
     function cerrarDrawer() {
+        const drawer  = document.getElementById('drawer-mas');
+        const overlay = document.getElementById('drawer-overlay');
+        const btnMas  = document.getElementById('bnav-mas');
+        if (!drawer) return;
+
         // El foco debe salir del drawer ANTES de ocultarlo: aria-hidden
-        // sobre un elemento enfocado deja al usuario de teclado atrapado.
-        const drawer = document.getElementById('drawer-mas');
+        // sobre un elemento enfocado deja atrapado al usuario de teclado.
         if (drawer.contains(document.activeElement)) {
             document.activeElement.blur();
         }
+
         drawer.classList.remove('active');
-        document.getElementById('drawer-overlay').classList.remove('active');
-        document.getElementById('drawer').setAttribute('aria-hidden', 'true');
-        document.getElementById('bnav-mas').setAttribute('aria-expanded', 'false');
+        if (overlay) overlay.classList.remove('active');
+        drawer.setAttribute('aria-hidden', 'true');
+        if (btnMas) btnMas.setAttribute('aria-expanded', 'false');
         document.body.style.overflow = '';
     }
  
@@ -2484,9 +2490,14 @@
         document.getElementById('etiqueta-izquierda').addEventListener('input', actualizarRadioLabels);
         document.getElementById('etiqueta-derecha').addEventListener('input', actualizarRadioLabels);
 
-        // Sección desde hash
-        const hash = window.location.hash.replace('#', '');
-        mostrarSeccion(secciones.includes(hash) ? hash : 'identidad');
+        // Sección desde hash. Envuelto porque un fallo aquí cancelaría
+        // todas las cargas de datos que vienen después.
+        try {
+            const hash = window.location.hash.replace('#', '');
+            mostrarSeccion(secciones.includes(hash) ? hash : 'identidad');
+        } catch (e) {
+            console.error('Error al mostrar la sección inicial:', e);
+        }
 
         // Cargar campos
         cargarCampos();
