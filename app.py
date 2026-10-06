@@ -190,6 +190,22 @@ CONTEXTO_SECTOR = {
         )
     }
 }
+# Zona horaria sugerida según el país de la empresa. Solo es el valor
+# que llega pre-seleccionado al crear un reporte; el admin puede cambiarlo.
+ZONAS_POR_PAIS = {
+    'Colombia':             'America/Bogota',
+    'México':               'America/Mexico_City',
+    'Perú':                 'America/Lima',
+    'Ecuador':              'America/Guayaquil',
+    'Chile':                'America/Santiago',
+    'Argentina':            'America/Argentina/Buenos_Aires',
+    'Panamá':               'America/Panama',
+    'Costa Rica':           'America/Costa_Rica',
+    'República Dominicana': 'America/Santo_Domingo',
+    'España':               'Europe/Madrid',
+    'Estados Unidos':       'America/New_York',
+}
+
 
 # Caché en memoria del glosario por empresa. Evita consultar Supabase en
 # cada dictado. TTL corto para que un término recién agregado se refleje
@@ -5312,7 +5328,8 @@ def configuracion():
         logo_actual = logo_row[0] if logo_row else None
 
         cursor.execute("""
-            SELECT logo_url, color_primario, color_secundario
+            SELECT logo_url, color_primario, color_secundario,
+                   COALESCE(NULLIF(pais, ''), 'Colombia')
             FROM empresas
             WHERE id = %s
         """, (session.get('empresa_id'),))
@@ -5320,12 +5337,15 @@ def configuracion():
         logo_actual      = empresa_row[0] if empresa_row else None
         color_primario   = empresa_row[1] if empresa_row else '#FBAF33'
         color_secundario = empresa_row[2] if empresa_row else '#E3E3E3'
+        pais_empresa     = empresa_row[3] if empresa_row else 'Colombia'
+        zona_empresa     = ZONAS_POR_PAIS.get(pais_empresa, 'America/Bogota')
 
         return render_template('configuracion.html', 
             miembros=miembros,
             logo_actual=logo_actual,
             color_primario=color_primario,
-            color_secundario=color_secundario
+            color_secundario=color_secundario,
+            zona_empresa=zona_empresa
         )
         #return render_template('configuracion.html', miembros=miembros)
     except Exception as e:
@@ -7299,6 +7319,313 @@ def _log_transcripcion(data, resultado, ms_interpretacion):
             conn.commit()
     except Exception as e:
         print(f"[LOG-TRANS] No se pudo registrar la transcripción: {e}")
+
+# ============================================================
+#  Reportes automáticos por correo
+# ============================================================
+
+def _reporte_de_mi_empresa(cursor, reporte_id, empresa_id):
+    """Verifica que el reporte pertenezca a la empresa en sesión.
+    Toda ruta que reciba un id debe pasar por aquí: sin esta validación,
+    cambiar el número en la URL daría acceso a otra organización."""
+    cursor.execute("""
+        SELECT r.id FROM reportes_programados r
+        JOIN proyectos p ON p.id = r.proyecto_id
+        WHERE r.id = %s AND p.empresa_id = %s
+    """, (reporte_id, empresa_id))
+    return cursor.fetchone() is not None
+
+
+@app.route('/api/reportes', methods=['GET'])
+def listar_reportes():
+    if session.get('user_rol') != 'admin':
+        return jsonify({'error': 'No autorizado'}), 403
+
+    empresa_id = session.get('empresa_id')
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT r.id, r.nombre, r.proyecto_id, p.nombre_proyecto,
+                       r.periodo, r.dias_semana, r.dia_semana, r.dia_mes,
+                       r.hora_envio, r.zona_horaria, r.fecha_inicio,
+                       r.incluir_resumen, r.enviar_sin_actividad, r.activo,
+                       (SELECT COUNT(*) FROM reportes_destinatarios d
+                         WHERE d.reporte_id = r.id AND d.activo) AS total_dest,
+                       ult.enviado_en, ult.estado
+                FROM reportes_programados r
+                JOIN proyectos p ON p.id = r.proyecto_id
+                LEFT JOIN LATERAL (
+                    SELECT enviado_en, estado FROM reportes_envios e
+                    WHERE e.reporte_id = r.id
+                    ORDER BY enviado_en DESC LIMIT 1
+                ) ult ON TRUE
+                WHERE p.empresa_id = %s
+                ORDER BY p.nombre_proyecto, r.nombre
+            """, (empresa_id,))
+
+            reportes = []
+            ids = []
+            for row in cursor.fetchall():
+                reportes.append({
+                    'id': row[0], 'nombre': row[1],
+                    'proyecto_id': row[2], 'proyecto_nombre': row[3],
+                    'periodo': row[4], 'dias_semana': row[5],
+                    'dia_semana': row[6], 'dia_mes': row[7],
+                    'hora_envio': row[8], 'zona_horaria': row[9],
+                    'fecha_inicio': row[10].strftime('%Y-%m-%d') if row[10] else '',
+                    'incluir_resumen': row[11], 'enviar_sin_actividad': row[12],
+                    'activo': row[13], 'total_destinatarios': row[14],
+                    'ultimo_envio': row[15].strftime('%d/%m/%Y %H:%M') if row[15] else None,
+                    'ultimo_estado': row[16],
+                    'formularios': [], 'destinatarios': []
+                })
+                ids.append(row[0])
+
+            # Formularios y destinatarios en dos consultas, no una por reporte.
+            if ids:
+                cursor.execute("""
+                    SELECT reporte_id, formulario_id
+                    FROM reportes_formularios WHERE reporte_id = ANY(%s)
+                """, (ids,))
+                for rid, fid in cursor.fetchall():
+                    next(r for r in reportes if r['id'] == rid)['formularios'].append(fid)
+
+                cursor.execute("""
+                    SELECT d.reporte_id, d.user_id, d.email, u.name, u.email
+                    FROM reportes_destinatarios d
+                    LEFT JOIN usuario u ON u.user_id = d.user_id
+                    WHERE d.reporte_id = ANY(%s) AND d.activo
+                """, (ids,))
+                for rid, uid, email, uname, uemail in cursor.fetchall():
+                    rep = next(r for r in reportes if r['id'] == rid)
+                    if uid:
+                        rep['destinatarios'].append({
+                            'tipo': 'usuario', 'id': uid,
+                            'nombre': f"{uname} — {uemail}"
+                        })
+                    else:
+                        rep['destinatarios'].append({
+                            'tipo': 'email', 'email': email, 'nombre': email
+                        })
+
+            # Proyectos de la empresa, para el desplegable del modal.
+            cursor.execute("""
+                SELECT id, nombre_proyecto FROM proyectos
+                WHERE empresa_id = %s ORDER BY nombre_proyecto
+            """, (empresa_id,))
+            proyectos = [{'id': r[0], 'nombre': r[1]} for r in cursor.fetchall()]
+
+        return jsonify({'success': True, 'reportes': reportes, 'proyectos': proyectos})
+
+    except Exception as e:
+        print(f"[REPORTES] Error listando: {e}")
+        return jsonify({'error': 'Error al cargar los reportes'}), 500
+
+
+@app.route('/api/reportes/proyecto/<int:proyecto_id>', methods=['GET'])
+def contexto_proyecto_reporte(proyecto_id):
+    """Formularios activos y usuarios asignados a un proyecto."""
+    if session.get('user_rol') != 'admin':
+        return jsonify({'error': 'No autorizado'}), 403
+
+    empresa_id = session.get('empresa_id')
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("SELECT 1 FROM proyectos WHERE id = %s AND empresa_id = %s",
+                           (proyecto_id, empresa_id))
+            if not cursor.fetchone():
+                return jsonify({'error': 'Proyecto no encontrado'}), 404
+
+            cursor.execute("""
+                SELECT DISTINCT f.id, f.nombre
+                FROM proyecto_formularios pf
+                JOIN formularios f ON f.id = pf.formulario_id
+                WHERE pf.proyecto_id = %s
+                ORDER BY f.nombre
+            """, (proyecto_id,))
+            formularios = [{'id': r[0], 'nombre': r[1]} for r in cursor.fetchall()]
+
+            cursor.execute("""
+                SELECT u.user_id, u.name, u.apellido, u.email
+                FROM proyecto_usuarios pu
+                JOIN usuario u ON u.user_id = pu.user_id
+                WHERE pu.id_proyecto = %s
+                  AND COALESCE(u.estado, 'activo') <> 'inactivo'
+                ORDER BY u.name
+            """, (proyecto_id,))
+            usuarios = [{'user_id': r[0],
+                         'nombre': f"{r[1]} {r[2] or ''}".strip(),
+                         'email': r[3]} for r in cursor.fetchall()]
+
+        return jsonify({'success': True, 'formularios': formularios, 'usuarios': usuarios})
+
+    except Exception as e:
+        print(f"[REPORTES] Error cargando proyecto: {e}")
+        return jsonify({'error': 'Error al cargar el proyecto'}), 500
+
+
+def _guardar_relaciones_reporte(cursor, reporte_id, data, user_id):
+    """Reescribe formularios y destinatarios del reporte."""
+    cursor.execute("DELETE FROM reportes_formularios WHERE reporte_id = %s", (reporte_id,))
+    for fid in (data.get('formularios') or []):
+        cursor.execute("""
+            INSERT INTO reportes_formularios (reporte_id, formulario_id)
+            VALUES (%s, %s) ON CONFLICT DO NOTHING
+        """, (reporte_id, fid))
+
+    cursor.execute("DELETE FROM reportes_destinatarios WHERE reporte_id = %s", (reporte_id,))
+    for d in (data.get('destinatarios') or []):
+        if d.get('tipo') == 'usuario':
+            cursor.execute("""
+                INSERT INTO reportes_destinatarios
+                    (reporte_id, user_id, agregado_por, baja_token)
+                VALUES (%s, %s, %s, %s)
+            """, (reporte_id, d['id'], user_id, secrets.token_urlsafe(24)))
+        else:
+            correo = (d.get('email') or '').strip().lower()
+            if correo:
+                cursor.execute("""
+                    INSERT INTO reportes_destinatarios
+                        (reporte_id, email, agregado_por, baja_token)
+                    VALUES (%s, %s, %s, %s)
+                """, (reporte_id, correo, user_id, secrets.token_urlsafe(24)))
+
+
+@app.route('/api/reportes', methods=['POST'])
+def crear_reporte():
+    if session.get('user_rol') != 'admin':
+        return jsonify({'error': 'No autorizado'}), 403
+
+    data       = request.get_json() or {}
+    empresa_id = session.get('empresa_id')
+    user_id    = session.get('user_id')
+
+    if not data.get('nombre') or not data.get('proyecto_id'):
+        return jsonify({'error': 'Nombre y proyecto son obligatorios'}), 400
+
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("SELECT 1 FROM proyectos WHERE id = %s AND empresa_id = %s",
+                           (data['proyecto_id'], empresa_id))
+            if not cursor.fetchone():
+                return jsonify({'error': 'Proyecto no válido'}), 400
+
+            cursor.execute("""
+                INSERT INTO reportes_programados
+                    (proyecto_id, nombre, periodo, dias_semana, dia_semana, dia_mes,
+                     hora_envio, zona_horaria, fecha_inicio,
+                     incluir_resumen, enviar_sin_actividad, creado_por)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                RETURNING id
+            """, (
+                data['proyecto_id'], data['nombre'].strip(), data['periodo'],
+                data.get('dias_semana'), data.get('dia_semana'), data.get('dia_mes'),
+                data.get('hora_envio', 7), data.get('zona_horaria', 'America/Bogota'),
+                data.get('fecha_inicio'),
+                bool(data.get('incluir_resumen', True)),
+                bool(data.get('enviar_sin_actividad', True)),
+                user_id
+            ))
+            reporte_id = cursor.fetchone()[0]
+            _guardar_relaciones_reporte(cursor, reporte_id, data, user_id)
+            conn.commit()
+
+        return jsonify({'success': True, 'id': reporte_id})
+
+    except Exception as e:
+        print(f"[REPORTES] Error creando: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/reportes/<int:reporte_id>', methods=['PUT'])
+def editar_reporte(reporte_id):
+    if session.get('user_rol') != 'admin':
+        return jsonify({'error': 'No autorizado'}), 403
+
+    data       = request.get_json() or {}
+    empresa_id = session.get('empresa_id')
+    user_id    = session.get('user_id')
+
+    try:
+        with db_connection() as (conn, cursor):
+            if not _reporte_de_mi_empresa(cursor, reporte_id, empresa_id):
+                return jsonify({'error': 'Reporte no encontrado'}), 404
+
+            # El proyecto no se actualiza: cambiarlo dejaría inconsistentes
+            # los formularios seleccionados y el historial de envíos.
+            cursor.execute("""
+                UPDATE reportes_programados
+                SET nombre = %s, periodo = %s, dias_semana = %s,
+                    dia_semana = %s, dia_mes = %s, hora_envio = %s,
+                    zona_horaria = %s, fecha_inicio = %s,
+                    incluir_resumen = %s, enviar_sin_actividad = %s
+                WHERE id = %s
+            """, (
+                data['nombre'].strip(), data['periodo'], data.get('dias_semana'),
+                data.get('dia_semana'), data.get('dia_mes'),
+                data.get('hora_envio', 7), data.get('zona_horaria', 'America/Bogota'),
+                data.get('fecha_inicio'),
+                bool(data.get('incluir_resumen', True)),
+                bool(data.get('enviar_sin_actividad', True)),
+                reporte_id
+            ))
+            _guardar_relaciones_reporte(cursor, reporte_id, data, user_id)
+            conn.commit()
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        print(f"[REPORTES] Error editando: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/reportes/<int:reporte_id>/activo', methods=['PATCH'])
+def alternar_reporte(reporte_id):
+    if session.get('user_rol') != 'admin':
+        return jsonify({'error': 'No autorizado'}), 403
+    try:
+        with db_connection() as (conn, cursor):
+            if not _reporte_de_mi_empresa(cursor, reporte_id, session.get('empresa_id')):
+                return jsonify({'error': 'Reporte no encontrado'}), 404
+            cursor.execute("""
+                UPDATE reportes_programados SET activo = NOT activo
+                WHERE id = %s RETURNING activo
+            """, (reporte_id,))
+            activo = cursor.fetchone()[0]
+            conn.commit()
+        return jsonify({'success': True, 'activo': activo})
+    except Exception as e:
+        print(f"[REPORTES] Error alternando: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/reportes/<int:reporte_id>', methods=['DELETE'])
+def eliminar_reporte_api(reporte_id):
+    if session.get('user_rol') != 'admin':
+        return jsonify({'error': 'No autorizado'}), 403
+    try:
+        with db_connection() as (conn, cursor):
+            if not _reporte_de_mi_empresa(cursor, reporte_id, session.get('empresa_id')):
+                return jsonify({'error': 'Reporte no encontrado'}), 404
+            # Las tablas hijas están en CASCADE: se borran solas.
+            cursor.execute("DELETE FROM reportes_programados WHERE id = %s", (reporte_id,))
+            conn.commit()
+        return jsonify({'success': True})
+    except Exception as e:
+        print(f"[REPORTES] Error eliminando: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/reportes/probar', methods=['POST'])
+def probar_reporte():
+    """Pendiente: requiere el generador del reporte, que viene en el
+    siguiente paso junto con el script del cron."""
+    if session.get('user_rol') != 'admin':
+        return jsonify({'error': 'No autorizado'}), 403
+    return jsonify({
+        'success': False,
+        'error': 'La prueba estará disponible cuando se active el envío automático.'
+    })
 
 @app.route('/api/plan-consumo', methods=['GET'])
 def plan_consumo():

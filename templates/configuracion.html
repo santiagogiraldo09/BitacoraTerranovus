@@ -2385,9 +2385,15 @@
     }
  
     function cerrarDrawer() {
-        document.getElementById('drawer-mas').classList.remove('active');
+        // El foco debe salir del drawer ANTES de ocultarlo: aria-hidden
+        // sobre un elemento enfocado deja al usuario de teclado atrapado.
+        const drawer = document.getElementById('drawer-mas');
+        if (drawer.contains(document.activeElement)) {
+            document.activeElement.blur();
+        }
+        drawer.classList.remove('active');
         document.getElementById('drawer-overlay').classList.remove('active');
-        document.getElementById('drawer-mas').setAttribute('aria-hidden', 'true');
+        document.getElementById('drawer').setAttribute('aria-hidden', 'true');
         document.getElementById('bnav-mas').setAttribute('aria-expanded', 'false');
         document.body.style.overflow = '';
     }
