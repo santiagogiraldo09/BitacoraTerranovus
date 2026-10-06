@@ -1431,6 +1431,407 @@
         }
     }
 
+
+    // ── Reportes automáticos ────────────────────────────────────
+    let reportesCargados   = [];
+    let proyectosReporte   = [];
+    let reporteEditandoId  = null;
+    let repDestinatarios   = [];   // [{tipo:'usuario'|'email', id?, email?, nombre}]
+
+    const DIAS_NOMBRE = { 1:'Lun', 2:'Mar', 3:'Mié', 4:'Jue', 5:'Vie', 6:'Sáb', 7:'Dom' };
+
+    /** Llena el desplegable de horas (00:00 a 23:00). */
+    function llenarHorasReporte() {
+        const sel = document.getElementById('rep-hora');
+        if (!sel || sel.options.length) return;
+        for (let h = 0; h < 24; h++) {
+            sel.appendChild(new Option(String(h).padStart(2, '0') + ':00', h));
+        }
+        sel.value = 7;
+    }
+
+    async function cargarReportes() {
+        const lista = document.getElementById('lista-reportes');
+        if (!lista) return;
+        try {
+            const res  = await fetch('/api/reportes');
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error);
+
+            reportesCargados = data.reportes || [];
+            proyectosReporte = data.proyectos || [];
+
+            if (!reportesCargados.length) {
+                lista.innerHTML = '<p style="color:var(--gris-texto);font-size:13px;">' +
+                                  'Aún no hay reportes programados.</p>';
+                return;
+            }
+
+            lista.innerHTML = '';
+            reportesCargados.forEach(r => {
+                const div = document.createElement('div');
+                div.className = 'rep-item' + (r.activo ? '' : ' inactivo');
+                div.dataset.busqueda = (r.nombre + ' ' + r.proyecto_nombre).toLowerCase();
+                div.innerHTML = `
+                    <div class="rep-item-info">
+                        <span class="rep-item-nombre">${r.nombre}</span>
+                        <span class="rep-item-proyecto">${r.proyecto_nombre}</span>
+                        <span class="rep-item-meta">${describirHorario(r)} · ${r.total_destinatarios} destinatario(s)</span>
+                        ${r.ultimo_envio
+                            ? `<span class="rep-item-envio ${r.ultimo_estado === 'error' ? 'error' : ''}">
+                                   Último envío: ${r.ultimo_envio}${r.ultimo_estado === 'error' ? ' — falló' : ''}
+                               </span>`
+                            : '<span class="rep-item-envio">Sin envíos todavía</span>'}
+                    </div>
+                    <div class="rep-item-actions">
+                        <button class="icon-btn" onclick="alternarReporte(${r.id})"
+                                title="${r.activo ? 'Desactivar' : 'Activar'}">
+                            <i class="fas fa-${r.activo ? 'pause' : 'play'}"></i>
+                        </button>
+                        <button class="icon-btn" onclick="abrirModalReporte(${r.id})" title="Editar">
+                            <i class="fas fa-pen"></i>
+                        </button>
+                        <button class="icon-btn danger" onclick="eliminarReporte(${r.id})" title="Eliminar">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>`;
+                lista.appendChild(div);
+            });
+        } catch {
+            lista.innerHTML = '<p style="color:var(--gris-texto);">Error al cargar los reportes.</p>';
+        }
+    }
+
+    /** Texto legible del horario, para la lista. */
+    function describirHorario(r) {
+        const hora = String(r.hora_envio).padStart(2, '0') + ':00';
+        if (r.periodo === 'diario') {
+            const dias = (r.dias_semana || []).map(d => DIAS_NOMBRE[d]).join(', ');
+            return `Diario (${dias || 'sin días'}) a las ${hora}`;
+        }
+        if (r.periodo === 'semanal') {
+            return `Semanal, ${DIAS_NOMBRE[r.dia_semana] || '—'} a las ${hora}`;
+        }
+        return `Mensual, día ${r.dia_mes} a las ${hora}`;
+    }
+
+    function filtrarReportes(q) {
+        const txt = q.toLowerCase().trim();
+        document.querySelectorAll('#lista-reportes .rep-item').forEach(item => {
+            item.style.display = item.dataset.busqueda.includes(txt) ? '' : 'none';
+        });
+    }
+
+    // ── Modal ──────────────────────────────────────────────────
+    async function abrirModalReporte(reporteId) {
+        reporteEditandoId = reporteId;
+        repDestinatarios  = [];
+        llenarHorasReporte();
+
+        // Desplegable de proyectos
+        const selProy = document.getElementById('rep-proyecto');
+        selProy.innerHTML = '<option value="">Selecciona un proyecto</option>';
+        proyectosReporte.forEach(p => selProy.appendChild(new Option(p.nombre, p.id)));
+
+        // Estado base
+        document.getElementById('rep-nombre').value = '';
+        document.getElementById('rep-periodo').value = 'diario';
+        document.getElementById('rep-dia-semana').value = '1';
+        document.getElementById('rep-dia-mes').value = '1';
+        document.getElementById('rep-hora').value = 7;
+        document.getElementById('rep-fecha-inicio').value = new Date().toISOString().slice(0, 10);
+        document.getElementById('rep-incluir-resumen').checked = true;
+        document.getElementById('rep-sin-actividad').checked = true;
+        document.getElementById('rep-feedback').textContent = '';
+        document.querySelectorAll('#rep-dias-wrap input').forEach(c => {
+            c.checked = parseInt(c.value) <= 5;   // L a V por defecto
+        });
+
+        // Zona horaria según el país de la empresa
+        document.getElementById('rep-zona').value = "{{ zona_empresa|default('America/Bogota') }}";
+
+        if (reporteId) {
+            const r = reportesCargados.find(x => x.id === reporteId);
+            if (r) {
+                document.getElementById('modal-reporte-titulo').textContent = 'Editar reporte';
+                document.getElementById('rep-btn-guardar-texto').textContent = 'Guardar cambios';
+                document.getElementById('rep-nombre').value = r.nombre;
+                selProy.value = r.proyecto_id;
+                // El proyecto no se puede cambiar: los formularios y el
+                // historial de envíos quedarían inconsistentes.
+                selProy.disabled = true;
+
+                await cargarDatosProyecto(r.formularios || []);
+
+                document.getElementById('rep-periodo').value = r.periodo;
+                if (r.dias_semana) {
+                    document.querySelectorAll('#rep-dias-wrap input').forEach(c => {
+                        c.checked = r.dias_semana.includes(parseInt(c.value));
+                    });
+                }
+                if (r.dia_semana) document.getElementById('rep-dia-semana').value = r.dia_semana;
+                if (r.dia_mes)    document.getElementById('rep-dia-mes').value    = r.dia_mes;
+                document.getElementById('rep-hora').value = r.hora_envio;
+                document.getElementById('rep-zona').value = r.zona_horaria;
+                document.getElementById('rep-fecha-inicio').value = r.fecha_inicio;
+                document.getElementById('rep-incluir-resumen').checked = r.incluir_resumen;
+                document.getElementById('rep-sin-actividad').checked   = r.enviar_sin_actividad;
+
+                repDestinatarios = r.destinatarios || [];
+                renderDestinatarios();
+            }
+        } else {
+            document.getElementById('modal-reporte-titulo').textContent = 'Nuevo reporte';
+            document.getElementById('rep-btn-guardar-texto').textContent = 'Crear reporte';
+            selProy.disabled = false;
+            document.getElementById('rep-formularios-lista').innerHTML =
+                '<p class="rep-vacio">Elige primero un proyecto.</p>';
+            document.getElementById('rep-usuario-sel').innerHTML =
+                '<option value="">Elige primero un proyecto</option>';
+            renderDestinatarios();
+        }
+
+        onPeriodoReporteChange();
+        document.getElementById('modal-reporte').classList.add('active');
+    }
+
+    function cerrarModalReporte() {
+        document.getElementById('modal-reporte').classList.remove('active');
+        reporteEditandoId = null;
+        repDestinatarios  = [];
+    }
+
+    /** Trae formularios y usuarios del proyecto elegido. */
+    async function cargarDatosProyecto(formulariosMarcados = []) {
+        const proyectoId = document.getElementById('rep-proyecto').value;
+        const cont       = document.getElementById('rep-formularios-lista');
+        const selUsr     = document.getElementById('rep-usuario-sel');
+
+        if (!proyectoId) {
+            cont.innerHTML = '<p class="rep-vacio">Elige primero un proyecto.</p>';
+            selUsr.innerHTML = '<option value="">Elige primero un proyecto</option>';
+            return;
+        }
+
+        cont.innerHTML = '<p class="rep-vacio">Cargando…</p>';
+        try {
+            const res  = await fetch(`/api/reportes/proyecto/${proyectoId}`);
+            const data = await res.json();
+
+            // Formularios
+            const forms = data.formularios || [];
+            if (!forms.length) {
+                cont.innerHTML = '<p class="rep-vacio">Este proyecto no tiene formularios activos.</p>';
+            } else {
+                // Sin selección guardada, todos marcados: equivale a "incluir todos".
+                const marcar = ids => formulariosMarcados.length === 0 || formulariosMarcados.includes(ids);
+                cont.innerHTML = forms.map(f => `
+                    <label class="rep-check-item">
+                        <input type="checkbox" value="${f.id}" ${marcar(f.id) ? 'checked' : ''}>
+                        <span>${f.nombre}</span>
+                    </label>`).join('');
+            }
+
+            // Usuarios asignados
+            selUsr.innerHTML = '<option value="">Selecciona un usuario</option>';
+            (data.usuarios || []).forEach(u => {
+                selUsr.appendChild(new Option(`${u.nombre} — ${u.email}`, u.user_id));
+            });
+
+        } catch {
+            cont.innerHTML = '<p class="rep-vacio">Error al cargar el proyecto.</p>';
+        }
+    }
+
+    /** Muestra solo los campos de horario que aplican al periodo. */
+    function onPeriodoReporteChange() {
+        const p = document.getElementById('rep-periodo').value;
+        document.getElementById('rep-dias-wrap').style.display       = p === 'diario'  ? '' : 'none';
+        document.getElementById('rep-dia-semana-wrap').style.display = p === 'semanal' ? '' : 'none';
+        document.getElementById('rep-dia-mes-wrap').style.display    = p === 'mensual' ? '' : 'none';
+    }
+
+    // ── Destinatarios ──────────────────────────────────────────
+    function agregarDestinatarioUsuario() {
+        const sel = document.getElementById('rep-usuario-sel');
+        const id  = parseInt(sel.value);
+        if (!id) return;
+        if (repDestinatarios.some(d => d.tipo === 'usuario' && d.id === id)) {
+            mostrarToast('Ese usuario ya está agregado', true);
+            return;
+        }
+        repDestinatarios.push({
+            tipo: 'usuario', id, nombre: sel.options[sel.selectedIndex].text
+        });
+        sel.value = '';
+        renderDestinatarios();
+    }
+
+    function agregarDestinatarioEmail() {
+        const input = document.getElementById('rep-email-externo');
+        const email = (input.value || '').trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            mostrarToast('Escribe un correo válido', true);
+            return;
+        }
+        if (repDestinatarios.some(d => d.tipo === 'email' && d.email === email)) {
+            mostrarToast('Ese correo ya está agregado', true);
+            return;
+        }
+        repDestinatarios.push({ tipo: 'email', email, nombre: email });
+        input.value = '';
+        renderDestinatarios();
+    }
+
+    function quitarDestinatario(idx) {
+        repDestinatarios.splice(idx, 1);
+        renderDestinatarios();
+    }
+
+    function renderDestinatarios() {
+        const cont = document.getElementById('rep-destinatarios-lista');
+        if (!repDestinatarios.length) {
+            cont.innerHTML = '<p class="rep-vacio">Aún no has agregado destinatarios.</p>';
+            return;
+        }
+        cont.innerHTML = repDestinatarios.map((d, i) => `
+            <span class="rep-chip ${d.tipo === 'email' ? 'externo' : ''}">
+                <i class="fas fa-${d.tipo === 'email' ? 'envelope' : 'user'}"></i>
+                ${d.nombre}
+                <i class="fas fa-times" onclick="quitarDestinatario(${i})"></i>
+            </span>`).join('');
+    }
+
+    // ── Guardar / eliminar / probar ────────────────────────────
+    function recogerConfiguracionReporte() {
+        const periodo = document.getElementById('rep-periodo').value;
+        return {
+            nombre:      document.getElementById('rep-nombre').value.trim(),
+            proyecto_id: parseInt(document.getElementById('rep-proyecto').value) || null,
+            periodo,
+            dias_semana: periodo === 'diario'
+                ? Array.from(document.querySelectorAll('#rep-dias-wrap input:checked'))
+                       .map(c => parseInt(c.value))
+                : null,
+            dia_semana:  periodo === 'semanal'
+                ? parseInt(document.getElementById('rep-dia-semana').value) : null,
+            dia_mes:     periodo === 'mensual'
+                ? parseInt(document.getElementById('rep-dia-mes').value) : null,
+            hora_envio:   parseInt(document.getElementById('rep-hora').value),
+            zona_horaria: document.getElementById('rep-zona').value,
+            fecha_inicio: document.getElementById('rep-fecha-inicio').value,
+            incluir_resumen:      document.getElementById('rep-incluir-resumen').checked,
+            enviar_sin_actividad: document.getElementById('rep-sin-actividad').checked,
+            formularios: Array.from(
+                document.querySelectorAll('#rep-formularios-lista input:checked')
+            ).map(c => parseInt(c.value)),
+            destinatarios: repDestinatarios
+        };
+    }
+
+    function validarReporte(cfg, fb) {
+        if (!cfg.nombre)      { fb.textContent = 'Ponle un nombre al reporte.'; return false; }
+        if (!cfg.proyecto_id) { fb.textContent = 'Selecciona un proyecto.';     return false; }
+        if (cfg.periodo === 'diario' && !cfg.dias_semana.length) {
+            fb.textContent = 'Marca al menos un día de envío.'; return false;
+        }
+        if (!cfg.destinatarios.length) {
+            fb.textContent = 'Agrega al menos un destinatario.'; return false;
+        }
+        return true;
+    }
+
+    async function guardarReporte() {
+        const fb  = document.getElementById('rep-feedback');
+        fb.className = 'invite-feedback error';
+        const cfg = recogerConfiguracionReporte();
+        if (!validarReporte(cfg, fb)) return;
+        fb.textContent = '';
+
+        try {
+            const url    = reporteEditandoId ? `/api/reportes/${reporteEditandoId}` : '/api/reportes';
+            const method = reporteEditandoId ? 'PUT' : 'POST';
+            const res  = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(cfg)
+            });
+            const data = await res.json();
+            if (data.success) {
+                cerrarModalReporte();
+                cargarReportes();
+                mostrarToast('✅ Reporte guardado');
+            } else {
+                fb.textContent = data.error || 'Error al guardar.';
+                fb.className   = 'invite-feedback error';
+            }
+        } catch {
+            fb.textContent = 'Error de conexión.';
+            fb.className   = 'invite-feedback error';
+        }
+    }
+
+    async function alternarReporte(id) {
+        try {
+            const res  = await fetch(`/api/reportes/${id}/activo`, { method: 'PATCH' });
+            const data = await res.json();
+            if (data.success) {
+                cargarReportes();
+                mostrarToast(data.activo ? '✅ Reporte activado' : '⏸️ Reporte desactivado');
+            }
+        } catch {
+            mostrarToast('❌ Error al cambiar el estado', true);
+        }
+    }
+
+    async function eliminarReporte(id) {
+        if (!confirm('¿Eliminar este reporte programado?')) return;
+        try {
+            const res  = await fetch(`/api/reportes/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                cargarReportes();
+                mostrarToast('🗑️ Reporte eliminado');
+            }
+        } catch {
+            mostrarToast('❌ Error al eliminar', true);
+        }
+    }
+
+    /** Genera el reporte con la configuración en pantalla y lo envía
+     *  solo al administrador, sin tocar a los destinatarios reales. */
+    async function probarReporte() {
+        const fb  = document.getElementById('rep-feedback');
+        const cfg = recogerConfiguracionReporte();
+        if (!cfg.proyecto_id) {
+            fb.textContent = 'Selecciona un proyecto para poder probar.';
+            fb.className   = 'invite-feedback error';
+            return;
+        }
+        fb.textContent = 'Generando el reporte de prueba…';
+        fb.className   = 'invite-feedback';
+        try {
+            const res  = await fetch('/api/reportes/probar', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(cfg)
+            });
+            const data = await res.json();
+            fb.textContent = data.success
+                ? '✅ Prueba enviada a tu correo.'
+                : (data.error || 'No se pudo generar la prueba.');
+            fb.className = 'invite-feedback ' + (data.success ? 'success' : 'error');
+        } catch {
+            fb.textContent = 'Error de conexión.';
+            fb.className   = 'invite-feedback error';
+        }
+    }
+
+    document.getElementById('modal-reporte').addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalReporte();
+    });
+
+
     document.getElementById('voc-instrucciones').addEventListener('input', function() {
         document.getElementById('voc-contador').textContent = this.value.length;
     });
@@ -2093,6 +2494,10 @@
 
         //Cargar Vocabulario Técnico
         cargarVocabulario();
+
+        //Cargar Reportes Automáticos
+        llenarHorasReporte();
+        cargarReportes();
 
         document.getElementById('voc-instrucciones').addEventListener('input', function() {
             document.getElementById('voc-contador').textContent = this.value.length;
