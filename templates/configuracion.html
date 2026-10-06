@@ -957,17 +957,6 @@
         <!-- ── Opciones ── -->
         <div class="invite-field">
             <label class="rep-toggle">
-                <input type="checkbox" id="rep-incluir-resumen" checked>
-                <span>Incluir resumen escrito con inteligencia artificial</span>
-            </label>
-            <span class="rep-hint">
-                Sintetiza las observaciones del periodo. Las cifras siempre se calculan
-                de los datos, nunca las redacta el modelo.
-            </span>
-        </div>
-
-        <div class="invite-field">
-            <label class="rep-toggle">
                 <input type="checkbox" id="rep-sin-actividad" checked>
                 <span>Enviar aunque no haya actividad en el periodo</span>
             </label>
@@ -1540,7 +1529,6 @@
         document.getElementById('rep-dia-mes').value = '1';
         document.getElementById('rep-hora').value = 7;
         document.getElementById('rep-fecha-inicio').value = new Date().toISOString().slice(0, 10);
-        document.getElementById('rep-incluir-resumen').checked = true;
         document.getElementById('rep-sin-actividad').checked = true;
         document.getElementById('rep-feedback').textContent = '';
         document.querySelectorAll('#rep-dias-wrap input').forEach(c => {
@@ -1574,7 +1562,6 @@
                 document.getElementById('rep-hora').value = r.hora_envio;
                 document.getElementById('rep-zona').value = r.zona_horaria;
                 document.getElementById('rep-fecha-inicio').value = r.fecha_inicio;
-                document.getElementById('rep-incluir-resumen').checked = r.incluir_resumen;
                 document.getElementById('rep-sin-actividad').checked   = r.enviar_sin_actividad;
 
                 repDestinatarios = r.destinatarios || [];
@@ -1720,7 +1707,8 @@
             hora_envio:   parseInt(document.getElementById('rep-hora').value),
             zona_horaria: document.getElementById('rep-zona').value,
             fecha_inicio: document.getElementById('rep-fecha-inicio').value,
-            incluir_resumen:      document.getElementById('rep-incluir-resumen').checked,
+            // El resumen con IA es parte del producto, no una opción.
+            incluir_resumen: true,
             enviar_sin_actividad: document.getElementById('rep-sin-actividad').checked,
             formularios: Array.from(
                 document.querySelectorAll('#rep-formularios-lista input:checked')
