@@ -7753,113 +7753,656 @@ def _cifras_reporte(cursor, proyecto_id, formulario_ids, desde, hasta):
         'observaciones': observaciones[:120]
     }
 
-def _html_reporte(datos, marca):
-    """Correo HTML con la marca de la empresa. 'marca' es
-    (nombre_empresa, logo_url, color_primario)."""
-    empresa, logo, color = marca
-    c = datos
+# ════════════════════════════════════════════════════════════════
+#  INDICADORES DE CONTENIDO
+#  El reporte no se queda en contar envíos: lee lo que hay DENTRO
+#  de las respuestas. Qué se agrega lo decide el tipo del campo,
+#  sin que el administrador tenga que configurar nada.
+# ════════════════════════════════════════════════════════════════
 
-    def bloque_vacio():
-        comparacion = (f"En el periodo anterior se registraron "
-                       f"<strong>{c['total_previo']}</strong>."
-                       if c['total_previo'] else "")
-        return f"""
-        <p style="font-size:15px;color:#374151;line-height:1.6;margin:0 0 10px;">
-            No se registraron actividades en <strong>{c['etiqueta']}</strong>.
-        </p>
-        <p style="font-size:14px;color:#6b7280;margin:0;">{comparacion}</p>"""
+TIPOS_CATEGORIA = {'seleccion', 'seleccion_unica', 'seleccion_dinamica'}
+TIPOS_NUMERICOS = {'numero', 'moneda', 'porcentaje'}
+MAX_VALORES     = 5    # valores distintos que se listan por campo
+MAX_INDICADORES = 12   # indicadores por formulario en el correo
+MAX_TEXTOS_IA   = 6    # observaciones por formulario que lee el modelo
 
-    def fila(nombre, cantidad):
+
+def _texto_opcion(op):
+    """Una opción puede venir como texto, {nombre:...} o
+    {izquierda:..., derecha:...}. Solo interesa la etiqueta visible."""
+    if isinstance(op, dict):
+        return str(op.get('nombre') or op.get('izquierda')
+                   or op.get('valor') or '').strip()
+    return str(op or '').strip()
+
+
+def _definicion_campos(cursor, empresa_id, formulario_id):
+    """Campos de un formulario: sueltos y dentro de grupos repetibles.
+
+    formularios.campos guarda solo referencias; la definición real
+    (nombre, tipo, opciones) vive en campos_globales. Se recorre en
+    orden porque es el orden lo que indica qué campos quedaron
+    dentro de cada grupo: un 'grupo' abre y un 'fin_grupo' cierra.
+    """
+    cursor.execute("""
+        SELECT nombre, campos
+        FROM formularios
+        WHERE id = %s AND empresa_id = %s
+    """, (formulario_id, empresa_id))
+    fila = cursor.fetchone()
+    if not fila:
+        return '', []
+
+    nombre_form = fila[0] or 'Formulario'
+    config      = fila[1] or []
+
+    orden, gid_actual, grupo_actual = [], None, None
+    for item in config:
+        if isinstance(item, dict) and item.get('tipo') == 'grupo':
+            gid_actual   = item.get('gid') or ''
+            grupo_actual = item.get('nombre') or 'Grupo'
+            continue
+        if isinstance(item, dict) and item.get('tipo') == 'fin_grupo':
+            gid_actual, grupo_actual = None, None
+            continue
+        cid = item.get('id') if isinstance(item, dict) else item
+        if cid:
+            orden.append((cid, gid_actual, grupo_actual))
+
+    if not orden:
+        return nombre_form, []
+
+    cursor.execute("""
+        SELECT id, nombre, tipo, opciones
+        FROM campos_globales
+        WHERE id = ANY(%s) AND empresa_id = %s
+    """, ([c[0] for c in orden], empresa_id))
+    catalogo = {r[0]: (r[1], r[2], r[3] or []) for r in cursor.fetchall()}
+
+    campos = []
+    for cid, gid, grupo in orden:
+        if cid not in catalogo:
+            continue
+        nom, tipo, opciones = catalogo[cid]
+        campos.append({
+            'id':       str(cid),
+            'nombre':   nom,
+            'tipo':     tipo,
+            'opciones': [_texto_opcion(o) for o in opciones],
+            'gid':      gid,
+            'grupo':    grupo
+        })
+    return nombre_form, campos
+
+
+def _valores_crudos(registros, campo):
+    """Todos los valores que tomó ese campo en el periodo.
+
+    Un campo suelto aporta un valor por registro. Un campo dentro de
+    un grupo repetible aporta uno por bloque, así que un mismo
+    registro puede contribuir con varios.
+    """
+    cid, gid = campo['id'], campo['gid']
+    valores  = []
+    for resp in registros:
+        if not isinstance(resp, dict):
+            continue
+        if gid:
+            bloques = (resp.get('__repeticiones') or {}).get(gid) or []
+            for bloque in bloques:
+                if isinstance(bloque, dict) and cid in bloque:
+                    valores.append(bloque[cid])
+        elif cid in resp:
+            valores.append(resp[cid])
+    return valores
+
+
+def _numero(valor):
+    """Convierte a float o devuelve None. No asume separador de miles:
+    un valor mal escrito se descarta, no se adivina."""
+    texto = str(valor if valor is not None else '').strip().replace(',', '.')
+    if not texto:
+        return None
+    try:
+        return float(texto)
+    except (ValueError, TypeError):
+        return None
+
+
+def _indicador(campo, valores):
+    """Resume un campo según su tipo. None si no hay nada que medir."""
+    tipo = campo['tipo']
+    etq  = f"{campo['grupo']} → {campo['nombre']}" if campo['grupo'] else campo['nombre']
+
+    # ── Sí / No ──
+    if tipo == 'booleano':
+        si = no = 0
+        for v in valores:
+            if v is True or str(v).strip().lower() in ('true', 'si', 'sí', '1'):
+                si += 1
+            elif v is False or str(v).strip().lower() in ('false', 'no', '0'):
+                no += 1
+        if si + no == 0:
+            return None
+        return {
+            'clase': 'booleano', 'etiqueta': etq,
+            'si': si, 'no': no, 'total': si + no,
+            'pct': round(si * 100 / (si + no))
+        }
+
+    # ── Categorías ──
+    if tipo in TIPOS_CATEGORIA:
+        cuenta = {}
+        for v in valores:
+            # Una selección múltiple guarda un array real en el JSONB.
+            items = v if isinstance(v, list) else [v]
+            for it in items:
+                texto = str(it if it is not None else '').strip()
+                if texto:
+                    cuenta[texto] = cuenta.get(texto, 0) + 1
+        if not cuenta:
+            return None
+        top = sorted(cuenta.items(), key=lambda x: (-x[1], x[0]))[:MAX_VALORES]
+        return {
+            'clase': 'categoria', 'etiqueta': etq,
+            'total': sum(cuenta.values()),
+            'distintos': len(cuenta),
+            'valores': [{'valor': k, 'veces': n} for k, n in top]
+        }
+
+    # ── Numéricos ──
+    if tipo in TIPOS_NUMERICOS:
+        nums = [n for n in (_numero(v) for v in valores) if n is not None]
+        if not nums:
+            return None
+        return {
+            'clase': 'numerico', 'etiqueta': etq, 'tipo': tipo,
+            'conteo':   len(nums),
+            'suma':     round(sum(nums), 2),
+            'promedio': round(sum(nums) / len(nums), 2),
+            'maximo':   round(max(nums), 2)
+        }
+
+    return None
+
+
+def _indicadores_reporte(cursor, empresa_id, proyecto_id, formulario_ids,
+                         desde, hasta):
+    """Lo que dicen las respuestas, formulario por formulario.
+
+    Devuelve una lista: [{formulario, registros, indicadores, textos}].
+    'textos' son las observaciones largas, material de lectura para
+    la IA — no se muestran crudas en el correo.
+    """
+    salida = []
+    for fid in formulario_ids or []:
+        try:
+            nombre_form, campos = _definicion_campos(cursor, empresa_id, fid)
+            if not campos:
+                continue
+
+            cursor.execute("""
+                SELECT respuestas
+                FROM respuestas_formulario
+                WHERE id_proyecto = %s AND formulario_id = %s
+                  AND created_at >= %s AND created_at < %s
+            """, (proyecto_id, fid, desde, hasta))
+            registros = [r[0] or {} for r in cursor.fetchall()]
+            if not registros:
+                continue
+
+            indicadores, textos = [], []
+            for campo in campos:
+                if campo['tipo'] == 'texto_largo':
+                    for v in _valores_crudos(registros, campo):
+                        t = str(v or '').strip()
+                        if len(t.split()) >= 5:
+                            textos.append({'campo': campo['nombre'], 'texto': t})
+                    continue
+                if campo['tipo'] != 'booleano' \
+                   and campo['tipo'] not in TIPOS_CATEGORIA \
+                   and campo['tipo'] not in TIPOS_NUMERICOS:
+                    continue
+                ind = _indicador(campo, _valores_crudos(registros, campo))
+                if ind:
+                    indicadores.append(ind)
+
+            salida.append({
+                'formulario':  nombre_form,
+                'registros':   len(registros),
+                'indicadores': indicadores[:MAX_INDICADORES],
+                'textos':      textos[:MAX_TEXTOS_IA]
+            })
+        except Exception as e:
+            # Un formulario con configuración rara no debe tumbar el reporte.
+            print(f"[REPORTE] Indicadores del formulario {fid} omitidos: {e}")
+            continue
+    return salida
+
+
+# ════════════════════════════════════════════════════════════════
+#  RESUMEN CON IA
+#  El modelo NO calcula. Recibe las cifras ya calculadas y su único
+#  trabajo es interpretarlas y señalar lo que merece atención.
+# ════════════════════════════════════════════════════════════════
+
+PROMPT_RESUMEN = """Eres un analista que redacta el resumen ejecutivo de un reporte de campo.
+
+Recibes DATOS YA CALCULADOS de un periodo de operación. Tu tarea es interpretarlos
+para un gerente que no va a abrir el portal.
+
+REGLAS ABSOLUTAS — su incumplimiento invalida el reporte:
+
+1. NO CALCULES NI INVENTES CIFRAS. Usa únicamente los números que están en los
+   datos. Está prohibido sumar, estimar, proyectar o deducir una cifra que no
+   aparezca explícita. Si quieres mencionar un número, cópialo tal cual.
+
+2. NO INVENTES CAUSAS. No expliques por qué subió o bajó algo, ni atribuyas
+   responsabilidades, salvo que el dato lo diga. "Bajó 12%" es un hecho;
+   "bajó por falta de personal" es una invención.
+
+3. CONSERVA LA INCERTIDUMBRE. Si una observación de campo expresa duda
+   ("parece que", "creo que"), mantenla como presunción, nunca como hecho.
+
+4. NO NOMBRES A NADIE EN TONO NEGATIVO. Puedes decir que hay personas sin
+   reportar y cuántas son; la lista ya aparece aparte en el reporte.
+
+5. Si los datos son insuficientes para decir algo útil, dilo en una frase.
+   Es preferible a rellenar.
+
+QUÉ SÍ DEBES HACER:
+- Señalar el indicador más relevante del periodo y qué implica.
+- Comparar con el periodo anterior cuando el dato exista.
+- Destacar concentraciones ("el 72% de los registros corresponde a un solo valor").
+- Detectar lo que falta: formularios sin uso, personas sin reportar, campos vacíos.
+- Leer las observaciones de campo y extraer el tema recurrente, si hay uno.
+
+TONO: profesional, directo, sin adjetivos de relleno. Español de Colombia.
+
+FORMATO DE SALIDA — SOLO este JSON, sin markdown ni explicaciones:
+{"resumen": "2 a 3 frases con lo esencial del periodo",
+ "puntos": ["hallazgo concreto", "hallazgo concreto", "hallazgo concreto"],
+ "atencion": ["algo que requiere decisión o seguimiento"]}
+
+"puntos": entre 2 y 4. "atencion": entre 0 y 3; lista vacía si no hay nada."""
+
+
+def _resumen_ia_reporte(datos, detalle):
+    """Narrativa del periodo a partir de cifras ya calculadas.
+
+    Ante cualquier error devuelve None: el reporte sale sin resumen
+    pero con todos sus datos. La IA mejora el correo, no lo sostiene.
+    """
+    try:
+        hechos = {
+            'proyecto':       datos.get('proyecto'),
+            'periodo':        datos.get('etiqueta'),
+            'frecuencia':     datos.get('periodo'),
+            'registros_periodo':      datos.get('total'),
+            'registros_periodo_previo': datos.get('total_previo'),
+            'por_formulario': datos.get('por_formulario'),
+            'personas_que_reportaron': datos.get('por_usuario'),
+            'personas_sin_reportar':   datos.get('sin_reportar'),
+            'formularios_sin_uso':     datos.get('sin_registros'),
+            'indicadores_por_formulario': [
+                {'formulario':  d.get('formulario'),
+                 'registros':   d.get('registros'),
+                 'indicadores': d.get('indicadores')}
+                for d in (detalle or [])
+            ]
+        }
+
+        muestras = []
+        for d in (detalle or []):
+            for t in d.get('textos') or []:
+                muestras.append(f"[{t['campo']}] {t['texto'][:400]}")
+
+        mensaje = (
+            "DATOS CALCULADOS DEL PERIODO:\n"
+            + json.dumps(hechos, ensure_ascii=False, indent=2, default=str)
+        )
+        if muestras:
+            mensaje += ("\n\nOBSERVACIONES DE CAMPO (texto dictado por el personal, "
+                        "para detectar temas recurrentes):\n- "
+                        + "\n- ".join(muestras[:20]))
+
+        t0 = time.time()
+        response = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": PROMPT_RESUMEN},
+                {"role": "user",   "content": mensaje}
+            ],
+            temperature=0.2,        # bajo: se busca consistencia, no prosa
+            max_tokens=700,
+            response_format={"type": "json_object"},
+            timeout=25
+        )
+        crudo = response.choices[0].message.content.strip()
+        crudo = crudo.replace('```json', '').replace('```', '').strip()
+        r = json.loads(crudo)
+
+        resumen = {
+            'resumen':  str(r.get('resumen') or '').strip(),
+            'puntos':   [str(p).strip() for p in (r.get('puntos') or [])
+                         if str(p).strip()][:4],
+            'atencion': [str(a).strip() for a in (r.get('atencion') or [])
+                         if str(a).strip()][:3]
+        }
+        if not resumen['resumen'] and not resumen['puntos']:
+            return None
+
+        print(f"[REPORTE] Resumen IA generado en {int((time.time() - t0) * 1000)} ms")
+        return resumen
+
+    except Exception as e:
+        print(f"[REPORTE] Resumen IA omitido: {e}")
+        return None
+
+
+def _esc(valor):
+    """Escapa para HTML. Los nombres vienen de dictados y pueden traer < o &."""
+    return (str(valor if valor is not None else '')
+            .replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;'))
+
+
+def _filas(crudo):
+    """Normaliza a [(etiqueta, valor)].
+
+    Tolera las tres formas en que pueden llegar los agregados:
+    lista de tuplas, lista de dicts o dict suelto.
+    """
+    if not crudo:
+        return []
+    if isinstance(crudo, dict):
+        return list(crudo.items())
+    filas = []
+    for item in crudo:
+        if isinstance(item, dict):
+            etq = item.get('nombre') or item.get('etiqueta') or item.get('formulario') or '—'
+            val = item.get('total') if item.get('total') is not None else item.get('cantidad', 0)
+            filas.append((etq, val))
+        elif isinstance(item, (list, tuple)) and len(item) >= 2:
+            filas.append((item[0], item[1]))
+        else:
+            filas.append((item, ''))
+    return filas
+
+
+def _lista_nombres(crudo):
+    """Normaliza a lista de nombres legibles."""
+    if not crudo:
+        return []
+    salida = []
+    for item in crudo:
+        if isinstance(item, dict):
+            salida.append(item.get('nombre') or item.get('etiqueta') or '—')
+        elif isinstance(item, (list, tuple)) and item:
+            salida.append(item[0])
+        else:
+            salida.append(item)
+    return [str(s) for s in salida if str(s).strip()]
+
+
+def _num_es(valor, decimales=0):
+    """Formato colombiano: 1.234,56"""
+    try:
+        texto = f"{float(valor):,.{decimales}f}"
+    except (ValueError, TypeError):
+        return str(valor)
+    return texto.replace(',', '@').replace('.', ',').replace('@', '.')
+
+
+def _html_indicador(ind, color):
+    """Una fila de indicador. El formato depende de qué se midió."""
+    etq = _esc(ind.get('etiqueta'))
+
+    if ind.get('clase') == 'booleano':
         return f"""
         <tr>
-            <td style="padding:9px 0;border-bottom:1px solid #f1f1f1;font-size:14px;color:#374151;">{nombre}</td>
-            <td style="padding:9px 0;border-bottom:1px solid #f1f1f1;font-size:14px;
-                       color:#111827;font-weight:600;text-align:right;">{cantidad}</td>
+          <td style="padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#333;">
+            {etq}
+          </td>
+          <td style="padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:13px;
+                     text-align:right;white-space:nowrap;">
+            <strong style="color:{color};font-size:15px;">{ind['si']}</strong>
+            <span style="color:#888;"> de {ind['total']} &nbsp;·&nbsp; {ind['pct']}%</span>
+          </td>
         </tr>"""
 
-    if c['total'] == 0:
-        cuerpo = bloque_vacio()
-    else:
-        dif = c['total'] - c['total_previo']
-        if c['total_previo']:
-            signo = '▲' if dif > 0 else ('▼' if dif < 0 else '=')
-            comp  = (f"<span style='font-size:14px;color:#6b7280;'>"
-                     f"{signo} {abs(dif)} frente al periodo anterior ({c['total_previo']})</span>")
-        else:
-            comp = "<span style='font-size:14px;color:#6b7280;'>Primer periodo con registros</span>"
+    if ind.get('clase') == 'numerico':
+        dec   = 2 if ind.get('tipo') in ('moneda', 'porcentaje') else 0
+        extra = '%' if ind.get('tipo') == 'porcentaje' else ''
+        return f"""
+        <tr>
+          <td style="padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:13px;color:#333;">
+            {etq}
+          </td>
+          <td style="padding:9px 0;border-bottom:1px solid #f0f0f0;font-size:13px;
+                     text-align:right;white-space:nowrap;">
+            <strong style="color:{color};font-size:15px;">
+              {_num_es(ind['suma'], dec)}{extra}</strong>
+            <span style="color:#888;"> total &nbsp;·&nbsp; prom.
+              {_num_es(ind['promedio'], dec)}{extra}</span>
+          </td>
+        </tr>"""
 
-        cuerpo = f"""
-        <div style="margin-bottom:26px;">
-            <div style="font-size:42px;font-weight:700;color:{color};line-height:1;">{c['total']}</div>
-            <div style="font-size:14px;color:#6b7280;margin-top:4px;">registros en el periodo</div>
-            <div style="margin-top:8px;">{comp}</div>
-        </div>
+    # Categorías: el campo arriba, sus valores debajo.
+    valores = ''.join(f"""
+          <div style="display:block;font-size:12px;color:#555;padding:3px 0;">
+            <span style="display:inline-block;min-width:34px;font-weight:600;
+                         color:{color};">{v['veces']}</span>
+            {_esc(v['valor'])}
+          </div>""" for v in ind.get('valores', []))
 
-        <p style="font-size:12px;font-weight:700;color:#9ca3af;letter-spacing:.5px;
-                  text-transform:uppercase;margin:0 0 6px;">Por formulario</p>
-        <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
-            {''.join(fila(f['nombre'], f['cantidad']) for f in c['por_formulario'])}
-        </table>
-
-        <p style="font-size:12px;font-weight:700;color:#9ca3af;letter-spacing:.5px;
-                  text-transform:uppercase;margin:0 0 6px;">Quién reportó</p>
-        <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
-            {''.join(fila(u['nombre'], u['cantidad']) for u in c['por_usuario'])}
-        </table>"""
-
-        # Lo que NO pasó: para un gerente suele ser lo más accionable.
-        alertas = []
-        if c['sin_reportar']:
-            alertas.append(f"Sin reportar: {', '.join(c['sin_reportar'])}")
-        if c['sin_registros']:
-            alertas.append(f"Formularios sin uso: {', '.join(c['sin_registros'])}")
-        if alertas:
-            cuerpo += f"""
-            <div style="background:#FFF8EE;border-left:3px solid {color};
-                        padding:14px 16px;border-radius:0 8px 8px 0;margin-bottom:24px;">
-                <p style="font-size:12px;font-weight:700;color:{color};margin:0 0 6px;
-                          text-transform:uppercase;letter-spacing:.5px;">Puntos de atención</p>
-                {''.join(f'<p style="font-size:13.5px;color:#374151;margin:0 0 4px;line-height:1.5;">{a}</p>'
-                         for a in alertas)}
-            </div>"""
-
-    if c.get('resumen_ia'):
-        cuerpo += f"""
-        <div style="background:#F9FAFB;border-radius:10px;padding:16px 18px;margin-bottom:24px;">
-            <p style="font-size:12px;font-weight:700;color:#9ca3af;margin:0 0 8px;
-                      text-transform:uppercase;letter-spacing:.5px;">Resumen del periodo</p>
-            <p style="font-size:14px;color:#374151;line-height:1.65;margin:0;">{c['resumen_ia']}</p>
-        </div>"""
-
-    logo_html = (f'<img src="{logo}" alt="{empresa}" style="height:38px;margin-bottom:14px;">'
-                 if logo else '')
+    sufijo = (f" <span style=\"color:#aaa;font-weight:400;\">"
+              f"({ind['distintos']} valores distintos)</span>"
+              if ind.get('distintos', 0) > MAX_VALORES else '')
 
     return f"""
-    <div style="font-family:'DM Sans',Arial,sans-serif;max-width:600px;margin:auto;
-                background:#fff;border-radius:14px;overflow:hidden;
-                box-shadow:0 2px 16px rgba(0,0,0,.07);">
-        <div style="background:#0f0f0f;padding:26px 32px;">
-            {logo_html}
-            <div style="color:#fff;font-size:19px;font-weight:700;">{c['nombre_reporte']}</div>
-            <div style="color:#9ca3af;font-size:13.5px;margin-top:3px;">
-                {c['proyecto']} · {c['etiqueta']}
+        <tr>
+          <td colspan="2" style="padding:11px 0 9px;border-bottom:1px solid #f0f0f0;">
+            <div style="font-size:13px;color:#333;font-weight:600;margin-bottom:4px;">
+              {etq}{sufijo}
             </div>
-        </div>
+            {valores}
+          </td>
+        </tr>"""
 
-        <div style="padding:28px 32px;">
-            {cuerpo}
-            <a href="https://bitacora.iaclatam.com/registros"
-               style="display:block;text-align:center;background:{color};color:#fff;
-                      padding:13px;border-radius:9px;text-decoration:none;
-                      font-weight:600;font-size:14.5px;">Ver el detalle en Bitácora</a>
-        </div>
 
-        <div style="background:#f9fafb;padding:18px 32px;border-top:1px solid #eee;text-align:center;">
-            <p style="font-size:11.5px;color:#9ca3af;margin:0;">
-                {empresa} · Reporte automático de Bitácora
-            </p>
-        </div>
-    </div>"""
+def _html_reporte(datos, marca):
+    """Cuerpo HTML del correo de reporte.
+
+    datos  → salida de _cifras_reporte más: proyecto, etiqueta, nombre,
+             periodo, 'detalle' (indicadores) y 'resumen_ia' (opcional).
+    marca  → logo, color y nombre de la empresa. Se leen con .get()
+             y nombres alternos para no depender del sitio que llama.
+    """
+    # La marca puede llegar como tupla (empresa, logo, color) —así la pasa
+    # probar_reporte— o como diccionario. Se aceptan las dos formas para
+    # que el cron no tenga que replicar un formato exacto.
+    if isinstance(marca, (list, tuple)):
+        empresa = marca[0] if len(marca) > 0 else ''
+        logo    = marca[1] if len(marca) > 1 else ''
+        color   = marca[2] if len(marca) > 2 else ''
+        url     = 'https://bitacora.iaclatam.com/registros'
+    else:
+        marca   = marca or {}
+        empresa = marca.get('empresa') or marca.get('nombre') or ''
+        logo    = marca.get('logo')  or marca.get('logo_url') or ''
+        color   = marca.get('color') or marca.get('color_primario') or ''
+        url     = marca.get('url') or 'https://bitacora.iaclatam.com/registros'
+
+    color   = color or '#FFAF33'
+    logo    = logo or ''
+    empresa = empresa or ''
+
+    total  = datos.get('total') or 0
+    previo = datos.get('total_previo')
+
+    # ── Comparación con el periodo anterior ──
+    if previo:
+        delta = round((total - previo) * 100 / previo)
+        if delta > 0:
+            comp = (f'<span style="color:#16a34a;">&#9650; {delta}%</span>'
+                    f'<span style="color:#888;"> vs. periodo anterior '
+                    f'({_num_es(previo)})</span>')
+        elif delta < 0:
+            comp = (f'<span style="color:#dc2626;">&#9660; {abs(delta)}%</span>'
+                    f'<span style="color:#888;"> vs. periodo anterior '
+                    f'({_num_es(previo)})</span>')
+        else:
+            comp = ('<span style="color:#888;">Sin cambio frente al periodo '
+                    f'anterior ({_num_es(previo)})</span>')
+    else:
+        comp = '<span style="color:#888;">Primer periodo con registros</span>'
+
+    # ── Resumen de la IA ──
+    ia      = datos.get('resumen_ia') or None
+    bloq_ia = ''
+    if ia:
+        puntos = ''.join(f"""
+            <li style="margin:0 0 7px;font-size:13px;line-height:1.55;color:#333;">
+              {_esc(p)}</li>""" for p in ia.get('puntos', []))
+        atencion = ''
+        if ia.get('atencion'):
+            items = ''.join(f"""
+                <li style="margin:0 0 5px;font-size:12.5px;line-height:1.5;
+                           color:#92400e;">{_esc(a)}</li>"""
+                for a in ia['atencion'])
+            atencion = f"""
+            <div style="margin-top:14px;padding:12px 14px;background:#fffbeb;
+                        border-left:3px solid #f59e0b;border-radius:4px;">
+              <div style="font-size:11px;font-weight:700;color:#92400e;
+                          letter-spacing:.5px;margin-bottom:7px;">REQUIERE DECISIÓN</div>
+              <ul style="margin:0;padding-left:16px;">{items}</ul>
+            </div>"""
+
+        bloq_ia = f"""
+        <div style="padding:20px 26px;background:#fafafa;
+                    border-left:3px solid {color};margin:0 0 4px;">
+          <div style="font-size:11px;font-weight:700;color:{color};
+                      letter-spacing:.6px;margin-bottom:9px;">LECTURA DEL PERIODO</div>
+          <p style="margin:0 0 11px;font-size:13.5px;line-height:1.6;color:#222;">
+            {_esc(ia.get('resumen'))}</p>
+          <ul style="margin:0;padding-left:16px;">{puntos}</ul>
+          {atencion}
+        </div>"""
+
+    # ── Indicadores por formulario ──
+    bloq_ind = ''
+    for d in (datos.get('detalle') or []):
+        if not d.get('indicadores'):
+            continue
+        filas = ''.join(_html_indicador(i, color) for i in d['indicadores'])
+        bloq_ind += f"""
+        <div style="padding:18px 26px 6px;">
+          <div style="font-size:11px;font-weight:700;color:#999;
+                      letter-spacing:.6px;margin-bottom:4px;">QUÉ DICEN LAS RESPUESTAS</div>
+          <div style="font-size:13.5px;font-weight:600;color:#222;margin-bottom:8px;">
+            {_esc(d['formulario'])}
+            <span style="font-weight:400;color:#999;">
+              · {_num_es(d['registros'])} registros</span>
+          </div>
+          <table width="100%" cellpadding="0" cellspacing="0"
+                 style="border-collapse:collapse;">{filas}</table>
+        </div>"""
+
+    # ── Tabla genérica reutilizable ──
+    def tabla(titulo, filas):
+        if not filas:
+            return ''
+        cuerpo = ''.join(f"""
+          <tr>
+            <td style="padding:8px 0;border-bottom:1px solid #f0f0f0;
+                       font-size:13px;color:#333;">{_esc(e)}</td>
+            <td style="padding:8px 0;border-bottom:1px solid #f0f0f0;
+                       font-size:13px;color:#222;font-weight:600;
+                       text-align:right;">{_num_es(v)}</td>
+          </tr>""" for e, v in filas)
+        return f"""
+        <div style="padding:18px 26px 6px;">
+          <div style="font-size:11px;font-weight:700;color:#999;
+                      letter-spacing:.6px;margin-bottom:8px;">{titulo}</div>
+          <table width="100%" cellpadding="0" cellspacing="0"
+                 style="border-collapse:collapse;">{cuerpo}</table>
+        </div>"""
+
+    # ── Puntos de atención (datos duros, no IA) ──
+    sin_reportar = _lista_nombres(datos.get('sin_reportar'))
+    sin_uso      = _lista_nombres(datos.get('sin_registros'))
+    avisos = ''
+    if sin_reportar:
+        avisos += (f'<div style="font-size:12.5px;color:#92400e;margin-bottom:5px;">'
+                   f'<strong>Sin reportar:</strong> '
+                   f'{_esc(", ".join(sin_reportar))}</div>')
+    if sin_uso:
+        avisos += (f'<div style="font-size:12.5px;color:#92400e;">'
+                   f'<strong>Formularios sin uso:</strong> '
+                   f'{_esc(", ".join(sin_uso))}</div>')
+    bloq_avisos = f"""
+        <div style="margin:14px 26px 0;padding:13px 15px;background:#fffbeb;
+                    border-radius:6px;">
+          <div style="font-size:11px;font-weight:700;color:#92400e;
+                      letter-spacing:.5px;margin-bottom:8px;">PUNTOS DE ATENCIÓN</div>
+          {avisos}
+        </div>""" if avisos else ''
+
+    logo_html = (f'<img src="{_esc(logo)}" alt="{_esc(empresa)}" '
+                 f'style="max-height:34px;max-width:150px;display:block;">'
+                 if logo else
+                 f'<div style="color:#fff;font-size:17px;font-weight:700;">'
+                 f'{_esc(empresa)}</div>')
+
+    return f"""<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;
+             font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;">
+<tr><td align="center" style="padding:24px 12px;">
+<table width="100%" cellpadding="0" cellspacing="0"
+       style="max-width:620px;background:#fff;border-radius:10px;overflow:hidden;
+              box-shadow:0 1px 3px rgba(0,0,0,.08);">
+
+  <tr><td style="background:#1f2124;padding:20px 26px;">{logo_html}</td></tr>
+
+  <tr><td style="padding:24px 26px 6px;">
+    <div style="font-size:19px;font-weight:700;color:#1f2124;margin-bottom:4px;">
+        {_esc(datos.get('nombre_reporte') or datos.get('nombre') or 'Reporte de avance')}</div>
+    <div style="font-size:13px;color:#888;">
+      {_esc(datos.get('proyecto'))} · {_esc(datos.get('etiqueta'))}</div>
+  </td></tr>
+
+  <tr><td style="padding:14px 26px 18px;">
+    <div style="font-size:42px;font-weight:700;color:{color};line-height:1;">
+      {_num_es(total)}</div>
+    <div style="font-size:12px;color:#999;margin-top:5px;">
+      registros en el periodo</div>
+    <div style="font-size:12.5px;margin-top:9px;">{comp}</div>
+  </td></tr>
+
+  <tr><td>{bloq_ia}</td></tr>
+  <tr><td>{bloq_ind}</td></tr>
+  <tr><td>{tabla('POR FORMULARIO', _filas(datos.get('por_formulario')))}</td></tr>
+  <tr><td>{tabla('QUIÉN REPORTÓ',  _filas(datos.get('por_usuario')))}</td></tr>
+  <tr><td>{bloq_avisos}</td></tr>
+
+  <tr><td align="center" style="padding:26px;">
+    <a href="{_esc(url)}" style="display:inline-block;background:{color};
+       color:#fff;text-decoration:none;padding:12px 28px;border-radius:7px;
+       font-size:14px;font-weight:600;">Ver el detalle en Bitácora</a>
+  </td></tr>
+
+  <tr><td style="background:#fafafa;padding:16px 26px;border-top:1px solid #eee;">
+    <div style="font-size:11px;color:#aaa;line-height:1.6;">
+      Reporte automático de Bitácora Digital. Las cifras provienen
+      directamente de los registros; el resumen es una interpretación
+      generada automáticamente a partir de ellas.
+    </div>
+  </td></tr>
+
+</table></td></tr></table></body></html>"""
 
 @app.route('/api/reportes/probar', methods=['POST'])
 def probar_reporte():
@@ -7900,11 +8443,23 @@ def probar_reporte():
             cifras = _cifras_reporte(cursor, proyecto_id,
                                      data.get('formularios') or [], desde, hasta)
 
+            # Lo que hay DENTRO de las respuestas, no solo cuántas hubo.
+            # Va aquí adentro porque necesita el cursor abierto.
+            cifras['detalle'] = _indicadores_reporte(
+                cursor, empresa_id, proyecto_id,
+                data.get('formularios') or [], desde, hasta)
+
         cifras.update({
             'nombre_reporte': (data.get('nombre') or 'Reporte').strip(),
             'proyecto': proyecto_nombre,
-            'etiqueta': etiqueta
+            'etiqueta': etiqueta,
+            'periodo':  data.get('periodo', 'diario')
         })
+
+        # El resumen se genera al final: necesita el nombre del proyecto
+        # y la etiqueta del periodo, que se acaban de asignar arriba.
+        # No requiere base de datos, así que va fuera del with.
+        cifras['resumen_ia'] = _resumen_ia_reporte(cifras, cifras['detalle'])
 
         enviar_correo(
             destinatarios=destino,
