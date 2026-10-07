@@ -2002,6 +2002,50 @@ class _PDFTablero(FPDF):
             t = t[:-1]
         return t + '...' if t else ''
 
+    def _envolver(self, texto, ancho_mm, max_lineas=6):
+        """Parte el texto en las líneas que caben en el ancho dado.
+
+        A diferencia de _ajustar, no pierde información: envuelve.
+        El tope de líneas evita que una celda patológica genere una fila
+        de media página; solo en ese caso se recorta la última línea.
+        """
+        t = self._txt(texto).strip()
+        if not t:
+            return ['']
+
+        disponible = ancho_mm - 2
+        lineas, actual = [], ''
+
+        for palabra in t.split():
+            tentativa = (actual + ' ' + palabra).strip()
+            if self.get_string_width(tentativa) <= disponible:
+                actual = tentativa
+                continue
+
+            if actual:
+                lineas.append(actual)
+                actual = ''
+
+            # Una palabra sola más ancha que la celda —un correo largo,
+            # una URL— se parte por caracteres en lugar de desbordarse.
+            while self.get_string_width(palabra) > disponible and len(palabra) > 1:
+                corte = len(palabra)
+                while corte > 1 and self.get_string_width(palabra[:corte]) > disponible:
+                    corte -= 1
+                lineas.append(palabra[:corte])
+                palabra = palabra[corte:]
+            actual = palabra
+
+        if actual:
+            lineas.append(actual)
+        if not lineas:
+            return ['']
+
+        if len(lineas) > max_lineas:
+            lineas = lineas[:max_lineas]
+            lineas[-1] = self._ajustar(lineas[-1] + '...', ancho_mm)
+        return lineas
+
     def bloque_grafico(self, titulo, imagen_b64):
         self._asegurar_vertical()
         """Inserta un gráfico. Salta de página si no cabe completo."""
@@ -2137,10 +2181,21 @@ class _PDFTablero(FPDF):
         encabezado()
 
         self.set_font('Helvetica', '', 7.5)
-        alto_fila = 5.5
+        ALTO_LINEA = 4.2        # alto de una línea de texto dentro de la celda
         alterno = False
 
         for fila in filas:
+            # El contenido manda: primero se resuelve en cuántas líneas
+            # queda cada celda, y la más alta define el alto de la fila.
+            celdas = []
+            for col, w in zip(columnas, anchos):
+                valor = fila.get(col.get('campo_id'), '')
+                valor = '' if valor is None else str(valor)
+                celdas.append(self._envolver(valor, w))
+
+            n_lineas  = max(len(c) for c in celdas)
+            alto_fila = n_lineas * ALTO_LINEA
+
             # Salto de página conservando la orientación y repitiendo encabezado
             if self.get_y() + alto_fila > self.h - 18:
                 self.add_page(orientation=orientacion)
@@ -2150,12 +2205,21 @@ class _PDFTablero(FPDF):
             self.set_fill_color(248, 249, 250) if alterno else self.set_fill_color(255, 255, 255)
             self.set_text_color(50, 50, 50)
 
-            for col, w in zip(columnas, anchos):
-                valor = fila.get(col.get('campo_id'), '')
-                valor = '' if valor is None else str(valor)
+            x0, y0 = self.get_x(), self.get_y()
+            x = x0
+
+            for col, w, lineas in zip(columnas, anchos, celdas):
                 alineacion = 'R' if col.get('tipo') == 'numero' else 'L'
-                self.cell(w, alto_fila, self._ajustar(valor, w), 1, 0, alineacion, True)
-            self.ln()
+
+                # El recuadro se dibuja una sola vez, con el alto completo
+                # de la fila; el texto se escribe línea por línea encima.
+                self.rect(x, y0, w, alto_fila, 'DF')
+                for i, linea in enumerate(lineas):
+                    self.set_xy(x, y0 + i * ALTO_LINEA)
+                    self.cell(w, ALTO_LINEA, linea, 0, 0, alineacion)
+                x += w
+
+            self.set_xy(x0, y0 + alto_fila)
             alterno = not alterno
 
         # Fila de totales
@@ -8076,7 +8140,7 @@ def _resumen_ia_reporte(datos, detalle):
             temperature=0.2,        # bajo: se busca consistencia, no prosa
             max_tokens=700,
             response_format={"type": "json_object"},
-            timeout=25
+            timeout=12
         )
         crudo = response.choices[0].message.content.strip()
         crudo = crudo.replace('```json', '').replace('```', '').strip()
