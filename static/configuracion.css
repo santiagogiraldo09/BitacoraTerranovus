@@ -2236,7 +2236,7 @@ button { font-family: inherit; cursor: pointer; }
     position: fixed;
     inset: 0;
     background: rgba(17, 24, 39, 0.5);
-    z-index: 400;           /* por encima de los demás modales */
+    z-index: 9999;           /* por encima de los demás modales */
     align-items: center;
     justify-content: center;
     padding: 20px;
