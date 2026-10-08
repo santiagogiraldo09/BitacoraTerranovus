@@ -9587,6 +9587,8 @@ def exportar_contactos_excel():
 app.register_blueprint(api_movil)
 from informes import informes_bp
 app.register_blueprint(informes_bp)
+from bi_publica import bi_publica_bp
+app.register_blueprint(bi_publica_bp)
 
 if __name__ == '__main__':
     app.run(debug=True)
