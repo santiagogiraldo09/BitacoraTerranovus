@@ -2040,3 +2040,177 @@ button { font-family: inherit; cursor: pointer; }
     .rep-fila-doble { grid-template-columns: 1fr; }
     .rep-dia span { width: 34px; height: 34px; font-size: 12px; }
 }
+
+/* ─── Power BI: accesos por token ───────────────────────────── */
+
+.integracion-badge.activa {
+    background: #f0fdf4;
+    color: #16a34a;
+}
+
+.integracion-meta {
+    display: block;
+    font-size: 12px;
+    color: var(--gris-texto);
+    margin-bottom: 10px;
+}
+
+/* El token recién creado: visualmente imposible de pasar por alto,
+   porque es la única vez que se puede copiar. */
+.pbi-token-nuevo {
+    background: #fffbeb;
+    border: 1.5px solid #fbbf24;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 16px;
+}
+
+.pbi-token-aviso {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #92400e;
+    margin-bottom: 10px;
+}
+
+.pbi-token-caja {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--blanco);
+    border: 1px solid var(--gris-borde);
+    border-radius: 8px;
+    padding: 9px 10px;
+}
+
+.pbi-token-caja code {
+    flex: 1;
+    font-size: 12px;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    color: var(--texto);
+    word-break: break-all;
+    line-height: 1.5;
+}
+
+.pbi-btn-copiar {
+    flex-shrink: 0;
+    background: var(--naranja);
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    padding: 8px 11px;
+    cursor: pointer;
+    font-size: 13px;
+}
+.pbi-btn-copiar:hover { background: var(--naranja-dark); }
+
+.pbi-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--gris-borde);
+}
+.pbi-item:last-child { border-bottom: none; }
+.pbi-item.revocado   { opacity: .55; }
+
+.pbi-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+
+.pbi-item-nombre {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--texto);
+}
+
+.pbi-tag {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    background: #fef2f2;
+    color: #dc2626;
+    padding: 2px 7px;
+    border-radius: 10px;
+    margin-left: 6px;
+}
+
+.pbi-item-prefijo {
+    font-size: 12px;
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    color: var(--gris-texto);
+}
+
+.pbi-item-meta {
+    font-size: 11.5px;
+    color: var(--gris-texto);
+    line-height: 1.5;
+}
+
+.pbi-item-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.pbi-form-acciones {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+.pbi-form-acciones .send-invite-btn { flex: 2; margin: 0; }
+
+.pbi-btn-cancelar {
+    flex: 1;
+    padding: 12px;
+    border-radius: 9px;
+    border: 1px solid var(--gris-borde);
+    background: var(--blanco);
+    color: var(--gris-texto);
+    font-weight: 600;
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+}
+.pbi-btn-cancelar:hover { background: var(--gris-fondo); }
+
+/* Instrucciones de conexión, plegadas por defecto */
+.pbi-ayuda summary {
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--texto);
+    padding: 6px 0;
+    list-style: none;
+}
+.pbi-ayuda summary::-webkit-details-marker { display: none; }
+.pbi-ayuda summary i { color: var(--naranja); margin-right: 6px; }
+
+.pbi-pasos {
+    margin: 10px 0 0;
+    padding-left: 20px;
+    font-size: 12.5px;
+    color: var(--gris-texto);
+    line-height: 1.75;
+}
+.pbi-pasos li { margin-bottom: 8px; }
+.pbi-pasos code {
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 11.5px;
+    background: var(--gris-fondo);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--texto);
+}
+.pbi-url {
+    display: inline-block;
+    margin-top: 4px;
+    word-break: break-all;
+}

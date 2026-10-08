@@ -691,15 +691,16 @@
                             <div class="integracion-logo">
                                 <i class="fas fa-chart-column"></i>
                             </div>
-                            <span class="integracion-badge">Próximamente</span>
+                            <span class="integracion-badge activa">Disponible</span>
                         </div>
                         <h4 class="integracion-nombre">Power BI</h4>
                         <p class="integracion-desc">
                             Consume los datos de tus formularios directamente en Power BI
                             para construir tus propios tableros y reportes.
                         </p>
-                        <button class="integracion-btn" disabled>
-                            <i class="fas fa-clock"></i> En desarrollo
+                        <span class="integracion-meta" id="pbi-resumen">—</span>
+                        <button class="integracion-btn" onclick="abrirModalPowerBI()">
+                            <i class="fas fa-key"></i> Gestionar accesos
                         </button>
                     </div>
 
@@ -974,6 +975,112 @@
         <button class="send-invite-btn" onclick="guardarReporte()">
             <i class="fas fa-save"></i> <span id="rep-btn-guardar-texto">Crear reporte</span>
         </button>
+    </div>
+</div>
+
+<!-- MODAL: ACCESOS DE POWER BI -->
+<div class="invite-overlay" id="modal-powerbi">
+    <div class="invite-modal">
+        <div class="invite-header">
+            <h3><i class="fas fa-chart-column"></i> Power BI</h3>
+            <button class="invite-close" onclick="cerrarModalPowerBI()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <p class="invite-subtitle">
+            Genera un acceso para conectar Power BI a los datos de tus formularios.
+        </p>
+
+        <!-- Token recién creado: se muestra UNA sola vez -->
+        <div class="pbi-token-nuevo" id="pbi-token-nuevo" style="display:none;">
+            <div class="pbi-token-aviso">
+                <i class="fas fa-triangle-exclamation"></i>
+                Cópialo ahora. Por seguridad no se puede volver a consultar.
+            </div>
+            <div class="pbi-token-caja">
+                <code id="pbi-token-valor"></code>
+                <button class="pbi-btn-copiar" onclick="copiarToken()" title="Copiar">
+                    <i class="fas fa-copy"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Formulario de creación -->
+        <div id="pbi-form-nuevo" style="display:none;">
+            <div class="cfg-inner-divider"></div>
+            <div class="rep-bloque-titulo">Nuevo acceso</div>
+
+            <div class="invite-field">
+                <label>Nombre *</label>
+                <input type="text" id="pbi-nombre" placeholder="Ej: Power BI — Gerencia">
+                <span class="rep-hint">Para saber de quién es cuando haya varios.</span>
+            </div>
+
+            <div class="invite-field">
+                <label>Alcance</label>
+                <select id="pbi-proyecto">
+                    <option value="">Toda la empresa</option>
+                </select>
+                <span class="rep-hint">
+                    Acotarlo a un proyecto es lo correcto cuando el acceso es
+                    para un contratista o un cliente.
+                </span>
+            </div>
+
+            <div class="invite-field">
+                <label>Expira el (opcional)</label>
+                <input type="date" id="pbi-expira">
+                <span class="rep-hint">En blanco, no expira.</span>
+            </div>
+
+            <p class="invite-feedback" id="pbi-feedback"></p>
+
+            <div class="pbi-form-acciones">
+                <button class="tb-btn-sec pbi-btn-cancelar" onclick="togglePbiForm(false)">
+                    Cancelar
+                </button>
+                <button class="send-invite-btn" onclick="crearTokenBI()">
+                    <i class="fas fa-key"></i> Generar acceso
+                </button>
+            </div>
+        </div>
+
+        <!-- Lista de accesos -->
+        <div id="pbi-lista-wrap">
+            <div class="cfg-inner-divider"></div>
+            <div class="rep-bloque-titulo">Accesos existentes</div>
+            <div id="pbi-lista"></div>
+            <button class="btn-nuevo-campo" onclick="togglePbiForm(true)" style="margin-top:12px;">
+                <i class="fas fa-plus"></i> Nuevo acceso
+            </button>
+        </div>
+
+        <!-- Instrucciones de conexión -->
+        <div class="cfg-inner-divider"></div>
+        <details class="pbi-ayuda">
+            <summary><i class="fas fa-circle-info"></i> Cómo conectar desde Power BI</summary>
+            <ol class="pbi-pasos">
+                <li>En Power BI Desktop: <strong>Obtener datos → Web → Avanzado</strong>.</li>
+                <li>En <em>Partes de la dirección URL</em> pega:<br>
+                    <code class="pbi-url" id="pbi-url-form"></code>
+                </li>
+                <li>En <em>Parámetros de encabezado HTTP</em>, agrega:<br>
+                    <code>Authorization</code> con el valor
+                    <code>Bearer &lt;tu-token&gt;</code>
+                </li>
+                <li>Esa primera consulta lista los formularios disponibles.
+                    Para traer los datos de uno, usa:<br>
+                    <code class="pbi-url" id="pbi-url-reg"></code>
+                </li>
+                <li>Los datos llegan paginados. Usa los campos
+                    <code>total</code>, <code>paginas</code> y <code>hay_mas</code>
+                    de la respuesta para recorrerlas todas.</li>
+            </ol>
+            <p class="rep-hint">
+                Cada formulario es una tabla del modelo. Los grupos repetibles
+                vienen en su propia URL y se relacionan por <code>registro_id</code>.
+            </p>
+        </details>
     </div>
 </div>
 
@@ -1419,6 +1526,209 @@
             caja.innerHTML = '<p>Error de conexión</p>';
         }
     }
+
+    // ── Power BI: accesos por token ─────────────────────────────
+    let pbiProyectos = [];
+
+    async function cargarTokensBI() {
+        const lista = document.getElementById('pbi-lista');
+        const resumen = document.getElementById('pbi-resumen');
+        if (!lista) return;
+
+        try {
+            const res  = await fetch('/api/integraciones/tokens');
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error);
+
+            pbiProyectos = data.proyectos || [];
+            const tokens = data.tokens || [];
+            const activos = tokens.filter(t => t.activo).length;
+
+            if (resumen) {
+                resumen.textContent = activos
+                    ? `${activos} acceso${activos !== 1 ? 's' : ''} activo${activos !== 1 ? 's' : ''}`
+                    : 'Sin accesos configurados';
+            }
+
+            if (!tokens.length) {
+                lista.innerHTML = '<p class="rep-vacio">Aún no hay accesos creados.</p>';
+                return;
+            }
+
+            lista.innerHTML = tokens.map(t => `
+                <div class="pbi-item ${t.activo ? '' : 'revocado'}">
+                    <div class="pbi-item-info">
+                        <span class="pbi-item-nombre">
+                            ${escHtml(t.nombre)}
+                            ${t.activo ? '' : '<span class="pbi-tag">revocado</span>'}
+                        </span>
+                        <span class="pbi-item-prefijo">${escHtml(t.prefijo)}…</span>
+                        <span class="pbi-item-meta">
+                            ${escHtml(t.alcance)} · ${t.total_llamadas} llamada(s) ·
+                            último uso: ${t.ultimo_uso}
+                            ${t.expira_en ? ' · expira ' + t.expira_en : ''}
+                        </span>
+                    </div>
+                    <div class="pbi-item-actions">
+                        ${t.activo ? `
+                            <button class="icon-btn" onclick="revocarTokenBI(${t.id})"
+                                    title="Revocar">
+                                <i class="fas fa-ban"></i>
+                            </button>` : ''}
+                        <button class="icon-btn danger" onclick="eliminarTokenBI(${t.id})"
+                                title="Eliminar del listado">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>`).join('');
+
+        } catch {
+            lista.innerHTML = '<p class="rep-vacio">Error al cargar los accesos.</p>';
+        }
+    }
+
+    function abrirModalPowerBI() {
+        // Las URLs se arman con el origen real: así el administrador
+        // copia la dirección correcta sin que esté escrita a mano.
+        const base = window.location.origin;
+        document.getElementById('pbi-url-form').textContent =
+            `${base}/api/bi/v1/formularios`;
+        document.getElementById('pbi-url-reg').textContent =
+            `${base}/api/bi/v1/registros?formulario_id=25&pagina=1`;
+
+        togglePbiForm(false);
+        document.getElementById('pbi-token-nuevo').style.display = 'none';
+        cargarTokensBI();
+        document.getElementById('modal-powerbi').classList.add('active');
+    }
+
+    function cerrarModalPowerBI() {
+        document.getElementById('modal-powerbi').classList.remove('active');
+        // El token deja de estar en pantalla al cerrar: no debe quedar
+        // visible si alguien vuelve a abrir el modal más tarde.
+        document.getElementById('pbi-token-nuevo').style.display = 'none';
+        document.getElementById('pbi-token-valor').textContent = '';
+    }
+
+    function togglePbiForm(mostrar) {
+        document.getElementById('pbi-form-nuevo').style.display = mostrar ? '' : 'none';
+        document.getElementById('pbi-lista-wrap').style.display = mostrar ? 'none' : '';
+        if (!mostrar) return;
+
+        document.getElementById('pbi-nombre').value = '';
+        document.getElementById('pbi-expira').value = '';
+        document.getElementById('pbi-feedback').textContent = '';
+
+        const sel = document.getElementById('pbi-proyecto');
+        sel.innerHTML = '<option value="">Toda la empresa</option>';
+        pbiProyectos.forEach(p => sel.appendChild(new Option(p.nombre, p.id)));
+        document.getElementById('pbi-nombre').focus();
+    }
+
+    async function crearTokenBI() {
+        const fb     = document.getElementById('pbi-feedback');
+        const nombre = document.getElementById('pbi-nombre').value.trim();
+
+        if (!nombre) {
+            fb.textContent = 'Ponle un nombre para saber de quién es.';
+            fb.className   = 'invite-feedback error';
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/integraciones/tokens', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({
+                    nombre,
+                    proyecto_id: parseInt(document.getElementById('pbi-proyecto').value) || null,
+                    expira_en:   document.getElementById('pbi-expira').value || null
+                })
+            });
+            const data = await res.json();
+
+            if (!data.success) {
+                fb.textContent = data.error || 'No se pudo generar el acceso.';
+                fb.className   = 'invite-feedback error';
+                return;
+            }
+
+            document.getElementById('pbi-token-valor').textContent = data.token;
+            document.getElementById('pbi-token-nuevo').style.display = '';
+            togglePbiForm(false);
+            cargarTokensBI();
+            mostrarToast('✅ Acceso generado — cópialo ahora');
+
+        } catch {
+            fb.textContent = 'Error de conexión.';
+            fb.className   = 'invite-feedback error';
+        }
+    }
+
+    function copiarToken() {
+        const texto = document.getElementById('pbi-token-valor').textContent;
+        if (!texto) return;
+
+        const exito = () => mostrarToast('📋 Token copiado');
+
+        // navigator.clipboard no existe fuera de HTTPS ni en navegadores
+        // antiguos; el respaldo con textarea funciona en todos.
+        if (navigator.clipboard?.writeText) {
+            navigator.clipboard.writeText(texto).then(exito).catch(() => copiarRespaldo(texto, exito));
+        } else {
+            copiarRespaldo(texto, exito);
+        }
+    }
+
+    function copiarRespaldo(texto, exito) {
+        const ta = document.createElement('textarea');
+        ta.value = texto;
+        ta.style.position = 'fixed';
+        ta.style.opacity  = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); exito(); }
+        catch { mostrarToast('No se pudo copiar, selecciónalo a mano', true); }
+        document.body.removeChild(ta);
+    }
+
+    async function revocarTokenBI(id) {
+        if (!confirm('¿Revocar este acceso?\n\nPower BI dejará de poder traer ' +
+                     'datos de inmediato. No se puede reactivar: si vuelve a ' +
+                     'hacer falta, se genera uno nuevo.')) return;
+        try {
+            const res  = await fetch(`/api/integraciones/tokens/${id}/revocar`, { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                cargarTokensBI();
+                mostrarToast('🚫 Acceso revocado');
+            } else {
+                mostrarToast('❌ ' + (data.error || 'Error al revocar'), true);
+            }
+        } catch {
+            mostrarToast('❌ Error de conexión', true);
+        }
+    }
+
+    async function eliminarTokenBI(id) {
+        if (!confirm('¿Eliminar este acceso del listado?\n\nSe pierde el ' +
+                     'registro de uso. Para un acceso que se filtró, revocar ' +
+                     'es mejor: conserva la evidencia.')) return;
+        try {
+            const res  = await fetch(`/api/integraciones/tokens/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                cargarTokensBI();
+                mostrarToast('🗑️ Acceso eliminado');
+            }
+        } catch {
+            mostrarToast('❌ Error de conexión', true);
+        }
+    }
+
+    document.getElementById('modal-powerbi')?.addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalPowerBI();
+    });
 
 
     // ── Reportes automáticos ────────────────────────────────────
@@ -2503,6 +2813,9 @@
         //Cargar Reportes Automáticos
         llenarHorasReporte();
         cargarReportes();
+
+        //Cargar accesos de Power BI
+        cargarTokensBI();
 
         document.getElementById('voc-instrucciones').addEventListener('input', function() {
             document.getElementById('voc-contador').textContent = this.value.length;
