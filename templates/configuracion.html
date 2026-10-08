@@ -978,6 +978,26 @@
     </div>
 </div>
 
+<!-- MODAL: CONFIRMACIÓN (reutilizable) -->
+<div class="confirmar-overlay" id="modal-confirmar">
+    <div class="confirmar-caja" role="alertdialog" aria-modal="true"
+         aria-labelledby="confirmar-titulo">
+        <div class="confirmar-icono" id="confirmar-icono">
+            <i class="fas fa-triangle-exclamation"></i>
+        </div>
+        <h3 class="confirmar-titulo" id="confirmar-titulo"></h3>
+        <p class="confirmar-mensaje" id="confirmar-mensaje"></p>
+        <p class="confirmar-detalle" id="confirmar-detalle"></p>
+        <div class="confirmar-acciones">
+            <button class="confirmar-btn-cancelar" onclick="_cerrarConfirmar(false)">
+                Cancelar
+            </button>
+            <button class="confirmar-btn-ok" id="confirmar-btn-ok"
+                    onclick="_cerrarConfirmar(true)"></button>
+        </div>
+    </div>
+</div>
+
 <!-- MODAL: ACCESOS DE POWER BI -->
 <div class="invite-overlay" id="modal-powerbi">
     <div class="invite-modal">
@@ -1527,6 +1547,56 @@
         }
     }
 
+    // ── Confirmación propia ─────────────────────────────────────
+    // Reemplaza a confirm(), que no se puede estilizar, bloquea la
+    // pestaña y en móvil se ve como un aviso del sistema operativo.
+    // Devuelve una promesa: se usa con await, igual que confirm().
+    let _confirmarResolver = null;
+
+    function confirmar({ titulo   = '¿Confirmar la acción?',
+                         mensaje  = '',
+                         detalle  = '',
+                         textoOk  = 'Aceptar',
+                         peligro  = false } = {}) {
+        return new Promise(resolve => {
+            _confirmarResolver = resolve;
+
+            document.getElementById('confirmar-titulo').textContent  = titulo;
+            document.getElementById('confirmar-mensaje').textContent = mensaje;
+
+            const det = document.getElementById('confirmar-detalle');
+            det.textContent   = detalle;
+            det.style.display = detalle ? '' : 'none';
+
+            const btn = document.getElementById('confirmar-btn-ok');
+            btn.textContent = textoOk;
+            btn.classList.toggle('peligro', peligro);
+            document.getElementById('confirmar-icono')
+                    .classList.toggle('peligro', peligro);
+
+            document.getElementById('modal-confirmar').classList.add('active');
+            // El foco arranca en Cancelar: la opción segura es la que
+            // responde si el usuario pulsa Enter sin leer.
+            document.querySelector('.confirmar-btn-cancelar').focus();
+        });
+    }
+
+    function _cerrarConfirmar(valor) {
+        document.getElementById('modal-confirmar').classList.remove('active');
+        if (_confirmarResolver) {
+            _confirmarResolver(valor);
+            _confirmarResolver = null;
+        }
+    }
+
+    // Escape cancela; clic fuera de la caja también.
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && _confirmarResolver) _cerrarConfirmar(false);
+    });
+    document.getElementById('modal-confirmar')?.addEventListener('click', function(e) {
+        if (e.target === this) _cerrarConfirmar(false);
+    });
+
     // ── Power BI: accesos por token ─────────────────────────────
     let pbiProyectos = [];
 
@@ -1693,9 +1763,13 @@
     }
 
     async function revocarTokenBI(id) {
-        if (!confirm('¿Revocar este acceso?\n\nPower BI dejará de poder traer ' +
-                     'datos de inmediato. No se puede reactivar: si vuelve a ' +
-                     'hacer falta, se genera uno nuevo.')) return;
+        const ok = await confirmar({
+            titulo:  'Revocar este acceso',
+            mensaje: 'Power BI dejará de poder traer datos de inmediato.',
+            detalle: 'No se puede reactivar. Si vuelve a hacer falta, se genera uno nuevo.',
+            textoOk: 'Revocar'
+        });
+        if (!ok) return;
         try {
             const res  = await fetch(`/api/integraciones/tokens/${id}/revocar`, { method: 'POST' });
             const data = await res.json();
@@ -1711,9 +1785,14 @@
     }
 
     async function eliminarTokenBI(id) {
-        if (!confirm('¿Eliminar este acceso del listado?\n\nSe pierde el ' +
-                     'registro de uso. Para un acceso que se filtró, revocar ' +
-                     'es mejor: conserva la evidencia.')) return;
+        const ok = await confirmar({
+            titulo:  'Eliminar del listado',
+            mensaje: 'Se pierde el registro de uso: quién lo creó, cuántas llamadas hizo y cuándo.',
+            detalle: 'Para un acceso que se filtró, revocar es mejor — conserva la evidencia.',
+            textoOk: 'Eliminar',
+            peligro: true
+        });
+        if (!ok) return;
         try {
             const res  = await fetch(`/api/integraciones/tokens/${id}`, { method: 'DELETE' });
             const data = await res.json();
