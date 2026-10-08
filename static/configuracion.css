@@ -2214,3 +2214,18 @@ button { font-family: inherit; cursor: pointer; }
     margin-top: 4px;
     word-break: break-all;
 }
+/* El botón nació solo para el estado deshabilitado, por eso se ve
+   gris y con cursor de bloqueado. Ahora que la integración está
+   activa, tiene que verse y comportarse como un botón real. */
+.integracion-btn:not(:disabled) {
+    pointer-events: auto;
+    cursor: pointer;
+    background: var(--naranja);
+    border-color: var(--naranja);
+    color: #fff;
+    opacity: 1;
+}
+.integracion-btn:not(:disabled):hover {
+    background: var(--naranja-dark);
+    border-color: var(--naranja-dark);
+}
