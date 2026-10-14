@@ -836,49 +836,57 @@
             </span>
         </div>
 
+        <!-- El periodo que cubre es parte de QUÉ se informa, no de cuándo
+             llega. Separarlos es lo que permite combinaciones como
+             "últimos 30 días, cada lunes". -->
+        <div class="invite-field">
+            <label>Periodo que cubre *</label>
+            <select id="rep-ventana" onchange="onVentanaReporteChange()">
+                <option value="7d">Últimos 7 días</option>
+                <option value="15d">Últimos 15 días</option>
+                <option value="30d">Últimos 30 días</option>
+                <option value="365d">Último año</option>
+                <option value="personalizado">Personalizado…</option>
+            </select>
+            <span class="rep-hint">
+                Se cuenta hacia atrás desde el día del envío, sin incluir
+                el día en curso.
+            </span>
+        </div>
+
+        <div class="invite-field" id="rep-ventana-dias-wrap" style="display:none;">
+            <label>Número de días</label>
+            <input type="number" id="rep-ventana-dias" min="1" max="730" value="21">
+            <span class="rep-hint">Entre 1 y 730 días.</span>
+        </div>
+
         <div class="cfg-inner-divider"></div>
 
         <!-- ── Bloque 2: CUÁNDO ── -->
         <div class="rep-bloque-titulo">Cuándo se envía</div>
 
         <div class="invite-field">
-            <label>Periodo que cubre *</label>
-            <select id="rep-periodo" onchange="onPeriodoReporteChange()">
-                <option value="diario">Diario — resume el día anterior</option>
-                <option value="semanal">Semanal — resume la semana anterior</option>
-                <option value="mensual">Mensual — resume el mes anterior</option>
+            <label>Se envía *</label>
+            <select id="rep-modo-envio" onchange="onModoEnvioChange()">
+                <option value="semana">En días de la semana</option>
+                <option value="mes">Un día del mes</option>
             </select>
         </div>
 
-        <!-- Solo para periodo diario -->
         <div class="invite-field" id="rep-dias-wrap">
             <label>Días en que llega</label>
             <div class="rep-dias">
-                <label class="rep-dia"><input type="checkbox" value="1" checked><span>L</span></label>
-                <label class="rep-dia"><input type="checkbox" value="2" checked><span>M</span></label>
-                <label class="rep-dia"><input type="checkbox" value="3" checked><span>M</span></label>
-                <label class="rep-dia"><input type="checkbox" value="4" checked><span>J</span></label>
-                <label class="rep-dia"><input type="checkbox" value="5" checked><span>V</span></label>
-                <label class="rep-dia"><input type="checkbox" value="6"><span>S</span></label>
-                <label class="rep-dia"><input type="checkbox" value="7"><span>D</span></label>
+                <label class="rep-dia"><input type="checkbox" value="1" checked onchange="actualizarAvisoCobertura()"><span>L</span></label>
+                <label class="rep-dia"><input type="checkbox" value="2" checked onchange="actualizarAvisoCobertura()"><span>M</span></label>
+                <label class="rep-dia"><input type="checkbox" value="3" checked onchange="actualizarAvisoCobertura()"><span>M</span></label>
+                <label class="rep-dia"><input type="checkbox" value="4" checked onchange="actualizarAvisoCobertura()"><span>J</span></label>
+                <label class="rep-dia"><input type="checkbox" value="5" checked onchange="actualizarAvisoCobertura()"><span>V</span></label>
+                <label class="rep-dia"><input type="checkbox" value="6" onchange="actualizarAvisoCobertura()"><span>S</span></label>
+                <label class="rep-dia"><input type="checkbox" value="7" onchange="actualizarAvisoCobertura()"><span>D</span></label>
             </div>
+            <span class="rep-hint" id="rep-cobertura-aviso"></span>
         </div>
 
-        <!-- Solo para periodo semanal -->
-        <div class="invite-field" id="rep-dia-semana-wrap" style="display:none;">
-            <label>Día de envío</label>
-            <select id="rep-dia-semana">
-                <option value="1">Lunes</option>
-                <option value="2">Martes</option>
-                <option value="3">Miércoles</option>
-                <option value="4">Jueves</option>
-                <option value="5">Viernes</option>
-                <option value="6">Sábado</option>
-                <option value="7">Domingo</option>
-            </select>
-        </div>
-
-        <!-- Solo para periodo mensual -->
         <div class="invite-field" id="rep-dia-mes-wrap" style="display:none;">
             <label>Día del mes</label>
             <input type="number" id="rep-dia-mes" min="1" max="28" value="1">
@@ -1880,17 +1888,32 @@
         }
     }
 
-    /** Texto legible del horario, para la lista. */
+    const VENTANA_NOMBRE = {
+        '7d':   'Últimos 7 días',
+        '15d':  'Últimos 15 días',
+        '30d':  'Últimos 30 días',
+        '365d': 'Último año'
+    };
+
+    /** Texto legible para la lista: qué cubre y cuándo llega. */
     function describirHorario(r) {
         const hora = String(r.hora_envio).padStart(2, '0') + ':00';
-        if (r.periodo === 'diario') {
-            const dias = (r.dias_semana || []).map(d => DIAS_NOMBRE[d]).join(', ');
-            return `Diario (${dias || 'sin días'}) a las ${hora}`;
+
+        const cubre = r.ventana === 'personalizado'
+            ? `Últimos ${r.ventana_dias || '?'} días`
+            : (VENTANA_NOMBRE[r.ventana] || 'Últimos 7 días');
+
+        let cuando;
+        if (r.modo_envio === 'mes') {
+            cuando = `día ${r.dia_mes} de cada mes`;
+        } else {
+            const dias = r.dias_semana || [];
+            cuando = dias.length === 7
+                ? 'todos los días'
+                : (dias.map(d => DIAS_NOMBRE[d]).join(', ') || 'sin días');
         }
-        if (r.periodo === 'semanal') {
-            return `Semanal, ${DIAS_NOMBRE[r.dia_semana] || '—'} a las ${hora}`;
-        }
-        return `Mensual, día ${r.dia_mes} a las ${hora}`;
+
+        return `${cubre} · llega ${cuando} a las ${hora}`;
     }
 
     function filtrarReportes(q) {
@@ -1913,8 +1936,9 @@
 
         // Estado base
         document.getElementById('rep-nombre').value = '';
-        document.getElementById('rep-periodo').value = 'diario';
-        document.getElementById('rep-dia-semana').value = '1';
+        document.getElementById('rep-ventana').value = '7d';
+        document.getElementById('rep-ventana-dias').value = '21';
+        document.getElementById('rep-modo-envio').value = 'semana';
         document.getElementById('rep-dia-mes').value = '1';
         document.getElementById('rep-hora').value = 7;
         document.getElementById('rep-fecha-inicio').value = new Date().toISOString().slice(0, 10);
@@ -1940,14 +1964,17 @@
 
                 await cargarDatosProyecto(r.formularios || []);
 
-                document.getElementById('rep-periodo').value = r.periodo;
+                document.getElementById('rep-ventana').value    = r.ventana || '7d';
+                document.getElementById('rep-modo-envio').value = r.modo_envio || 'semana';
+                if (r.ventana_dias) {
+                    document.getElementById('rep-ventana-dias').value = r.ventana_dias;
+                }
                 if (r.dias_semana) {
                     document.querySelectorAll('#rep-dias-wrap input').forEach(c => {
                         c.checked = r.dias_semana.includes(parseInt(c.value));
                     });
                 }
-                if (r.dia_semana) document.getElementById('rep-dia-semana').value = r.dia_semana;
-                if (r.dia_mes)    document.getElementById('rep-dia-mes').value    = r.dia_mes;
+                if (r.dia_mes) document.getElementById('rep-dia-mes').value = r.dia_mes;
                 document.getElementById('rep-hora').value = r.hora_envio;
                 document.getElementById('rep-zona').value = r.zona_horaria;
                 document.getElementById('rep-fecha-inicio').value = r.fecha_inicio;
@@ -1967,7 +1994,8 @@
             renderDestinatarios();
         }
 
-        onPeriodoReporteChange();
+        onVentanaReporteChange();
+        onModoEnvioChange();
         document.getElementById('modal-reporte').classList.add('active');
     }
 
@@ -2019,12 +2047,56 @@
         }
     }
 
-    /** Muestra solo los campos de horario que aplican al periodo. */
-    function onPeriodoReporteChange() {
-        const p = document.getElementById('rep-periodo').value;
-        document.getElementById('rep-dias-wrap').style.display       = p === 'diario'  ? '' : 'none';
-        document.getElementById('rep-dia-semana-wrap').style.display = p === 'semanal' ? '' : 'none';
-        document.getElementById('rep-dia-mes-wrap').style.display    = p === 'mensual' ? '' : 'none';
+    /** Días que cubre la ventana elegida, para el aviso de cobertura. */
+    const VENTANA_DIAS = { '7d': 7, '15d': 15, '30d': 30, '365d': 365 };
+
+    function diasDeVentana() {
+        const v = document.getElementById('rep-ventana').value;
+        if (v === 'personalizado') {
+            return parseInt(document.getElementById('rep-ventana-dias').value) || 7;
+        }
+        return VENTANA_DIAS[v] || 7;
+    }
+
+    /** La caja de días solo aparece con 'personalizado'. */
+    function onVentanaReporteChange() {
+        const esPersonalizado = document.getElementById('rep-ventana').value === 'personalizado';
+        document.getElementById('rep-ventana-dias-wrap').style.display =
+            esPersonalizado ? '' : 'none';
+        actualizarAvisoCobertura();
+    }
+
+    /** Días de la semana o día del mes: nunca los dos. */
+    function onModoEnvioChange() {
+        const porSemana = document.getElementById('rep-modo-envio').value === 'semana';
+        document.getElementById('rep-dias-wrap').style.display    = porSemana ? '' : 'none';
+        document.getElementById('rep-dia-mes-wrap').style.display = porSemana ? 'none' : '';
+        actualizarAvisoCobertura();
+    }
+
+    /**
+     * Avisa cuando la ventana es más corta que el intervalo entre envíos.
+     * No lo bloquea —puede ser deliberado— pero el usuario debe saber que
+     * va a quedar con días sin reportar entre un correo y otro.
+     */
+    function actualizarAvisoCobertura() {
+        const aviso = document.getElementById('rep-cobertura-aviso');
+        if (!aviso) return;
+
+        const porSemana = document.getElementById('rep-modo-envio').value === 'semana';
+        if (!porSemana) { aviso.textContent = ''; return; }
+
+        const marcados = document.querySelectorAll('#rep-dias-wrap input:checked').length;
+        if (!marcados) {
+            aviso.textContent = 'Sin días marcados el reporte no se enviaría nunca.';
+            return;
+        }
+
+        // Con un envío por semana el hueco es de 7 días; con dos, de ~3.
+        const intervalo = Math.round(7 / marcados);
+        aviso.textContent = diasDeVentana() < intervalo
+            ? `Cada envío cubre ${diasDeVentana()} días, pero pasan ~${intervalo} entre uno y otro: quedarán días sin reportar.`
+            : '';
     }
 
     // ── Destinatarios ──────────────────────────────────────────
@@ -2080,22 +2152,33 @@
 
     // ── Guardar / eliminar / probar ────────────────────────────
     function recogerConfiguracionReporte() {
-        const periodo = document.getElementById('rep-periodo').value;
+        const ventana   = document.getElementById('rep-ventana').value;
+        const porSemana = document.getElementById('rep-modo-envio').value === 'semana';
+
         return {
             nombre:      document.getElementById('rep-nombre').value.trim(),
             proyecto_id: parseInt(document.getElementById('rep-proyecto').value) || null,
-            periodo,
-            dias_semana: periodo === 'diario'
+
+            // Qué periodo cubre
+            ventana,
+            ventana_dias: ventana === 'personalizado'
+                ? parseInt(document.getElementById('rep-ventana-dias').value) || null
+                : null,
+
+            // Cuándo llega
+            modo_envio:  porSemana ? 'semana' : 'mes',
+            dias_semana: porSemana
                 ? Array.from(document.querySelectorAll('#rep-dias-wrap input:checked'))
                        .map(c => parseInt(c.value))
                 : null,
-            dia_semana:  periodo === 'semanal'
-                ? parseInt(document.getElementById('rep-dia-semana').value) : null,
-            dia_mes:     periodo === 'mensual'
-                ? parseInt(document.getElementById('rep-dia-mes').value) : null,
+            dia_mes: porSemana
+                ? null
+                : parseInt(document.getElementById('rep-dia-mes').value) || 1,
+
             hora_envio:   parseInt(document.getElementById('rep-hora').value),
             zona_horaria: document.getElementById('rep-zona').value,
             fecha_inicio: document.getElementById('rep-fecha-inicio').value,
+
             // El resumen con IA es parte del producto, no una opción.
             incluir_resumen: true,
             enviar_sin_actividad: document.getElementById('rep-sin-actividad').checked,
@@ -2109,7 +2192,15 @@
     function validarReporte(cfg, fb) {
         if (!cfg.nombre)      { fb.textContent = 'Ponle un nombre al reporte.'; return false; }
         if (!cfg.proyecto_id) { fb.textContent = 'Selecciona un proyecto.';     return false; }
-        if (cfg.periodo === 'diario' && !cfg.dias_semana.length) {
+
+        if (cfg.ventana === 'personalizado') {
+            const d = cfg.ventana_dias;
+            if (!d || d < 1 || d > 730) {
+                fb.textContent = 'El periodo personalizado va entre 1 y 730 días.';
+                return false;
+            }
+        }
+        if (cfg.modo_envio === 'semana' && !cfg.dias_semana.length) {
             fb.textContent = 'Marca al menos un día de envío.'; return false;
         }
         if (!cfg.destinatarios.length) {

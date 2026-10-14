@@ -7412,9 +7412,9 @@ def listar_reportes():
         with db_connection() as (conn, cursor):
             cursor.execute("""
                 SELECT r.id, r.nombre, r.proyecto_id, p.nombre_proyecto,
-                       r.periodo, r.dias_semana, r.dia_semana, r.dia_mes,
+                       r.ventana, r.dias_semana, r.ventana_dias, r.dia_mes,
                        r.hora_envio, r.zona_horaria, r.fecha_inicio,
-                       r.incluir_resumen, r.enviar_sin_actividad, r.activo,
+                       r.incluir_resumen, r.enviar_sin_actividad, r.activo, r.modo_activo,
                        (SELECT COUNT(*) FROM reportes_destinatarios d
                          WHERE d.reporte_id = r.id AND d.activo) AS total_dest,
                        ult.enviado_en, ult.estado
@@ -7435,8 +7435,8 @@ def listar_reportes():
                 reportes.append({
                     'id': row[0], 'nombre': row[1],
                     'proyecto_id': row[2], 'proyecto_nombre': row[3],
-                    'periodo': row[4], 'dias_semana': row[5],
-                    'dia_semana': row[6], 'dia_mes': row[7],
+                    'ventana': row[4], 'dias_semana': row[5],
+                    'ventana_dias': row[6], 'dia_mes': row[7],
                     'hora_envio': row[8], 'zona_horaria': row[9],
                     'fecha_inicio': row[10].strftime('%Y-%m-%d') if row[10] else '',
                     'incluir_resumen': row[11], 'enviar_sin_actividad': row[12],
@@ -7556,6 +7556,65 @@ def _guardar_relaciones_reporte(cursor, reporte_id, data, user_id):
                     VALUES (%s, %s, %s, %s)
                 """, (reporte_id, correo, user_id, secrets.token_urlsafe(24)))
 
+VENTANAS_VALIDAS = {'7d', '15d', '30d', '365d', 'personalizado'}
+
+
+def _normalizar_reporte(data):
+    """Deja la configuración en un estado que la base acepta.
+
+    La tabla exige coherencia: ventana_dias solo con 'personalizado',
+    y el horario regido por dias_semana O por dia_mes, nunca por los
+    dos. Normalizar aquí evita que un cliente desactualizado tumbe el
+    guardado con una violación de CHECK.
+    """
+    ventana = data.get('ventana')
+    if ventana not in VENTANAS_VALIDAS:
+        ventana = '7d'
+
+    if ventana == 'personalizado':
+        try:
+            ventana_dias = min(max(int(data.get('ventana_dias') or 7), 1), 730)
+        except (TypeError, ValueError):
+            ventana_dias = 7
+    else:
+        ventana_dias = None
+
+    modo = data.get('modo_envio')
+    if modo not in ('semana', 'mes'):
+        modo = 'semana'
+
+    if modo == 'semana':
+        crudos = data.get('dias_semana') or []
+        dias = sorted({d for d in (int(x) for x in crudos
+                                   if str(x).strip().isdigit()) if 1 <= d <= 7})
+        # Sin ningún día marcado el reporte no se enviaría nunca y el
+        # usuario no tendría cómo saberlo. Se asume lunes.
+        if not dias:
+            dias = [1]
+        dia_mes = None
+    else:
+        dias = None
+        try:
+            dia_mes = min(max(int(data.get('dia_mes') or 1), 1), 28)
+        except (TypeError, ValueError):
+            dia_mes = 1
+
+    try:
+        hora = min(max(int(data.get('hora_envio', 7)), 0), 23)
+    except (TypeError, ValueError):
+        hora = 7
+
+    return {
+        'ventana':      ventana,
+        'ventana_dias': ventana_dias,
+        'modo_envio':   modo,
+        'dias_semana':  dias,
+        'dia_mes':      dia_mes,
+        'hora_envio':   hora,
+        'zona_horaria': data.get('zona_horaria') or 'America/Bogota',
+        'fecha_inicio': data.get('fecha_inicio') or None
+    }
+
 
 @app.route('/api/reportes', methods=['POST'])
 def crear_reporte():
@@ -7569,6 +7628,8 @@ def crear_reporte():
     if not data.get('nombre') or not data.get('proyecto_id'):
         return jsonify({'error': 'Nombre y proyecto son obligatorios'}), 400
 
+    cfg = _normalizar_reporte(data)
+
     try:
         with db_connection() as (conn, cursor):
             cursor.execute("SELECT 1 FROM proyectos WHERE id = %s AND empresa_id = %s",
@@ -7578,16 +7639,16 @@ def crear_reporte():
 
             cursor.execute("""
                 INSERT INTO reportes_programados
-                    (proyecto_id, nombre, periodo, dias_semana, dia_semana, dia_mes,
-                     hora_envio, zona_horaria, fecha_inicio,
+                    (proyecto_id, nombre, ventana, ventana_dias, modo_envio,
+                     dias_semana, dia_mes, hora_envio, zona_horaria, fecha_inicio,
                      incluir_resumen, enviar_sin_actividad, creado_por)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 RETURNING id
             """, (
-                data['proyecto_id'], data['nombre'].strip(), data['periodo'],
-                data.get('dias_semana'), data.get('dia_semana'), data.get('dia_mes'),
-                data.get('hora_envio', 7), data.get('zona_horaria', 'America/Bogota'),
-                data.get('fecha_inicio'),
+                data['proyecto_id'], data['nombre'].strip(),
+                cfg['ventana'], cfg['ventana_dias'], cfg['modo_envio'],
+                cfg['dias_semana'], cfg['dia_mes'],
+                cfg['hora_envio'], cfg['zona_horaria'], cfg['fecha_inicio'],
                 bool(data.get('incluir_resumen', True)),
                 bool(data.get('enviar_sin_actividad', True)),
                 user_id
@@ -7612,6 +7673,8 @@ def editar_reporte(reporte_id):
     empresa_id = session.get('empresa_id')
     user_id    = session.get('user_id')
 
+    cfg = _normalizar_reporte(data)
+
     try:
         with db_connection() as (conn, cursor):
             if not _reporte_de_mi_empresa(cursor, reporte_id, empresa_id):
@@ -7621,16 +7684,16 @@ def editar_reporte(reporte_id):
             # los formularios seleccionados y el historial de envíos.
             cursor.execute("""
                 UPDATE reportes_programados
-                SET nombre = %s, periodo = %s, dias_semana = %s,
-                    dia_semana = %s, dia_mes = %s, hora_envio = %s,
-                    zona_horaria = %s, fecha_inicio = %s,
+                SET nombre = %s, ventana = %s, ventana_dias = %s,
+                    modo_envio = %s, dias_semana = %s, dia_mes = %s,
+                    hora_envio = %s, zona_horaria = %s, fecha_inicio = %s,
                     incluir_resumen = %s, enviar_sin_actividad = %s
                 WHERE id = %s
             """, (
-                data['nombre'].strip(), data['periodo'], data.get('dias_semana'),
-                data.get('dia_semana'), data.get('dia_mes'),
-                data.get('hora_envio', 7), data.get('zona_horaria', 'America/Bogota'),
-                data.get('fecha_inicio'),
+                data['nombre'].strip(),
+                cfg['ventana'], cfg['ventana_dias'], cfg['modo_envio'],
+                cfg['dias_semana'], cfg['dia_mes'],
+                cfg['hora_envio'], cfg['zona_horaria'], cfg['fecha_inicio'],
                 bool(data.get('incluir_resumen', True)),
                 bool(data.get('enviar_sin_actividad', True)),
                 reporte_id
@@ -7643,7 +7706,6 @@ def editar_reporte(reporte_id):
     except Exception as e:
         print(f"[REPORTES] Error editando: {e}")
         return jsonify({'error': str(e)}), 500
-
 
 @app.route('/api/reportes/<int:reporte_id>/activo', methods=['PATCH'])
 def alternar_reporte(reporte_id):
@@ -7685,38 +7747,56 @@ MESES_ES = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
             'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 
 
-def _periodo_reporte(periodo, zona_horaria, referencia=None):
-    """Rango que cubre el reporte, en la zona horaria de la operación.
+# Días que cubre cada ventana fija. 'personalizado' los toma de
+# ventana_dias, que la base ya garantiza entre 1 y 730.
+VENTANAS_DIAS = {'7d': 7, '15d': 15, '30d': 30, '365d': 365}
+
+
+def _dias_de_ventana(ventana, ventana_dias=None):
+    """Cuántos días cubre la ventana. Ante un valor desconocido
+    devuelve 7, que es el comportamiento menos sorpresivo."""
+    if ventana == 'personalizado':
+        try:
+            return min(max(int(ventana_dias or 7), 1), 730)
+        except (TypeError, ValueError):
+            return 7
+    return VENTANAS_DIAS.get(ventana, 7)
+
+
+def _ventana_reporte(ventana, ventana_dias, zona_horaria, referencia=None):
+    """Rango de datos que cubre el reporte, en la zona de la operación.
+
+    La ventana siempre TERMINA al comienzo del día de hoy. El día en
+    curso está incompleto, y si se incluyera, dos envíos del mismo día
+    darían cifras distintas sobre el mismo periodo.
+
+    Pasar referencia=desde devuelve la ventana inmediatamente anterior,
+    del mismo largo: así se calcula la comparación sin duplicar lógica.
 
     Devuelve (desde, hasta, clave, etiqueta). 'hasta' es exclusivo.
-    La zona importa dos veces: decide cuándo se envía y qué registros
-    entran — un registro de las 7pm en Bogotá es del día siguiente en UTC.
     """
-    tz    = ZoneInfo(zona_horaria)
+    tz    = ZoneInfo(zona_horaria or 'America/Bogota')
     ahora = referencia.astimezone(tz) if referencia else datetime.now(tz)
     hoy   = ahora.date()
 
-    if periodo == 'diario':
-        d1, d2   = hoy - timedelta(days=1), hoy
-        clave    = d1.strftime('%Y-%m-%d')
-        etiqueta = d1.strftime('%d/%m/%Y')
-
-    elif periodo == 'semanal':
-        lunes_actual = hoy - timedelta(days=hoy.weekday())
-        d1, d2 = lunes_actual - timedelta(days=7), lunes_actual
-        iso      = d1.isocalendar()
-        clave    = f"{iso[0]}-W{iso[1]:02d}"
-        etiqueta = f"{d1.strftime('%d/%m')} al {(d2 - timedelta(days=1)).strftime('%d/%m/%Y')}"
-
-    else:  # mensual
-        primero_actual = hoy.replace(day=1)
-        d2 = primero_actual
-        d1 = (primero_actual - timedelta(days=1)).replace(day=1)
-        clave    = d1.strftime('%Y-%m')
-        etiqueta = f"{MESES_ES[d1.month]} de {d1.year}"
+    dias = _dias_de_ventana(ventana, ventana_dias)
+    d2   = hoy                              # exclusivo
+    d1   = hoy - timedelta(days=dias)
 
     desde = datetime.combine(d1, dt_time.min, tzinfo=tz)
     hasta = datetime.combine(d2, dt_time.min, tzinfo=tz)
+
+    # La clave de idempotencia es la FECHA DE ENVÍO, no el periodo.
+    # Una ventana móvil no corresponde a ninguna semana ISO ni mes
+    # calendario, así que no hay otra etiqueta estable que usar.
+    clave = hoy.strftime('%Y-%m-%d')
+
+    if dias == 1:
+        etiqueta = d1.strftime('%d/%m/%Y')
+    else:
+        etiqueta = (f"{d1.strftime('%d/%m/%Y')} al "
+                    f"{(d2 - timedelta(days=1)).strftime('%d/%m/%Y')}")
+
     return desde, hasta, clave, etiqueta
 
 def _cifras_reporte(cursor, proyecto_id, formulario_ids, desde, hasta):
@@ -8499,8 +8579,9 @@ def probar_reporte():
                            (session.get('user_id'),))
             destino = cursor.fetchone()[0]
 
-            desde, hasta, clave, etiqueta = _periodo_reporte(
-                data.get('periodo', 'diario'),
+            desde, hasta, clave, etiqueta = _ventana_reporte(
+                data.get('ventana', '7d'),
+                data.get('ventana_dias'),
                 data.get('zona_horaria', 'America/Bogota')
             )
 
@@ -8517,7 +8598,7 @@ def probar_reporte():
             'nombre_reporte': (data.get('nombre') or 'Reporte').strip(),
             'proyecto': proyecto_nombre,
             'etiqueta': etiqueta,
-            'periodo':  data.get('periodo', 'diario')
+            'ventana':  data.get('ventana', '7d')
         })
 
         # El resumen se genera al final: necesita el nombre del proyecto
