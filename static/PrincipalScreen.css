@@ -245,3 +245,21 @@ body, html {
         align-items: center;
     }
 }
+
+/* ─── Enlace de recuperación ─────────────────────────────────── */
+/* Va como enlace discreto y no como botón: compitiendo con
+   "Ingresar" distraería del camino principal, que es entrar. */
+.link-recuperar {
+    display: block;
+    text-align: right;
+    margin: -6px 0 18px;
+    font-size: 13px;
+    color: #6b7280;
+    text-decoration: none;
+    transition: color .15s;
+}
+
+.link-recuperar:hover {
+    color: #e59400;
+    text-decoration: underline;
+}
