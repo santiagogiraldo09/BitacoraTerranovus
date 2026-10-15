@@ -55,6 +55,7 @@ from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from api_movil import api_movil
 from zoneinfo import ZoneInfo
 from datetime import time as dt_time   # 'time' a secas ya está tomado por import time
+import hashlib
 
 
 connection_pool = None
@@ -224,9 +225,81 @@ def invalidar_glosario(empresa_id):
     """
     _CACHE_GLOSARIO.pop(empresa_id, None)
 
+# ── Validez de las sesiones abiertas ────────────────────────────
+# Flask guarda la sesión en una cookie firmada, no en el servidor:
+# no hay una lista de sesiones que se pueda borrar. En su lugar se
+# compara cuándo empezó la sesión contra cuándo cambió la contraseña.
+#
+# Consultar la base en cada petición sería caro, así que se cachea
+# por worker durante 60 segundos. El precio: una sesión revocada
+# puede sobrevivir hasta un minuto. Vale la pena frente a una
+# consulta extra en absolutamente todas las peticiones.
+
+_CACHE_PASSWORD = {}        # user_id -> (consultado_en, cambio_epoch|None)
+_PASSWORD_TTL   = 60        # segundos
+
+
+def invalidar_cache_password(user_id):
+    """Llamar tras cambiar una contraseña, para que el corte sea
+    inmediato al menos en el worker que atendió el cambio."""
+    _CACHE_PASSWORD.pop(user_id, None)
+
+
+def _password_cambiada_en(user_id):
+    """Epoch del último cambio de contraseña, o None si nunca cambió."""
+    ahora    = time.time()
+    cacheado = _CACHE_PASSWORD.get(user_id)
+    if cacheado and (ahora - cacheado[0]) < _PASSWORD_TTL:
+        return cacheado[1]
+
+    cambio = None
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute(
+                "SELECT password_changed_at FROM usuario WHERE user_id = %s",
+                (user_id,)
+            )
+            fila = cursor.fetchone()
+            if fila and fila[0]:
+                cambio = fila[0].timestamp()
+    except Exception as e:
+        # Ante un fallo de base no se expulsa a nadie: dejar fuera a
+        # todos los usuarios es peor que mantener una sesión de más.
+        print(f"[SESION] No se pudo verificar al usuario {user_id}: {e}")
+        return None
+
+    _CACHE_PASSWORD[user_id] = (ahora, cambio)
+    return cambio
+
 @app.before_request
 def make_session_permanent():
     session.permanent = True
+
+    user_id = session.get('user_id')
+    if not user_id:
+        return
+
+    # Los archivos estáticos no necesitan la comprobación y son el
+    # grueso de las peticiones: saltarlos ahorra trabajo real.
+    if request.endpoint == 'static':
+        return
+
+    cambio = _password_cambiada_en(user_id)
+    if not cambio:
+        return
+
+    # Una sesión sin marca de inicio es anterior a este cambio:
+    # se trata como vencida en lugar de dejarla pasar.
+    iniciada = session.get('iniciada_en', 0)
+    if iniciada >= cambio:
+        return
+
+    session.clear()
+    if request.path.startswith('/api/'):
+        return jsonify({'error': 'Tu sesión expiró porque se cambió la contraseña',
+                        'redirect': '/'}), 401
+    return redirect(url_for('principalscreen'))
+
 def init_pool():
     global connection_pool
 
@@ -4095,6 +4168,11 @@ def login():
         session['user_rol']   = usuario['rol']
         session['empresa_id'] = usuario['empresa_id']
         session['user_name']  = usuario['name']
+        # Marca de tiempo de la sesión. Se compara contra
+        # password_changed_at: una sesión iniciada antes del cambio
+        # de contraseña deja de ser válida. Es lo que permite cerrar
+        # sesiones en otros dispositivos sin llevar una lista de ellas.
+        session['iniciada_en'] = time.time()
 
         print(f"Login total tardó: {time.time() - t0:.2f}s")
 
@@ -4610,6 +4688,242 @@ def get_form_definitions():
         'body': response.json()
     })
 
+# ════════════════════════════════════════════════════════════════
+#  RECUPERACIÓN DE CONTRASEÑA
+#
+#  Dos principios que gobiernan todo lo de abajo:
+#  1. La respuesta es idéntica exista o no la cuenta. Si cambiara,
+#     el formulario serviría para averiguar quién tiene cuenta.
+#  2. En la base vive el hash del token, nunca el token. Leer la
+#     tabla no debe alcanzar para entrar a ninguna cuenta.
+# ════════════════════════════════════════════════════════════════
+
+RECUPERACION_HORAS       = 1     # vigencia del enlace
+RECUPERACION_MAX         = 3     # solicitudes permitidas...
+RECUPERACION_VENTANA_MIN = 15    # ...dentro de esta ventana
+
+# Mismo texto siempre, haya o no cuenta con ese correo.
+RESPUESTA_RECUPERACION = {
+    'success': True,
+    'mensaje': ('Si existe una cuenta con ese correo, en unos minutos '
+                'recibirás el enlace. Revisa también la carpeta de no deseados.')
+}
+
+
+def _hash_recuperacion(token):
+    return hashlib.sha256(token.encode('utf-8')).hexdigest()
+
+
+def _html_correo_recuperacion(nombre, enlace, empresa, logo, color):
+    """Correo de recuperación, con la marca de la empresa del usuario."""
+    logo_html = (f'<img src="{logo}" alt="{empresa}" style="height:34px;">'
+                 if logo else
+                 f'<div style="color:#fff;font-size:17px;font-weight:700;">{empresa}</div>')
+
+    return f"""<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#f4f4f5;
+             font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;">
+<table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f5;">
+<tr><td align="center" style="padding:24px 12px;">
+<table width="100%" cellpadding="0" cellspacing="0"
+       style="max-width:560px;background:#fff;border-radius:10px;overflow:hidden;">
+
+  <tr><td style="background:#1f2124;padding:20px 26px;">{logo_html}</td></tr>
+
+  <tr><td style="padding:28px 26px 10px;">
+    <div style="font-size:19px;font-weight:700;color:#1f2124;margin-bottom:12px;">
+      Recupera tu acceso</div>
+    <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#444;">
+      Hola {nombre}, recibimos una solicitud para restablecer la contraseña
+      de tu cuenta en Bitácora.
+    </p>
+  </td></tr>
+
+  <tr><td align="center" style="padding:6px 26px 20px;">
+    <a href="{enlace}" style="display:inline-block;background:{color};
+       color:#fff;text-decoration:none;padding:13px 30px;border-radius:8px;
+       font-size:15px;font-weight:600;">Crear una contraseña nueva</a>
+  </td></tr>
+
+  <tr><td style="padding:0 26px 22px;">
+    <p style="margin:0 0 10px;font-size:12.5px;line-height:1.6;color:#888;">
+      El enlace vence en {RECUPERACION_HORAS} hora y solo se puede usar una vez.
+    </p>
+    <p style="margin:0;font-size:12.5px;line-height:1.6;color:#888;">
+      <strong>Si no fuiste tú</strong>, ignora este mensaje: tu contraseña
+      actual sigue funcionando y nadie puede cambiarla sin este enlace.
+    </p>
+  </td></tr>
+
+  <tr><td style="background:#fafafa;padding:14px 26px;border-top:1px solid #eee;">
+    <div style="font-size:11px;color:#aaa;line-height:1.6;">
+      Si el botón no funciona, copia esta dirección en tu navegador:<br>
+      <span style="color:#888;word-break:break-all;">{enlace}</span>
+    </div>
+  </td></tr>
+
+</table></td></tr></table></body></html>"""
+
+
+@app.route('/recuperar', methods=['GET'])
+def recuperar_page():
+    """Pantalla donde el usuario escribe su correo."""
+    return render_template('recuperarPassword.html')
+
+
+@app.route('/api/recuperar', methods=['POST'])
+def solicitar_recuperacion():
+    """Genera el enlace y lo envía. Responde siempre lo mismo."""
+    data   = request.get_json() or {}
+    correo = (data.get('email') or '').strip().lower()
+
+    if not correo:
+        return jsonify(RESPUESTA_RECUPERACION)
+
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT u.user_id, u.name, COALESCE(u.estado, 'activo'),
+                       e.nombre, e.logo_url,
+                       COALESCE(NULLIF(e.color_primario, ''), '#FFAF33')
+                FROM usuario u
+                LEFT JOIN empresas e ON e.id = u.empresa_id
+                WHERE u.email = %s
+            """, (correo,))
+            fila = cursor.fetchone()
+
+            # Cuenta inexistente o desactivada: se corta en silencio.
+            # Un colaborador eliminado conserva su fila con su correo;
+            # sin esta validación podría volver a entrar solo.
+            if not fila or fila[2] == 'inactivo':
+                return jsonify(RESPUESTA_RECUPERACION)
+
+            user_id, nombre, _estado, empresa, logo, color = fila
+
+            # Límite de solicitudes: evita que el formulario sirva para
+            # inundar el buzón de alguien, y protege la cuota de Graph.
+            cursor.execute("""
+                SELECT COUNT(*) FROM recuperacion_tokens
+                WHERE user_id = %s
+                  AND created_at > NOW() - INTERVAL '%s minutes'
+            """, (user_id, RECUPERACION_VENTANA_MIN))
+            if cursor.fetchone()[0] >= RECUPERACION_MAX:
+                print(f"[RECUPERAR] Límite alcanzado para user {user_id}")
+                return jsonify(RESPUESTA_RECUPERACION)
+
+            # Solo el último enlace debe servir: los anteriores se queman.
+            cursor.execute("""
+                UPDATE recuperacion_tokens SET usado_en = NOW()
+                WHERE user_id = %s AND usado_en IS NULL
+            """, (user_id,))
+
+            token = secrets.token_urlsafe(32)
+            cursor.execute("""
+                INSERT INTO recuperacion_tokens
+                    (user_id, token_hash, expira_en, ip_solicitud)
+                VALUES (%s, %s, NOW() + INTERVAL '%s hours', %s)
+            """, (user_id, _hash_recuperacion(token),
+                  RECUPERACION_HORAS,
+                  request.headers.get('X-Forwarded-For', request.remote_addr)))
+            conn.commit()
+
+        enlace = f"{request.url_root.rstrip('/')}/recuperar/{token}"
+
+        # Un fallo de correo no debe cambiar la respuesta: delataría
+        # que la cuenta existe. Se registra y se responde igual.
+        try:
+            enviar_correo(
+                destinatarios=correo,
+                asunto='Recupera tu acceso a Bitácora',
+                cuerpo_html=_html_correo_recuperacion(
+                    nombre or 'hola', enlace, empresa or 'Bitácora', logo, color)
+            )
+        except Exception as e:
+            print(f"[RECUPERAR] No se pudo enviar a {correo}: {e}")
+
+        return jsonify(RESPUESTA_RECUPERACION)
+
+    except Exception as e:
+        print(f"[RECUPERAR] Error en la solicitud: {e}")
+        return jsonify(RESPUESTA_RECUPERACION)
+
+
+def _usuario_de_token(cursor, token):
+    """Devuelve (token_id, user_id) si el enlace sirve, o (None, None)."""
+    cursor.execute("""
+        SELECT t.id, t.user_id
+        FROM recuperacion_tokens t
+        JOIN usuario u ON u.user_id = t.user_id
+        WHERE t.token_hash = %s
+          AND t.usado_en IS NULL
+          AND t.expira_en > NOW()
+          AND COALESCE(u.estado, 'activo') <> 'inactivo'
+    """, (_hash_recuperacion(token or ''),))
+    fila = cursor.fetchone()
+    return (fila[0], fila[1]) if fila else (None, None)
+
+
+@app.route('/recuperar/<token>', methods=['GET'])
+def recuperar_con_token(token):
+    """Pantalla de contraseña nueva. Valida el enlace antes de mostrarla."""
+    valido = False
+    try:
+        with db_connection() as (conn, cursor):
+            token_id, _ = _usuario_de_token(cursor, token)
+            valido = token_id is not None
+    except Exception as e:
+        print(f"[RECUPERAR] Error validando el enlace: {e}")
+
+    return render_template('nuevaPassword.html', token=token, valido=valido)
+
+
+@app.route('/api/recuperar/<token>', methods=['POST'])
+def guardar_password_recuperada(token):
+    """Guarda la contraseña nueva y cierra las sesiones abiertas."""
+    data     = request.get_json() or {}
+    nueva    = data.get('password_nuevo') or ''
+    confirma = data.get('password_confirm') or ''
+
+    if nueva != confirma:
+        return jsonify({'error': 'Las contraseñas no coinciden'}), 400
+    if len(nueva) < 8:
+        return jsonify({'error': 'La contraseña debe tener al menos 8 caracteres'}), 400
+
+    try:
+        with db_connection() as (conn, cursor):
+            token_id, user_id = _usuario_de_token(cursor, token)
+            if not token_id:
+                return jsonify({
+                    'error': 'Este enlace ya no es válido. Solicita uno nuevo.'
+                }), 400
+
+            # password_changed_at es lo que invalida las sesiones abiertas
+            # en otros dispositivos. estado pasa a 'activo' por si el
+            # usuario nunca llegó a entrar con su contraseña temporal.
+            cursor.execute("""
+                UPDATE usuario
+                SET password = %s,
+                    password_changed_at = NOW(),
+                    estado = 'activo'
+                WHERE user_id = %s
+            """, (generate_password_hash(nueva), user_id))
+
+            cursor.execute("""
+                UPDATE recuperacion_tokens SET usado_en = NOW() WHERE id = %s
+            """, (token_id,))
+            conn.commit()
+
+        # No se inicia sesión automáticamente: que escriba la contraseña
+        # nueva es la prueba de que de verdad la recuerda.
+        invalidar_cache_password(user_id)
+        session.clear()
+        return jsonify({'success': True})
+
+    except Exception as e:
+        print(f"[RECUPERAR] Error guardando la contraseña: {e}")
+        return jsonify({'error': 'No se pudo guardar la contraseña'}), 500
+
 
 @app.route('/cambiar-password', methods=['GET'])
 def cambiar_password_page():
@@ -4635,10 +4949,17 @@ def cambiar_password():
     try:
         with db_connection() as (conn, cursor):
             cursor.execute("""
-                UPDATE usuario 
-                SET password = %s, estado = 'activo'
+                UPDATE usuario
+                SET password = %s, estado = 'activo', password_changed_at = NOW()
                 WHERE user_id = %s
             """, (generate_password_hash(password_nuevo), session['user_id']))
+            conn.commit()
+
+        # Esta sesión se renueva para que el cambio no eche al propio
+        # usuario que lo acaba de hacer. Las de otros dispositivos sí
+        # quedan por debajo de la marca y se cierran.
+        invalidar_cache_password(session['user_id'])
+        session['iniciada_en'] = time.time()
 
         return jsonify({'success': True})
 
