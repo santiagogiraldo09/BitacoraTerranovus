@@ -7735,10 +7735,11 @@ def listar_reportes():
                 SELECT r.id, r.nombre, r.proyecto_id, p.nombre_proyecto,
                        r.ventana, r.dias_semana, r.ventana_dias, r.dia_mes,
                        r.hora_envio, r.zona_horaria, r.fecha_inicio,
-                       r.incluir_resumen, r.enviar_sin_actividad, r.activo, r.modo_activo,
+                       r.incluir_resumen, r.enviar_sin_actividad, r.activo,
                        (SELECT COUNT(*) FROM reportes_destinatarios d
                          WHERE d.reporte_id = r.id AND d.activo) AS total_dest,
-                       ult.enviado_en, ult.estado
+                       ult.enviado_en, ult.estado,
+                       r.modo_envio
                 FROM reportes_programados r
                 JOIN proyectos p ON p.id = r.proyecto_id
                 LEFT JOIN LATERAL (
@@ -7764,6 +7765,9 @@ def listar_reportes():
                     'activo': row[13], 'total_destinatarios': row[14],
                     'ultimo_envio': row[15].strftime('%d/%m/%Y %H:%M') if row[15] else None,
                     'ultimo_estado': row[16],
+                    # modo_envio va de último en el SELECT a propósito:
+                    # meterlo en medio corre todos los índices de abajo.
+                    'modo_envio': row[17],
                     'formularios': [], 'destinatarios': []
                 })
                 ids.append(row[0])
