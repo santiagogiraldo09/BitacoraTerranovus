@@ -46,7 +46,11 @@ MINUTOS_ZOMBIE  = 15           # 'procesando' más viejo que esto se recupera
 
 # Sólo el multi-línea: el texto corto suele ser un nombre o un código,
 # no una observación, y sólo agregaría ruido.
-TIPOS_TEXTO = {'texto_largo'}
+# El multi-línea siempre aporta. El texto corto sólo cuando de verdad
+# trae una narrativa: muchos formularios lo usan para nombres, códigos o
+# cantidades, pero en otros la gente escribe párrafos completos ahí.
+TIPOS_TEXTO     = {'texto_largo', 'texto_corto'}
+MIN_CHARS_CORTO = 60
 
 SEVERIDADES = {'informativo', 'atencion', 'critico'}
 
@@ -92,7 +96,7 @@ def catalogo_temas(cursor, empresa_id, sector='construccion'):
 # ══════════════════════════════════════════════════════════════════════════
 
 def _texto_de_respuesta(respuestas, campos):
-    """Junta las observaciones largas de un registro en un solo texto.
+    """Junta las observaciones de un registro en un solo texto.
 
     Incluye los campos dentro de grupos repetibles, que viven bajo
     `__repeticiones[gid]` y pueden aportar varios valores por registro.
@@ -100,17 +104,29 @@ def _texto_de_respuesta(respuestas, campos):
     if not isinstance(respuestas, dict):
         return ''
 
-    ids_texto = {c['id']: c['nombre'] for c in campos
+    # id -> (nombre, tipo)
+    ids_texto = {c['id']: (c['nombre'], c.get('tipo')) for c in campos
                  if c.get('tipo') in TIPOS_TEXTO}
     if not ids_texto:
         return ''
 
+    def _aporta(valor, tipo):
+        """Un texto corto sólo cuenta si es largo de verdad."""
+        if not isinstance(valor, str):
+            return False
+        v = valor.strip()
+        if not v:
+            return False
+        if tipo == 'texto_corto':
+            return len(v) >= MIN_CHARS_CORTO
+        return True
+
     partes = []
 
     # Campos sueltos
-    for cid, nombre in ids_texto.items():
+    for cid, (nombre, tipo) in ids_texto.items():
         valor = respuestas.get(cid) or respuestas.get(str(cid))
-        if isinstance(valor, str) and valor.strip():
+        if _aporta(valor, tipo):
             partes.append(f"{nombre}: {valor.strip()}")
 
     # Campos dentro de grupos repetibles
@@ -122,9 +138,9 @@ def _texto_de_respuesta(respuestas, campos):
             for bloque in bloques:
                 if not isinstance(bloque, dict):
                     continue
-                for cid, nombre in ids_texto.items():
+                for cid, (nombre, tipo) in ids_texto.items():
                     valor = bloque.get(cid) or bloque.get(str(cid))
-                    if isinstance(valor, str) and valor.strip():
+                    if _aporta(valor, tipo):
                         partes.append(f"{nombre}: {valor.strip()}")
 
     texto = ' | '.join(partes)
