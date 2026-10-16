@@ -275,7 +275,7 @@ def _reclamar(cursor, ids=None, limite=None):
             WHERE id IN (
                 SELECT id FROM respuestas_formulario
                 WHERE clasificacion_estado = 'pendiente'
-                ORDER BY id
+                ORDER BY id DESC
                 LIMIT %s
                 FOR UPDATE SKIP LOCKED
             )
