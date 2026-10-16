@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Constructor de plantilla · Bitácora</title>
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap"
+      rel="stylesheet">
+
+<!--
+  Los estilos van aquí dentro a propósito: esta pantalla es nueva y no
+  comparte nada con configuracion.css. Embebidos, no hay forma de que el
+  navegador sirva una versión vieja del archivo.
+-->
+<style>
+    :root {
+        --naranja:      {{ color_primario or '#FBAF33' }};
+        --naranja-light: rgba(251,175,51,0.12);
+        --gris-borde:   #e5e7eb;
+        --gris-fondo:   #f6f7f9;
+        --gris-texto:   #6b7280;
+        --texto:        #1f2937;
+        --peligro:      #dc2626;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+        font-family: 'DM Sans', sans-serif;
+        background: var(--gris-fondo);
+        color: var(--texto);
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    /* ── Barra superior ───────────────────────────────────────────── */
+    .pl-header {
+        display: flex; align-items: center; gap: 14px;
+        padding: 12px 20px;
+        background: #fff;
+        border-bottom: 1px solid var(--gris-borde);
+        flex-shrink: 0;
+    }
+    .pl-back {
+        background: none; border: none; cursor: pointer;
+        font-size: 16px; color: var(--gris-texto); padding: 6px 10px;
+        border-radius: 8px;
+    }
+    .pl-back:hover { background: var(--gris-fondo); }
+
+    .pl-nombre {
+        font-size: 16px; font-weight: 700; color: var(--texto);
+        border: 1px solid transparent; border-radius: 8px;
+        padding: 6px 10px; min-width: 220px;
+        font-family: inherit; background: transparent;
+    }
+    .pl-nombre:hover  { border-color: var(--gris-borde); }
+    .pl-nombre:focus  { border-color: var(--naranja); outline: none; background: #fff; }
+
+    .pl-header-acciones { margin-left: auto; display: flex; gap: 10px; align-items: center; }
+
+    .pl-estado {
+        font-size: 12px; color: var(--gris-texto); margin-right: 4px;
+    }
+    .pl-estado.sin-guardar { color: var(--naranja); font-weight: 500; }
+
+    .pl-btn {
+        display: inline-flex; align-items: center; gap: 7px;
+        padding: 9px 16px; border-radius: 9px; border: 1px solid var(--gris-borde);
+        background: #fff; color: var(--texto); font-family: inherit;
+        font-size: 13px; font-weight: 500; cursor: pointer;
+    }
+    .pl-btn:hover { background: var(--gris-fondo); }
+    .pl-btn.primario {
+        background: var(--naranja); border-color: var(--naranja); color: #fff;
+    }
+    .pl-btn.primario:hover { filter: brightness(0.94); }
+
+    /* ── Cuerpo ───────────────────────────────────────────────────── */
+    .pl-cuerpo { display: flex; flex: 1; min-height: 0; }
+
+    /* Paleta */
+    .pl-paleta {
+        width: 260px; flex-shrink: 0;
+        background: #fff; border-right: 1px solid var(--gris-borde);
+        overflow-y: auto; padding: 16px;
+    }
+    .pl-paleta-titulo {
+        font-size: 11px; font-weight: 700; letter-spacing: .5px;
+        text-transform: uppercase; color: var(--gris-texto);
+        margin: 18px 0 10px;
+    }
+    .pl-paleta-titulo:first-child { margin-top: 0; }
+
+    .pl-bloque-op {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 12px; margin-bottom: 7px;
+        border: 1px solid var(--gris-borde); border-radius: 9px;
+        background: #fff; cursor: grab; font-size: 13px;
+        transition: border-color .12s, transform .12s;
+    }
+    .pl-bloque-op:hover {
+        border-color: var(--naranja); transform: translateX(2px);
+    }
+    .pl-bloque-op i { width: 16px; text-align: center; color: var(--gris-texto); }
+    .pl-bloque-op.datos i { color: var(--naranja); }
+
+    /* Lienzo */
+    .pl-lienzo-wrap {
+        flex: 1; overflow-y: auto; padding: 28px 20px 80px;
+        display: flex; justify-content: center;
+    }
+    .pl-hoja {
+        width: 100%; max-width: 760px;
+        background: #fff; border: 1px solid var(--gris-borde);
+        border-radius: 12px; padding: 34px 38px;
+        min-height: 400px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        display: flex; flex-wrap: wrap; gap: 0 16px;
+        align-content: flex-start;
+    }
+
+    .pl-vacio {
+        width: 100%; text-align: center; color: var(--gris-texto);
+        padding: 60px 20px; font-size: 14px;
+    }
+    .pl-vacio i { font-size: 32px; display: block; margin-bottom: 12px; opacity: .4; }
+
+    /* Bloques en el lienzo */
+    .pl-bloque {
+        position: relative; width: 100%;
+        border: 1px solid transparent; border-radius: 9px;
+        padding: 10px 12px; margin-bottom: 4px; cursor: pointer;
+    }
+    .pl-bloque.mitad { width: calc(50% - 8px); }
+    .pl-bloque:hover { border-color: var(--gris-borde); }
+    .pl-bloque.activo {
+        border-color: var(--naranja); background: var(--naranja-light);
+        cursor: default;
+    }
+
+    .pl-bloque-barra {
+        display: none; align-items: center; gap: 6px;
+        margin-bottom: 10px; padding-bottom: 8px;
+        border-bottom: 1px dashed var(--gris-borde);
+    }
+    .pl-bloque.activo .pl-bloque-barra { display: flex; }
+    .pl-bloque-nombre {
+        font-size: 11px; font-weight: 700; text-transform: uppercase;
+        letter-spacing: .4px; color: var(--gris-texto); margin-right: auto;
+    }
+
+    .pl-icon-btn {
+        background: none; border: none; cursor: pointer; padding: 5px 7px;
+        border-radius: 6px; color: var(--gris-texto); font-size: 12px;
+    }
+    .pl-icon-btn:hover { background: #fff; color: var(--texto); }
+    .pl-icon-btn.danger:hover { color: var(--peligro); }
+
+    /* Controles de estilo */
+    .pl-controles {
+        display: none; flex-wrap: wrap; gap: 8px; align-items: center;
+        margin-bottom: 12px;
+    }
+    .pl-bloque.activo .pl-controles { display: flex; }
+
+    .pl-sel {
+        font-family: inherit; font-size: 12px; padding: 5px 8px;
+        border: 1px solid var(--gris-borde); border-radius: 7px;
+        background: #fff; color: var(--texto);
+    }
+    .pl-toggle {
+        width: 30px; height: 28px; border: 1px solid var(--gris-borde);
+        border-radius: 7px; background: #fff; cursor: pointer;
+        font-size: 12px; color: var(--gris-texto);
+    }
+    .pl-toggle.on { background: var(--naranja); border-color: var(--naranja); color: #fff; }
+
+    /* Contenido editable */
+    .pl-texto {
+        width: 100%; border: none; background: transparent;
+        font-family: inherit; color: inherit; resize: vertical;
+        outline: none; padding: 0; line-height: 1.5;
+    }
+    .pl-texto::placeholder { color: #c3c7cd; }
+
+    .pl-variables { display: none; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+    .pl-bloque.activo .pl-variables { display: flex; }
+    .pl-var {
+        font-size: 11px; padding: 3px 8px; border-radius: 20px;
+        border: 1px solid var(--gris-borde); background: #fff;
+        cursor: pointer; font-family: inherit; color: var(--gris-texto);
+    }
+    .pl-var:hover { border-color: var(--naranja); color: var(--texto); }
+
+    /* Bloques de datos */
+    .pl-datos-caja {
+        background: #fbfbfc; border: 1px dashed var(--gris-borde);
+        border-radius: 9px; padding: 14px;
+    }
+    .pl-datos-cabeza {
+        display: flex; align-items: center; gap: 9px;
+        font-size: 13px; font-weight: 500; margin-bottom: 4px;
+    }
+    .pl-datos-cabeza i { color: var(--naranja); }
+    .pl-datos-nota { font-size: 11.5px; color: var(--gris-texto); }
+    .pl-datos-config { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 11px; }
+
+    .pl-separador { border-top: 2px solid var(--gris-borde); margin: 6px 0; }
+    .pl-salto {
+        border-top: 2px dashed var(--naranja); text-align: center;
+        font-size: 11px; color: var(--naranja); padding-top: 5px;
+    }
+    .pl-logo-prev { max-height: 54px; max-width: 200px; object-fit: contain; }
+
+    /* Toast */
+    .toast {
+        position: fixed; bottom: 26px; left: 50%; transform: translateX(-50%) translateY(14px);
+        background: #1f2937; color: #fff; padding: 12px 22px; border-radius: 10px;
+        font-size: 14px; font-weight: 500; opacity: 0; transition: all .3s;
+        z-index: 9999; pointer-events: none; max-width: 90%;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    @media (max-width: 860px) {
+        .pl-paleta { width: 190px; padding: 12px; }
+        .pl-hoja   { padding: 20px; }
+        .pl-bloque.mitad { width: 100%; }
+    }
+</style>
+</head>
+<body>
+
+<header class="pl-header">
+    <button class="pl-back" onclick="salir()" title="Volver">
+        <i class="fas fa-chevron-left"></i>
+    </button>
+    <input type="text" class="pl-nombre" id="pl-nombre"
+           placeholder="Nombre de la plantilla" oninput="marcarSucio()">
+    <div class="pl-header-acciones">
+        <span class="pl-estado" id="pl-estado">Guardada</span>
+        <button class="pl-btn primario" onclick="guardar()">
+            <i class="fas fa-save"></i> Guardar
+        </button>
+    </div>
+</header>
+
+<div class="pl-cuerpo">
+
+    <aside class="pl-paleta">
+        <div class="pl-paleta-titulo">Contenido</div>
+        <div id="paleta-contenido"></div>
+        <div class="pl-paleta-titulo">Datos del informe</div>
+        <div id="paleta-datos"></div>
+        <p style="font-size:11.5px;color:var(--gris-texto);margin-top:14px;line-height:1.5;">
+            Los bloques de datos se llenan solos cuando se genera el informe.
+        </p>
+    </aside>
+
+    <div class="pl-lienzo-wrap">
+        <div class="pl-hoja" id="pl-hoja"></div>
+    </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const PLANTILLA_ID = {{ plantilla_id or 0 }};
+const LOGO_URL     = "{{ logo_actual or url_for('static', filename='logo_nuevo.png') }}";
+
+let CATALOGO   = {bloques: [], estilo: {}, variables: [], formularios: []};
+let secciones  = [];
+let activo     = -1;      // índice del bloque seleccionado
+let sucio      = false;
+
+// Tamaños en pantalla. Los puntos reales del PDF los decide el
+// renderizador; aquí sólo se busca que la proporción se vea igual.
+const PX = {titulo_grande: 26, titulo: 21, subtitulo: 17, normal: 13.5, pequeno: 11};
+const ESPACIO_PX = {compacto: 2, normal: 10, amplio: 24};
+const NOMBRE_TAMANO = {
+    titulo_grande: 'Título grande', titulo: 'Título',
+    subtitulo: 'Subtítulo', normal: 'Normal', pequeno: 'Pequeño'
+};
+
+// Qué controles tiene sentido mostrar por tipo de bloque.
+const CON_TEXTO   = ['titulo', 'texto', 'portada'];
+const CON_FUENTE  = ['titulo', 'texto', 'portada', 'cifras', 'indicadores',
+                     'tabla', 'resumen_ia', 'firmas'];
+const CON_ANCHO   = ['texto', 'imagen', 'cifras', 'indicadores', 'tabla', 'resumen_ia'];
+const SOLO_DATOS  = ['cifras', 'indicadores', 'tabla', 'resumen_ia'];
+
+/* ═══════════════════════════════════════════════════════════════════
+   CARGA
+   ═══════════════════════════════════════════════════════════════════ */
+
+async function iniciar() {
+    try {
+        const res = await fetch('/api/plantillas-informe/catalogo');
+        CATALOGO  = await res.json();
+        if (CATALOGO.error) throw new Error(CATALOGO.error);
+    } catch (e) {
+        mostrarToast('❌ No se pudo cargar el catálogo de bloques');
+        return;
+    }
+
+    renderPaleta();
+
+    if (PLANTILLA_ID) {
+        try {
+            const res  = await fetch(`/api/plantillas-informe/${PLANTILLA_ID}`);
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            document.getElementById('pl-nombre').value = data.plantilla.nombre || '';
+            secciones = data.plantilla.secciones || [];
+        } catch (e) {
+            mostrarToast('❌ No se pudo cargar la plantilla');
+        }
+    }
+
+    render();
+    limpiarSucio();
+}
+
+function renderPaleta() {
+    const cont = document.getElementById('paleta-contenido');
+    const dat  = document.getElementById('paleta-datos');
+    cont.innerHTML = ''; dat.innerHTML = '';
+
+    (CATALOGO.bloques || []).forEach(b => {
+        const div = document.createElement('div');
+        div.className = 'pl-bloque-op' + (b.familia === 'datos' ? ' datos' : '');
+        div.draggable = true;
+        div.innerHTML = `<i class="fas ${b.icono}"></i><span>${b.nombre}</span>`;
+        div.onclick = () => agregar(b.tipo);
+        div.ondragstart = e => e.dataTransfer.setData('text/plain', b.tipo);
+        (b.familia === 'datos' ? dat : cont).appendChild(div);
+    });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ESTADO
+   ═══════════════════════════════════════════════════════════════════ */
+
+function estiloPorDefecto(tipo) {
+    const base = Object.assign({}, CATALOGO.estilo.por_defecto || {});
+    if (tipo === 'titulo')  { base.tamano = 'titulo';        base.negrita = true; }
+    if (tipo === 'portada') { base.tamano = 'titulo_grande'; base.negrita = true;
+                              base.alineacion = 'centro'; }
+    if (tipo === 'logo')    { base.alineacion = 'izquierda'; }
+    return base;
+}
+
+function agregar(tipo) {
+    secciones.push({
+        tipo:   tipo,
+        ancho:  'completo',
+        texto:  '',
+        config: {},
+        estilo: estiloPorDefecto(tipo)
+    });
+    activo = secciones.length - 1;
+    marcarSucio();
+    render();
+}
+
+function quitar(i) {
+    secciones.splice(i, 1);
+    activo = -1;
+    marcarSucio();
+    render();
+}
+
+function mover(i, dir) {
+    const j = i + dir;
+    if (j < 0 || j >= secciones.length) return;
+    [secciones[i], secciones[j]] = [secciones[j], secciones[i]];
+    activo = j;
+    marcarSucio();
+    render();
+}
+
+function duplicarBloque(i) {
+    secciones.splice(i + 1, 0, JSON.parse(JSON.stringify(secciones[i])));
+    activo = i + 1;
+    marcarSucio();
+    render();
+}
+
+function setEstilo(i, clave, valor) {
+    secciones[i].estilo[clave] = valor;
+    marcarSucio();
+    render();
+}
+
+function setConfig(i, clave, valor) {
+    secciones[i].config[clave] = valor;
+    marcarSucio();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER DEL LIENZO
+   ═══════════════════════════════════════════════════════════════════ */
+
+function render() {
+    const hoja = document.getElementById('pl-hoja');
+    hoja.innerHTML = '';
+
+    if (!secciones.length) {
+        hoja.innerHTML = `
+            <div class="pl-vacio">
+                <i class="fas fa-layer-group"></i>
+                Arrastra bloques desde la izquierda, o haz clic en uno
+                para agregarlo al informe.
+            </div>`;
+        return;
+    }
+
+    secciones.forEach((s, i) => hoja.appendChild(nodoBloque(s, i)));
+}
+
+function nodoBloque(s, i) {
+    const meta = (CATALOGO.bloques || []).find(b => b.tipo === s.tipo)
+                 || {nombre: s.tipo, icono: 'fa-cube', familia: 'contenido'};
+
+    const div = document.createElement('div');
+    div.className = 'pl-bloque' + (s.ancho === 'mitad' ? ' mitad' : '')
+                  + (activo === i ? ' activo' : '');
+    div.style.marginTop    = (ESPACIO_PX[s.estilo.espacio] || 10) + 'px';
+    div.onclick = e => {
+        if (e.target.closest('.pl-bloque-barra, .pl-controles, .pl-variables')) return;
+        activo = i; render();
+    };
+
+    div.innerHTML =
+        barraBloque(meta, i) +
+        (activo === i ? controles(s, i) : '') +
+        cuerpoBloque(s, i, meta) +
+        (CON_TEXTO.includes(s.tipo) ? variables(i) : '');
+
+    // El textarea se engancha después de insertar el HTML
+    const ta = div.querySelector('.pl-texto');
+    if (ta) {
+        ta.oninput = () => {
+            secciones[i].texto = ta.value;
+            ta.style.height = 'auto';
+            ta.style.height = ta.scrollHeight + 'px';
+            marcarSucio();
+        };
+        requestAnimationFrame(() => {
+            ta.style.height = 'auto';
+            ta.style.height = ta.scrollHeight + 'px';
+        });
+    }
+
+    div.querySelectorAll('[data-cfg]').forEach(el => {
+        el.onchange = () => setConfig(i, el.dataset.cfg,
+            el.type === 'number' ? parseInt(el.value) : el.value);
+    });
+
+    return div;
+}
+
+function barraBloque(meta, i) {
+    return `
+        <div class="pl-bloque-barra">
+            <span class="pl-bloque-nombre">${meta.nombre}</span>
+            <button class="pl-icon-btn" onclick="mover(${i},-1)" title="Subir">
+                <i class="fas fa-chevron-up"></i></button>
+            <button class="pl-icon-btn" onclick="mover(${i},1)" title="Bajar">
+                <i class="fas fa-chevron-down"></i></button>
+            <button class="pl-icon-btn" onclick="duplicarBloque(${i})" title="Duplicar">
+                <i class="fas fa-copy"></i></button>
+            <button class="pl-icon-btn danger" onclick="quitar(${i})" title="Quitar">
+                <i class="fas fa-times"></i></button>
+        </div>`;
+}
+
+function controles(s, i) {
+    const e = s.estilo;
+    let h = '<div class="pl-controles">';
+
+    if (CON_FUENTE.includes(s.tipo)) {
+        h += `<select class="pl-sel" onchange="setEstilo(${i},'tamano',this.value)">` +
+             (CATALOGO.estilo.tamanos || []).map(t =>
+                `<option value="${t}" ${e.tamano === t ? 'selected' : ''}>${NOMBRE_TAMANO[t] || t}</option>`
+             ).join('') + '</select>';
+
+        h += `<button class="pl-toggle ${e.negrita ? 'on' : ''}"
+                 onclick="setEstilo(${i},'negrita',${!e.negrita})" title="Negrita">
+                 <b>B</b></button>`;
+        h += `<button class="pl-toggle ${e.cursiva ? 'on' : ''}"
+                 onclick="setEstilo(${i},'cursiva',${!e.cursiva})" title="Cursiva">
+                 <i>I</i></button>`;
+    }
+
+    if (s.tipo !== 'separador' && s.tipo !== 'salto_pagina') {
+        h += `<select class="pl-sel" onchange="setEstilo(${i},'alineacion',this.value)">
+                <option value="izquierda" ${e.alineacion==='izquierda'?'selected':''}>Izquierda</option>
+                <option value="centro"    ${e.alineacion==='centro'?'selected':''}>Centro</option>
+                <option value="derecha"   ${e.alineacion==='derecha'?'selected':''}>Derecha</option>
+              </select>`;
+    }
+
+    if (CON_FUENTE.includes(s.tipo)) {
+        h += `<select class="pl-sel" onchange="setEstilo(${i},'color',this.value)">
+                <option value="negro" ${e.color==='negro'?'selected':''}>Negro</option>
+                <option value="gris"  ${e.color==='gris'?'selected':''}>Gris</option>
+                <option value="marca" ${e.color==='marca'?'selected':''}>Color de marca</option>
+              </select>`;
+    }
+
+    h += `<select class="pl-sel" onchange="setEstilo(${i},'espacio',this.value)">
+            <option value="compacto" ${e.espacio==='compacto'?'selected':''}>Espacio compacto</option>
+            <option value="normal"   ${e.espacio==='normal'?'selected':''}>Espacio normal</option>
+            <option value="amplio"   ${e.espacio==='amplio'?'selected':''}>Espacio amplio</option>
+          </select>`;
+
+    if (CON_ANCHO.includes(s.tipo)) {
+        h += `<select class="pl-sel" onchange="setEstilo__ancho(${i},this.value)">
+                <option value="completo" ${s.ancho==='completo'?'selected':''}>Ancho completo</option>
+                <option value="mitad"    ${s.ancho==='mitad'?'selected':''}>Media página</option>
+              </select>`;
+    }
+
+    return h + '</div>';
+}
+
+function setEstilo__ancho(i, valor) {
+    secciones[i].ancho = valor;
+    marcarSucio();
+    render();
+}
+
+function estiloTexto(e) {
+    const color = e.color === 'marca' ? 'var(--naranja)'
+                : e.color === 'gris'  ? 'var(--gris-texto)' : 'var(--texto)';
+    return `font-size:${PX[e.tamano] || 13.5}px;`
+         + `text-align:${e.alineacion === 'centro' ? 'center'
+                        : e.alineacion === 'derecha' ? 'right' : 'left'};`
+         + `font-weight:${e.negrita ? '700' : '400'};`
+         + `font-style:${e.cursiva ? 'italic' : 'normal'};`
+         + `color:${color};`;
+}
+
+function cuerpoBloque(s, i, meta) {
+    const est = estiloTexto(s.estilo);
+
+    if (CON_TEXTO.includes(s.tipo)) {
+        const ph = s.tipo === 'titulo'  ? 'Escribe el título...'
+                 : s.tipo === 'portada' ? 'Título de la portada...'
+                 : 'Escribe el texto. Puedes usar variables como {proyecto}.';
+        return `<textarea class="pl-texto" rows="1" style="${est}"
+                   placeholder="${ph}">${escapar(s.texto || '')}</textarea>`;
+    }
+
+    if (s.tipo === 'logo') {
+        return `<div style="text-align:${s.estilo.alineacion === 'centro' ? 'center'
+                   : s.estilo.alineacion === 'derecha' ? 'right' : 'left'};">
+                   <img src="${LOGO_URL}" class="pl-logo-prev" alt="Logo">
+                </div>`;
+    }
+
+    if (s.tipo === 'separador')    return '<div class="pl-separador"></div>';
+    if (s.tipo === 'salto_pagina') return '<div class="pl-salto">Salto de página</div>';
+
+    if (s.tipo === 'imagen') {
+        const url = s.config.url || '';
+        return `<div class="pl-datos-caja">
+                  <div class="pl-datos-cabeza"><i class="fas fa-photo-film"></i> Imagen</div>
+                  <input type="text" class="pl-sel" data-cfg="url" value="${escapar(url)}"
+                         placeholder="https://..." style="width:100%;margin-top:9px;">
+                  ${url ? `<img src="${escapar(url)}" style="max-width:100%;margin-top:10px;border-radius:7px;">` : ''}
+                </div>`;
+    }
+
+    if (s.tipo === 'firmas') {
+        const n = (s.config.nombres || ['', '']).slice(0, 4);
+        return `<div class="pl-datos-caja">
+                  <div class="pl-datos-cabeza"><i class="fas fa-signature"></i> Firmas</div>
+                  <div class="pl-datos-nota">Un espacio de firma por cada nombre.</div>
+                  <div class="pl-datos-config">
+                    ${n.map((v, k) => `<input type="text" class="pl-sel"
+                        value="${escapar(v)}" placeholder="Cargo o nombre ${k+1}"
+                        onchange="setFirma(${i},${k},this.value)">`).join('')}
+                  </div>
+                </div>`;
+    }
+
+    if (SOLO_DATOS.includes(s.tipo)) {
+        return `<div class="pl-datos-caja">
+                  <div class="pl-datos-cabeza">
+                    <i class="fas ${meta.icono}"></i> ${meta.nombre}
+                  </div>
+                  <div class="pl-datos-nota">${notaDatos(s.tipo)}</div>
+                  ${configDatos(s, i)}
+                </div>`;
+    }
+
+    return `<div class="pl-datos-caja"><div class="pl-datos-cabeza">
+              <i class="fas ${meta.icono}"></i> ${meta.nombre}</div></div>`;
+}
+
+function notaDatos(tipo) {
+    return {
+        cifras:      'Totales del periodo: registros, participantes y proyectos.',
+        indicadores: 'Resumen de las respuestas de un formulario.',
+        tabla:       'Listado de los registros del periodo.',
+        resumen_ia:  'Párrafo escrito por IA sobre las cifras ya calculadas. Nunca inventa datos.'
+    }[tipo] || '';
+}
+
+function configDatos(s, i) {
+    let h = '<div class="pl-datos-config">';
+
+    if (['indicadores', 'tabla', 'resumen_ia'].includes(s.tipo)) {
+        h += `<select class="pl-sel" data-cfg="formulario_id">
+                <option value="">Todos los formularios</option>` +
+             (CATALOGO.formularios || []).map(f =>
+                `<option value="${f.id}" ${String(s.config.formulario_id) === String(f.id) ? 'selected' : ''}>${escapar(f.nombre)}</option>`
+             ).join('') + '</select>';
+    }
+
+    if (s.tipo === 'tabla') {
+        h += `<input type="number" class="pl-sel" data-cfg="max_filas" min="1" max="200"
+                 value="${s.config.max_filas || 20}" style="width:110px;"
+                 title="Máximo de filas">`;
+    }
+
+    if (s.tipo === 'indicadores') {
+        h += `<input type="number" class="pl-sel" data-cfg="max_indicadores" min="1" max="20"
+                 value="${s.config.max_indicadores || 8}" style="width:130px;"
+                 title="Máximo de indicadores">`;
+    }
+
+    return h + '</div>';
+}
+
+function setFirma(i, k, valor) {
+    const n = (secciones[i].config.nombres || ['', '']).slice();
+    while (n.length <= k) n.push('');
+    n[k] = valor;
+    secciones[i].config.nombres = n;
+    marcarSucio();
+}
+
+function variables(i) {
+    return '<div class="pl-variables">' +
+        (CATALOGO.variables || []).map(v =>
+            `<button class="pl-var" title="${escapar(v.descripcion)}"
+                     onclick="insertarVariable(${i},'${v.clave}')">${v.clave}</button>`
+        ).join('') + '</div>';
+}
+
+function insertarVariable(i, clave) {
+    const ta = document.querySelectorAll('.pl-bloque')[i]?.querySelector('.pl-texto');
+    if (!ta) return;
+    const ini = ta.selectionStart ?? ta.value.length;
+    const fin = ta.selectionEnd   ?? ta.value.length;
+    ta.value = ta.value.slice(0, ini) + clave + ta.value.slice(fin);
+    secciones[i].texto = ta.value;
+    ta.focus();
+    ta.selectionStart = ta.selectionEnd = ini + clave.length;
+    marcarSucio();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ARRASTRAR DESDE LA PALETA
+   ═══════════════════════════════════════════════════════════════════ */
+
+const hoja = document.getElementById('pl-hoja');
+hoja.addEventListener('dragover', e => e.preventDefault());
+hoja.addEventListener('drop', e => {
+    e.preventDefault();
+    const tipo = e.dataTransfer.getData('text/plain');
+    if (tipo) agregar(tipo);
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   GUARDAR
+   ═══════════════════════════════════════════════════════════════════ */
+
+function marcarSucio() {
+    sucio = true;
+    const el = document.getElementById('pl-estado');
+    el.textContent = 'Sin guardar';
+    el.classList.add('sin-guardar');
+}
+
+function limpiarSucio() {
+    sucio = false;
+    const el = document.getElementById('pl-estado');
+    el.textContent = 'Guardada';
+    el.classList.remove('sin-guardar');
+}
+
+async function guardar() {
+    const nombre = document.getElementById('pl-nombre').value.trim();
+    if (!nombre) {
+        mostrarToast('⚠️ Ponle un nombre a la plantilla');
+        document.getElementById('pl-nombre').focus();
+        return;
+    }
+
+    const payload = {nombre, secciones};
+
+    try {
+        const url    = PLANTILLA_ID ? `/api/plantillas-informe/${PLANTILLA_ID}`
+                                    : '/api/plantillas-informe';
+        const method = PLANTILLA_ID ? 'PUT' : 'POST';
+        const res    = await fetch(url, {
+            method, headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error || 'Error');
+
+        limpiarSucio();
+        mostrarToast('✅ Plantilla guardada');
+
+        if (!PLANTILLA_ID && data.id) {
+            window.history.replaceState({}, '', `/plantillas-informe/${data.id}`);
+        }
+    } catch (e) {
+        mostrarToast('❌ No se pudo guardar');
+    }
+}
+
+function salir() {
+    if (sucio && !window.confirm('Hay cambios sin guardar. ¿Salir de todos modos?')) return;
+    window.location.href = '/configuracion#plantillas';
+}
+
+window.addEventListener('beforeunload', e => {
+    if (!sucio) return;
+    e.preventDefault();
+    e.returnValue = '';
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   UTILIDADES
+   ═══════════════════════════════════════════════════════════════════ */
+
+function escapar(t) {
+    return String(t ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+let toastTimer = null;
+function mostrarToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+iniciar();
+</script>
+</body>
+</html>
