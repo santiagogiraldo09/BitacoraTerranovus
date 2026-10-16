@@ -7813,6 +7813,34 @@ def listar_reportes():
         return jsonify({'error': 'Error al cargar los reportes'}), 500
 
 
+@app.route('/api/clasificacion/barrer', methods=['POST'])
+def api_clasificacion_barrer():
+    """Procesa un lote de respuestas pendientes de clasificar.
+
+    Manual por ahora; más adelante lo llama el cron y el botón
+    'Actualizar' del panel de tendencias.
+    """
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    if session.get('user_rol') != 'admin':
+        return jsonify({'error': 'Solo administradores'}), 403
+
+    try:
+        limite = int((request.get_json(silent=True) or {}).get('limite', 40))
+    except (TypeError, ValueError):
+        limite = 40
+    limite = min(max(limite, 1), 150)
+
+    try:
+        from clasificacion import barrer_pendientes
+        procesadas, recuperadas = barrer_pendientes(limite=limite)
+        return jsonify({'success': True,
+                        'procesadas': procesadas,
+                        'recuperadas': recuperadas})
+    except Exception as e:
+        app.logger.exception('Error en barrido de clasificación')
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/reportes/proyecto/<int:proyecto_id>', methods=['GET'])
 def contexto_proyecto_reporte(proyecto_id):
     """Formularios activos y usuarios asignados a un proyecto."""
