@@ -53,6 +53,11 @@
                 <i class="fas fa-paper-plane"></i>
                 <span>Reportes Automáticos</span>
             </button>
+            <button class="sidebar-nav-item" id="nav-plantillas"
+                    onclick="mostrarSeccion('plantillas'); cargarPlantillas();">
+                <i class="fas fa-file-invoice"></i>
+                <span>Plantillas de Informe</span>
+            </button>
             <!--
             <button class="sidebar-nav-item" id="nav-vocabulario" onclick="mostrarSeccion('vocabulario')">
                 <i class="fas fa-book"></i>
@@ -753,6 +758,34 @@
             </div>
         </div>
 
+        <!-- ── SECCIÓN: PLANTILLAS DE INFORME ── -->
+        <div id="seccion-plantillas" class="cfg-seccion" style="display:none;">
+            <div class="cfg-card">
+                <div class="cfg-card-title">
+                    <i class="fas fa-file-invoice cfg-icon-orange"></i>
+                    <span>Plantillas de Informe</span>
+                </div>
+                <p class="cfg-card-subtitle">
+                    Arma el informe con bloques, igual que armas un formulario con
+                    campos. Lo que escribas se conserva; las cifras se recalculan
+                    cada vez que se genera.
+                </p>
+
+                <div class="buscador-seccion">
+                    <i class="fas fa-search buscador-icon"></i>
+                    <input type="text" id="buscar-plantillas" class="buscador-input"
+                        placeholder="Buscar plantilla..."
+                        oninput="filtrarPlantillas(this.value)">
+                </div>
+
+                <button class="btn-nuevo-campo" onclick="nuevaPlantilla()">
+                    <i class="fas fa-plus"></i> Nueva plantilla
+                </button>
+
+                <div id="lista-plantillas"></div>
+            </div>
+        </div>
+
     </main>
 </div>
 
@@ -809,6 +842,12 @@
         <button class="drawer-nav-item" id="drawer-reportes" onclick="mostrarSeccion('reportes')">
         <i class="fas fa-paper-plane"></i>
         <span>Reportes Automáticos</span>
+        <i class="fas fa-chevron-right drawer-chevron"></i>
+    </button>
+    <button class="drawer-nav-item" id="drawer-plantillas"
+            onclick="mostrarSeccion('plantillas'); cargarPlantillas();">
+        <i class="fas fa-file-invoice"></i>
+        <span>Plantillas de Informe</span>
         <i class="fas fa-chevron-right drawer-chevron"></i>
     </button>
  
@@ -1160,7 +1199,7 @@
 <script>
 
     const secciones = ['identidad', 'usuarios', 'campos', 'formularios', 'proyectos',
-                       'vocabulario', 'integraciones', 'reportes'];
+                       'vocabulario', 'integraciones', 'reportes', 'plantillas'];
     const titulos   = {
         'identidad':     'Identidad Visual',
         'usuarios':      'Gestión de Usuarios',
@@ -1169,13 +1208,13 @@
         'proyectos':     'Proyectos',
         'vocabulario':   'Vocabulario Técnico',
         'integraciones': 'Integraciones',
-        'reportes':      'Reportes Automáticos'
+        'reportes':      'Reportes Automáticos',
+        'plantillas':    'Plantillas de Informe'
     };
-
     // Secciones que en móvil viven dentro del drawer y no tienen
     // botón propio en la barra inferior.
     const seccionesDrawer = ['formularios', 'proyectos', 'vocabulario',
-                             'integraciones', 'reportes'];
+                             'integraciones', 'reportes', 'plantillas'];
 
     // ── Form Builder ──
     let builderCamposGlobales = [];
@@ -2856,6 +2895,142 @@
         } catch {
             mostrarToast('❌ Error al eliminar', true);
         }
+    }
+
+    // ══════════════════════════════════════════════════════════════
+    //  PLANTILLAS DE INFORME
+    // ══════════════════════════════════════════════════════════════
+
+    let plantillasCache = [];
+
+    async function cargarPlantillas() {
+        const lista = document.getElementById('lista-plantillas');
+        if (!lista) return;
+        lista.innerHTML = '<p style="color:var(--gris-texto);">Cargando...</p>';
+
+        try {
+            const res  = await fetch('/api/plantillas-informe');
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            plantillasCache = data.plantillas || [];
+            renderPlantillas(plantillasCache);
+        } catch (e) {
+            lista.innerHTML =
+                '<p style="color:var(--gris-texto);">Error al cargar plantillas.</p>';
+        }
+    }
+
+    function renderPlantillas(plantillas) {
+        const lista = document.getElementById('lista-plantillas');
+        lista.innerHTML = '';
+
+        if (!plantillas.length) {
+            lista.innerHTML = `
+                <p style="color:var(--gris-texto);padding:16px 0;">
+                    Aún no hay plantillas. Crea la primera con
+                    <strong>Nueva plantilla</strong>.
+                </p>`;
+            return;
+        }
+
+        plantillas.forEach(p => {
+            const div = document.createElement('div');
+            div.className = 'formulario-item';
+            div.innerHTML = `
+                <div class="formulario-item-info">
+                    <span class="formulario-item-nombre">${p.nombre}</span>
+                    <span class="formulario-item-meta">
+                        ${p.bloques} bloque${p.bloques === 1 ? '' : 's'}
+                        ${p.actualizado_en ? ' · actualizada ' + p.actualizado_en : ''}
+                    </span>
+                </div>
+                <div class="formulario-item-actions">
+                    <button class="icon-btn"
+                            onclick="window.location.href='/plantillas-informe/${p.id}'"
+                            title="Editar">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="icon-btn" onclick="duplicarPlantilla(${p.id})"
+                            title="Duplicar">
+                        <i class="fas fa-copy"></i>
+                    </button>
+                    <button class="icon-btn danger"
+                            onclick="eliminarPlantilla(${p.id}, '${(p.nombre || '').replace(/'/g, "\\'")}')"
+                            title="Eliminar">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>`;
+            lista.appendChild(div);
+        });
+    }
+
+    function filtrarPlantillas(texto) {
+        const q = (texto || '').toLowerCase();
+        renderPlantillas(plantillasCache.filter(p =>
+            (p.nombre || '').toLowerCase().includes(q) ||
+            (p.descripcion || '').toLowerCase().includes(q)
+        ));
+    }
+
+    /** Crea la plantilla vacía y entra directo al constructor.
+     *  Pedir el nombre aquí evita llegar al constructor con una
+     *  plantilla sin identificar que después nadie encuentra. */
+    async function nuevaPlantilla() {
+        const nombre = prompt('Nombre de la plantilla:', 'Informe de avance');
+        if (!nombre || !nombre.trim()) return;
+
+        try {
+            const res = await fetch('/api/plantillas-informe', {
+                method:  'POST',
+                headers: {'Content-Type': 'application/json'},
+                body:    JSON.stringify({nombre: nombre.trim(), secciones: []})
+            });
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Error');
+            window.location.href = `/plantillas-informe/${data.id}`;
+        } catch (e) {
+            mostrarToast('❌ No se pudo crear la plantilla', true);
+        }
+    }
+
+    async function duplicarPlantilla(id) {
+        try {
+            const res  = await fetch(`/api/plantillas-informe/${id}/duplicar`,
+                                     {method: 'POST'});
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Error');
+            mostrarToast('📋 Plantilla duplicada');
+            cargarPlantillas();
+        } catch (e) {
+            mostrarToast('❌ No se pudo duplicar', true);
+        }
+    }
+
+    async function eliminarPlantilla(id, nombre) {
+        const ok = await confirmar({
+            titulo:   'Eliminar plantilla',
+            mensaje:  `¿Seguro que deseas eliminar "${nombre}"?`,
+            detalle:  'Los informes ya generados no se ven afectados.',
+            textoOk:  'Eliminar',
+            peligro:  true
+        });
+        if (!ok) return;
+
+        try {
+            const res  = await fetch(`/api/plantillas-informe/${id}`,
+                                     {method: 'DELETE'});
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || 'Error');
+            mostrarToast('🗑️ Plantilla eliminada');
+            cargarPlantillas();
+        } catch (e) {
+            mostrarToast('❌ No se pudo eliminar', true);
+        }
+    }
+
+    // Si se entra directo con #plantillas en la URL
+    if (window.location.hash === '#plantillas') {
+        document.addEventListener('DOMContentLoaded', cargarPlantillas);
     }
 
     function abrirDrawer() {
