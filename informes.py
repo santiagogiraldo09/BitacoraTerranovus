@@ -217,7 +217,7 @@ def listar_plantillas():
         with db_connection() as (conn, cursor):
             cursor.execute("""
                 SELECT id, nombre, descripcion, secciones,
-                       creado_en, actualizado_en
+                       created_at, updated_at
                 FROM plantillas_informe
                 WHERE empresa_id = %s
                 ORDER BY nombre
@@ -287,8 +287,9 @@ def crear_plantilla():
         with db_connection() as (conn, cursor):
             cursor.execute("""
                 INSERT INTO plantillas_informe
-                    (empresa_id, nombre, descripcion, secciones, creado_por)
-                VALUES (%s, %s, %s, %s::jsonb, %s)
+                    (empresa_id, nombre, descripcion, secciones,
+                     creada_por, activa)
+                VALUES (%s, %s, %s, %s::jsonb, %s, TRUE)
                 RETURNING id
             """, (session['empresa_id'], nombre,
                   str(data.get('descripcion') or '').strip()[:300],
@@ -322,7 +323,7 @@ def editar_plantilla(plantilla_id):
             cursor.execute("""
                 UPDATE plantillas_informe
                 SET nombre = %s, descripcion = %s,
-                    secciones = %s::jsonb, actualizado_en = NOW()
+                    secciones = %s::jsonb, updated_at = NOW()
                 WHERE id = %s AND empresa_id = %s
                 RETURNING id
             """, (nombre,
@@ -354,10 +355,11 @@ def duplicar_plantilla(plantilla_id):
         with db_connection() as (conn, cursor):
             cursor.execute("""
                 INSERT INTO plantillas_informe
-                    (empresa_id, nombre, descripcion, secciones, creado_por)
+                    (empresa_id, nombre, descripcion, secciones,
+                     creada_por, activa)
                 SELECT empresa_id,
                        LEFT(nombre || ' (copia)', 120),
-                       descripcion, secciones, %s
+                       descripcion, secciones, %s, TRUE
                 FROM plantillas_informe
                 WHERE id = %s AND empresa_id = %s
                 RETURNING id
