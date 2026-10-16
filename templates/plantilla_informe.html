@@ -307,6 +307,9 @@ async function iniciar() {
         mostrarToast('❌ No se pudo cargar el catálogo de bloques');
         return;
     }
+    CATALOGO.estilo = CATALOGO.estilo || {};
+    CATALOGO.estilo.tamanos = CATALOGO.estilo.tamanos
+        || ['titulo_grande', 'titulo', 'subtitulo', 'normal', 'pequeno'];
 
     renderPaleta();
 
@@ -316,7 +319,7 @@ async function iniciar() {
             const data = await res.json();
             if (data.error) throw new Error(data.error);
             document.getElementById('pl-nombre').value = data.plantilla.nombre || '';
-            secciones = data.plantilla.secciones || [];
+            secciones = (data.plantilla.secciones || []).map(normalizar);
         } catch (e) {
             mostrarToast('❌ No se pudo cargar la plantilla');
         }
@@ -346,8 +349,29 @@ function renderPaleta() {
    ESTADO
    ═══════════════════════════════════════════════════════════════════ */
 
+const ESTILO_BASE = {
+    tamano: 'normal', alineacion: 'izquierda', negrita: false,
+    cursiva: false, color: 'negro', espacio: 'normal'
+};
+
+/** Completa lo que falte en un bloque guardado por una versión
+ *  anterior. Sin esto, abrir una plantilla vieja rompe el render. */
+function normalizar(s) {
+    s = s || {};
+    const tipo = s.tipo || 'texto';
+    return {
+        tipo:   tipo,
+        ancho:  s.ancho === 'mitad' ? 'mitad' : 'completo',
+        // 'contenido' era como se llamaba este campo antes
+        texto:  s.texto ?? s.contenido ?? '',
+        config: (s.config && typeof s.config === 'object') ? s.config : {},
+        estilo: Object.assign(estiloPorDefecto(tipo), s.estilo || {})
+    };
+}
+
 function estiloPorDefecto(tipo) {
-    const base = Object.assign({}, CATALOGO.estilo.por_defecto || {});
+    const base = Object.assign({}, ESTILO_BASE,
+                               (CATALOGO.estilo || {}).por_defecto || {});
     if (tipo === 'titulo')  { base.tamano = 'titulo';        base.negrita = true; }
     if (tipo === 'portada') { base.tamano = 'titulo_grande'; base.negrita = true;
                               base.alineacion = 'centro'; }
