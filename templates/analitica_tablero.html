@@ -602,10 +602,10 @@
     }
 
     /**
-     * Resumen con IA. El servidor calcula las cifras con SQL y el modelo
-     * sólo las interpreta — nunca produce números por su cuenta. El sello
-     * de autoría va visible a propósito: el lector debe saber qué parte
-     * del tablero escribió el sistema.
+     * Widget de análisis con IA. Python calcula todas las cifras —
+     * distribuciones, totales y cruces entre campos — y el modelo sólo
+     * escoge cuáles importan y las explica. Por eso ningún número de
+     * esta tarjeta puede estar mal calculado.
      */
     async function renderVizResumenIA(viz) {
         const cuerpo = document.getElementById(`viz-body-${viz.id}`);
@@ -613,6 +613,9 @@
 
         const esc = t => String(t ?? '')
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        const aviso = txt => `<p style="color:#9ca3af;font-size:13px;
+            padding:16px 2px;margin:0;">${esc(txt)}</p>`;
 
         try {
             const res = await fetch('/api/bi/resumen-ia', {
@@ -624,44 +627,58 @@
                     filtros:          filtrosActivos
                 })
             });
-            const data = await res.json();
+            const d = await res.json();
 
-            if (data.error) {
+            if (d.error) {
                 cuerpo.innerHTML = `<p class="tb-viz-error">
-                    <i class="fas fa-exclamation-circle"></i> ${esc(data.error)}</p>`;
+                    <i class="fas fa-exclamation-circle"></i> ${esc(d.error)}</p>`;
                 return;
             }
+            if (d.sin_datos) { cuerpo.innerHTML = aviso(d.texto); return; }
 
-            if (data.sin_datos || !data.texto) {
-                cuerpo.innerHTML = `<p style="color:#9ca3af;font-size:13px;padding:14px 2px;">
-                    ${esc(data.texto || 'No hay datos suficientes para resumir.')}</p>`;
-                return;
-            }
+            const metricas = (d.metricas || []).map(m => `
+                <div style="flex:1;min-width:120px;background:#fafafa;
+                            border:1px solid #eef0f2;border-radius:9px;padding:11px 13px;">
+                    <div style="font-size:10.5px;text-transform:uppercase;
+                                letter-spacing:.4px;color:#9ca3af;margin-bottom:4px;">
+                        ${esc(m.etiqueta)}</div>
+                    <div style="font-size:17px;font-weight:700;color:#1f2937;
+                                line-height:1.25;">${esc(m.valor)}</div>
+                </div>`).join('');
 
-            const parrafos = String(data.texto)
-                .split(/\n{2,}/)
-                .filter(p => p.trim())
-                .map(p => `<p style="margin:0 0 10px;line-height:1.6;">${esc(p.trim())}</p>`)
-                .join('');
+            const hallazgos = (d.hallazgos || []).map(h => `
+                <li style="margin-bottom:7px;line-height:1.55;">${esc(h)}</li>`).join('');
 
-            // Estilos en línea: esta tarjeta es nueva y así no depende de
-            // que el navegador refresque analitica_tablero.css.
             cuerpo.innerHTML = `
-                <div style="font-size:13.5px;color:#374151;padding:4px 2px;">
-                    <div style="display:flex;align-items:center;gap:7px;
-                                font-size:11px;font-weight:600;letter-spacing:.3px;
-                                text-transform:uppercase;color:var(--naranja,#FBAF33);
-                                margin-bottom:12px;">
+                <div style="font-size:13.5px;color:#374151;padding:2px;">
+
+                    ${d.titular ? `<p style="font-size:15px;font-weight:700;
+                        color:#1f2937;line-height:1.4;margin:0 0 14px;">
+                        ${esc(d.titular)}</p>` : ''}
+
+                    ${metricas ? `<div style="display:flex;flex-wrap:wrap;gap:9px;
+                        margin-bottom:15px;">${metricas}</div>` : ''}
+
+                    ${hallazgos ? `<ul style="margin:0 0 12px;padding-left:18px;">
+                        ${hallazgos}</ul>` : ''}
+
+                    ${d.limitacion ? `<p style="font-size:12px;color:#9ca3af;
+                        border-left:2px solid #e5e7eb;padding-left:10px;margin:0 0 12px;
+                        line-height:1.5;">${esc(d.limitacion)}</p>` : ''}
+
+                    <div style="display:flex;align-items:center;gap:6px;font-size:10.5px;
+                                text-transform:uppercase;letter-spacing:.3px;
+                                color:var(--naranja,#FBAF33);border-top:1px solid #f1f2f4;
+                                padding-top:10px;">
                         <i class="fas fa-wand-magic-sparkles"></i>
-                        Generado con IA sobre las cifras del periodo
+                        Análisis con IA sobre ${d.registros || 0} registros
                     </div>
-                    ${parrafos}
                 </div>`;
 
         } catch (e) {
             console.error(e);
             cuerpo.innerHTML = `<p class="tb-viz-error">
-                <i class="fas fa-exclamation-circle"></i> Error al generar el resumen</p>`;
+                <i class="fas fa-exclamation-circle"></i> Error al generar el análisis</p>`;
         }
     }
 

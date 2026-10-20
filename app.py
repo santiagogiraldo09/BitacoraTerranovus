@@ -1808,121 +1808,6 @@ def bi_datos():
         return jsonify({'error': str(e)}), 500
 
 
-# ── BI: resumen con IA de un formulario ──────────────────────────────
-#
-# Reusa la misma maquinaria del correo de reportes: las cifras salen de
-# SQL y el modelo sólo las interpreta. Nunca calcula ni inventa números.
-#
-# Se cachea por hash de las cifras: si el usuario recarga el tablero o
-# vuelve a una combinación de filtros ya vista, no hay llamada al modelo.
-
-@app.route('/api/bi/resumen-ia', methods=['POST'])
-def bi_resumen_ia():
-    if 'user_id' not in session:
-        return jsonify({'error': 'No autorizado'}), 401
-
-    data          = request.get_json() or {}
-    empresa_id    = session.get('empresa_id')
-    formulario_id = data.get('formulario_id')
-    viz_id        = data.get('visualizacion_id')
-    filtros       = data.get('filtros') or {}
-    proyecto_id   = filtros.get('proyecto_id') or None
-
-    if not proyecto_id:
-        return jsonify({'error': 'Elige un proyecto en los filtros del tablero',
-                        'sin_datos': True}), 200
-
-    # El filtro global entrega fechas inclusivas; las funciones de
-    # reportes esperan 'hasta' exclusivo.
-    tz = ZoneInfo('America/Bogota')
-    try:
-        desde = (datetime.fromisoformat(filtros['desde']).replace(tzinfo=tz)
-                 if filtros.get('desde')
-                 else datetime(1900, 1, 1, tzinfo=tz))
-        hasta = ((datetime.fromisoformat(filtros['hasta']) + timedelta(days=1)).replace(tzinfo=tz)
-                 if filtros.get('hasta')
-                 else datetime.now(tz) + timedelta(days=1))
-    except (TypeError, ValueError):
-        return jsonify({'error': 'Fechas del filtro no válidas'}), 400
-
-    formularios = [int(formulario_id)] if formulario_id else []
-
-    try:
-        with db_connection() as (conn, cursor):
-            # El proyecto debe ser de esta empresa: el id viene del
-            # navegador y no se puede confiar en él.
-            cursor.execute("""
-                SELECT nombre_proyecto FROM proyectos
-                WHERE id = %s AND empresa_id = %s
-            """, (proyecto_id, empresa_id))
-            fila = cursor.fetchone()
-            if not fila:
-                return jsonify({'error': 'Proyecto no encontrado'}), 404
-            proyecto_nombre = fila[0]
-
-            cifras = _cifras_reporte(cursor, proyecto_id, formularios, desde, hasta)
-            cifras['detalle'] = _indicadores_reporte(
-                cursor, empresa_id, proyecto_id, formularios, desde, hasta)
-
-            if not cifras.get('total_registros'):
-                return jsonify({'sin_datos': True,
-                                'texto': 'No hay registros en el periodo filtrado.',
-                                'debug': {k: v for k, v in cifras.items()
-                                          if k != 'detalle'}})
-
-            # Etiqueta del periodo, para que el párrafo sepa de qué habla
-            if filtros.get('desde') or filtros.get('hasta'):
-                etiqueta = (f"{filtros.get('desde') or 'el inicio'} al "
-                            f"{filtros.get('hasta') or 'hoy'}")
-            else:
-                etiqueta = 'todo el histórico del proyecto'
-
-            cifras.update({'proyecto': proyecto_nombre, 'etiqueta': etiqueta,
-                           'nombre_reporte': 'Resumen del tablero'})
-
-            # Hash de lo que se le va a pasar al modelo. Si no cambió,
-            # el texto guardado sigue siendo válido.
-            huella = hashlib.sha256(
-                json.dumps(cifras, sort_keys=True, default=str).encode('utf-8')
-            ).hexdigest()
-
-            if viz_id:
-                cursor.execute("""
-                    UPDATE notas_ia SET ultimo_uso = NOW()
-                    WHERE visualizacion_id = %s AND hash_datos = %s
-                    RETURNING contenido
-                """, (viz_id, huella))
-                guardada = cursor.fetchone()
-                conn.commit()
-                if guardada:
-                    return jsonify({'texto': (guardada[0] or {}).get('texto', ''),
-                                    'cacheado': True})
-
-        # Fuera del with: no necesita base y la llamada al modelo tarda.
-        resumen = _resumen_ia_reporte(cifras, cifras.get('detalle'))
-        texto   = (resumen or {}).get('texto') or (resumen if isinstance(resumen, str) else '')
-
-        if viz_id and texto:
-            try:
-                with db_connection() as (conn, cursor):
-                    cursor.execute("""
-                        INSERT INTO notas_ia
-                            (empresa_id, visualizacion_id, hash_datos,
-                             contenido, modelo)
-                        VALUES (%s, %s, %s, %s::jsonb, %s)
-                        ON CONFLICT (visualizacion_id, hash_datos) DO NOTHING
-                    """, (empresa_id, viz_id, huella,
-                          json.dumps({'texto': texto}), 'gpt-4o-mini'))
-                    conn.commit()
-            except Exception as e:
-                # Que falle la caché no debe tumbar la respuesta
-                app.logger.warning(f"[BI-IA] No se pudo cachear: {e}")
-
-        return jsonify({'texto': texto, 'cacheado': False})
-
-    except Exception as e:
-        app.logger.exception('bi_resumen_ia')
-        return jsonify({'error': str(e)}), 500
 
 # ── Exportar tablero BI a PDF ───────────────────────────────────
 @app.route('/api/bi/tableros/<int:tablero_id>/exportar-pdf', methods=['POST'])
@@ -10241,6 +10126,8 @@ from informes import informes_bp
 app.register_blueprint(informes_bp)
 from bi_publica import bi_publica_bp
 app.register_blueprint(bi_publica_bp)
+from resumen_ia import resumen_bp
+app.register_blueprint(resumen_bp)
 
 if __name__ == '__main__':
     app.run(debug=True)
