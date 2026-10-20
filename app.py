@@ -1866,7 +1866,9 @@ def bi_resumen_ia():
 
             if not cifras.get('total_registros'):
                 return jsonify({'sin_datos': True,
-                                'texto': 'No hay registros en el periodo filtrado.'})
+                                'texto': 'No hay registros en el periodo filtrado.',
+                                'debug': {k: v for k, v in cifras.items()
+                                          if k != 'detalle'}})
 
             # Etiqueta del periodo, para que el párrafo sepa de qué habla
             if filtros.get('desde') or filtros.get('hasta'):
