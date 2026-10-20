@@ -189,6 +189,10 @@
                     <i class="fas fa-sort-amount-down"></i>
                     <span>Pareto (80/20)</span>
                 </button>
+                <button class="tb-tipo-btn" data-tipo="resumen_ia" onclick="seleccionarTipo('resumen_ia')">
+                    <i class="fas fa-wand-magic-sparkles"></i>
+                    <span>Resumen con IA</span>
+                </button>
             </div>
 
             <label class="tb-label" style="margin-top:14px;">FORMULARIO FUENTE</label>
@@ -547,6 +551,13 @@
         }
         document.getElementById('tb-grid').appendChild(card);
 
+        // El resumen no pasa por /api/bi/datos: tiene su propio endpoint,
+        // que reusa la maquinaria de los reportes por correo.
+        if (viz.tipo === 'resumen_ia') {
+            await renderVizResumenIA(viz);
+            return;
+        }
+
         // Obtener datos del backend
         try {
             const body = {
@@ -587,6 +598,70 @@
             console.error(e);
             document.getElementById(`viz-body-${viz.id}`).innerHTML =
                 `<p class="tb-viz-error"><i class="fas fa-exclamation-circle"></i> Error al cargar datos</p>`;
+        }
+    }
+
+    /**
+     * Resumen con IA. El servidor calcula las cifras con SQL y el modelo
+     * sólo las interpreta — nunca produce números por su cuenta. El sello
+     * de autoría va visible a propósito: el lector debe saber qué parte
+     * del tablero escribió el sistema.
+     */
+    async function renderVizResumenIA(viz) {
+        const cuerpo = document.getElementById(`viz-body-${viz.id}`);
+        const ds     = viz.config?.datasets?.[0] || {};
+
+        const esc = t => String(t ?? '')
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+        try {
+            const res = await fetch('/api/bi/resumen-ia', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    formulario_id:    ds.formulario_id || null,
+                    visualizacion_id: viz.id,
+                    filtros:          filtrosActivos
+                })
+            });
+            const data = await res.json();
+
+            if (data.error) {
+                cuerpo.innerHTML = `<p class="tb-viz-error">
+                    <i class="fas fa-exclamation-circle"></i> ${esc(data.error)}</p>`;
+                return;
+            }
+
+            if (data.sin_datos || !data.texto) {
+                cuerpo.innerHTML = `<p style="color:#9ca3af;font-size:13px;padding:14px 2px;">
+                    ${esc(data.texto || 'No hay datos suficientes para resumir.')}</p>`;
+                return;
+            }
+
+            const parrafos = String(data.texto)
+                .split(/\n{2,}/)
+                .filter(p => p.trim())
+                .map(p => `<p style="margin:0 0 10px;line-height:1.6;">${esc(p.trim())}</p>`)
+                .join('');
+
+            // Estilos en línea: esta tarjeta es nueva y así no depende de
+            // que el navegador refresque analitica_tablero.css.
+            cuerpo.innerHTML = `
+                <div style="font-size:13.5px;color:#374151;padding:4px 2px;">
+                    <div style="display:flex;align-items:center;gap:7px;
+                                font-size:11px;font-weight:600;letter-spacing:.3px;
+                                text-transform:uppercase;color:var(--naranja,#FBAF33);
+                                margin-bottom:12px;">
+                        <i class="fas fa-wand-magic-sparkles"></i>
+                        Generado con IA sobre las cifras del periodo
+                    </div>
+                    ${parrafos}
+                </div>`;
+
+        } catch (e) {
+            console.error(e);
+            cuerpo.innerHTML = `<p class="tb-viz-error">
+                <i class="fas fa-exclamation-circle"></i> Error al generar el resumen</p>`;
         }
     }
 
@@ -1333,6 +1408,39 @@
         document.querySelectorAll('.tb-tipo-btn').forEach(b => {
             b.classList.toggle('activo', b.dataset.tipo === tipo);
         });
+
+        const ocultar = (ids, valor) => ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = valor;
+        });
+
+        // El resumen sólo necesita saber de qué formulario hablar: las
+        // cifras las calcula el servidor y el periodo lo hereda de los
+        // filtros del tablero. Todo lo demás estorba.
+        if (tipo === 'resumen_ia') {
+            ocultar(['viz-campos-temporal', 'viz-campo-serie-wrap',
+                     'viz-columnas-wrap', 'viz-ejes-wrap',
+                     'viz-campo-valor', 'label-campo-valor',
+                     'viz-campo-agrupacion', 'label-campo-agrupa',
+                     'viz-agregacion', 'viz-campo-fecha'], 'none');
+
+            ['viz-agregacion', 'viz-campo-fecha'].forEach(id => {
+                const lbl = document.getElementById(id)?.previousElementSibling;
+                if (lbl) lbl.style.display = 'none';
+            });
+
+            if (vizEnEdicion === null) {
+                document.getElementById('viz-ancho-completo').checked = true;
+            }
+            return;
+        }
+
+        // Al volver de 'resumen_ia' hay que restaurar lo que sólo él
+        // oculta; el resto lo maneja la lógica de abajo.
+        ocultar(['viz-campo-fecha'], '');
+        const lblFecha = document.getElementById('viz-campo-fecha')?.previousElementSibling;
+        if (lblFecha) lblFecha.style.display = '';
+
         const esLinea    = tipo === 'linea';
         const esTarjetas = tipo === 'tarjetas';
         const esDona     = tipo === 'dona';
@@ -1705,6 +1813,9 @@
         const granularidad    = document.getElementById('viz-granularidad').value;
         const esLinea         = tipoSeleccionado === 'linea';
         const esTabla         = tipoSeleccionado === 'tabla';
+        const esResumen       = tipoSeleccionado === 'resumen_ia';
+        // Ni la tabla ni el resumen miden un campo concreto.
+        const sinCampos       = esTabla || esResumen;
 
         // ── Títulos de ejes / etiquetas (barras, línea, dona y pareto) ──
         const esCartesiano  = tipoSeleccionado === 'barras'
@@ -1741,7 +1852,9 @@
         if (!tipoSeleccionado) { mostrarToast('⚠️ Selecciona un tipo de gráfico'); return; }
         if (!formularioId)     { mostrarToast('⚠️ Selecciona un formulario'); return; }
 
-        if (esTabla) {
+        if (esResumen) {
+            // Con el formulario basta: ya se validó arriba.
+        } else if (esTabla) {
             if (columnasSeleccionadas.length === 0) {
                 mostrarToast('⚠️ Selecciona al menos una columna');
                 return;
@@ -1752,23 +1865,23 @@
             if (esLinea && !campoFechaEjeId) { mostrarToast('⚠️ Selecciona el campo de fecha para el eje X'); return; }
         }
 
-        // ── Parsear campos (solo si no es tabla) ──
-        const campoValor  = !esTabla ? parsearCampo(campoValorRaw) : null;
-        const campoAgrupa = (!esLinea && !esTabla) ? parsearCampo(campoAgrupaRaw) : null;
+        // ── Parsear campos (solo si el tipo los usa) ──
+        const campoValor  = !sinCampos ? parsearCampo(campoValorRaw) : null;
+        const campoAgrupa = (!esLinea && !sinCampos) ? parsearCampo(campoAgrupaRaw) : null;
 
         // ── Nombres semánticos ──
         const selValorEl  = document.getElementById('viz-campo-valor');
         const selAgrupaEl = document.getElementById('viz-campo-agrupacion');
-        const campoValorNombre  = !esTabla ? (selValorEl.options[selValorEl.selectedIndex]?.text || '') : '';
-        const campoAgrupaNombre = !esTabla ? (selAgrupaEl.options[selAgrupaEl.selectedIndex]?.text || '') : '';
+        const campoValorNombre  = !sinCampos ? (selValorEl.options[selValorEl.selectedIndex]?.text || '') : '';
+        const campoAgrupaNombre = !sinCampos ? (selAgrupaEl.options[selAgrupaEl.selectedIndex]?.text || '') : '';
 
         // ── Construir dataset ──
         const dataset = {
             formulario_id:           parseInt(formularioId),
-            campo_valor:             esTabla ? '' : campoValor.campo_id,
+            campo_valor:             sinCampos ? '' : campoValor.campo_id,
             campo_valor_nombre:      campoValorNombre,
-            campo_agrupacion:        (esLinea || esTabla) ? '' : campoAgrupa.campo_id,
-            campo_agrupacion_nombre: (esLinea || esTabla) ? '' : campoAgrupaNombre,
+            campo_agrupacion:        (esLinea || sinCampos) ? '' : campoAgrupa.campo_id,
+            campo_agrupacion_nombre: (esLinea || sinCampos) ? '' : campoAgrupaNombre,
             parte_agrupacion:        (esLinea || esTabla) ? 'valor' : (campoAgrupa?.parte || 'valor'),
             es_agrupado:             esAgrupado,
             campo_serie:             esAgrupado ? campoSerie.campo_id : '',
@@ -1776,8 +1889,8 @@
             es_tabla:                esTabla,
             columnas:                columnasSeleccionadas,
             agregacion:              agregacion,
-            es_grupo:                esTabla ? false : campoValor.es_grupo,
-            gid:                     esTabla ? '' : campoValor.gid,
+            es_grupo:                sinCampos ? false : campoValor.es_grupo,
+            gid:                     sinCampos ? '' : campoValor.gid,
             campo_fecha_id:          campoFechaId,
             es_temporal:             esLinea,
             granularidad:            esLinea ? granularidad : '',
@@ -1794,9 +1907,9 @@
             // Antes solo se guardaba el del campo a medir, y editarViz lo
             // reutilizaba para los demás. Si venían de grupos distintos, el
             // select quedaba en blanco al editar.
-            valor_parte:             !esTabla ? (campoValor?.parte || 'valor') : 'valor',
-            agrupacion_es_grupo:     (esLinea || esTabla) ? false : !!campoAgrupa?.es_grupo,
-            agrupacion_gid:          (esLinea || esTabla) ? '' : (campoAgrupa?.gid || ''),
+            valor_parte:             !sinCampos ? (campoValor?.parte || 'valor') : 'valor',
+            agrupacion_es_grupo:     (esLinea || sinCampos) ? false : !!campoAgrupa?.es_grupo,
+            agrupacion_gid:          (esLinea || sinCampos) ? '' : (campoAgrupa?.gid || ''),
             serie_es_grupo:          esAgrupado ? !!campoSerie?.es_grupo : false,
             serie_gid:               esAgrupado ? (campoSerie?.gid || '') : '',
             serie_parte:             esAgrupado ? (campoSerie?.parte || 'valor') : 'valor'
