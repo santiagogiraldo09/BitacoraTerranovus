@@ -899,15 +899,19 @@
         <div class="invite-field">
             <label>Periodo que cubre *</label>
             <select id="rep-ventana" onchange="onVentanaReporteChange()">
-                <option value="7d">Últimos 7 días</option>
-                <option value="15d">Últimos 15 días</option>
-                <option value="30d">Últimos 30 días</option>
-                <option value="365d">Último año</option>
+                <option value="semana_actual">Esta semana</option>
+                <option value="semana_pasada">Semana pasada</option>
+                <option value="mes_actual">Este mes</option>
+                <option value="mes_pasado">El mes pasado</option>
+                <option value="trimestre_actual">Este trimestre</option>
+                <option value="trimestre_pasado">Trimestre pasado</option>
+                <option value="ano_actual">Este año</option>
+                <option value="ano_pasado">El año pasado</option>
                 <option value="personalizado">Personalizado…</option>
             </select>
             <span class="rep-hint">
-                Se cuenta hacia atrás desde el día del envío, sin incluir
-                el día en curso.
+                Los periodos en curso van hasta ayer; el día de hoy está
+                incompleto. La semana empieza el lunes.
             </span>
         </div>
 
@@ -920,13 +924,13 @@
         <div class="cfg-inner-divider"></div>
 
         <!-- ── Bloque 2: CUÁNDO ── -->
-        <div class="rep-bloque-titulo">Cuándo se envía</div>
+        <div class="rep-bloque-titulo">Frecuencia de envío</div>
 
         <div class="invite-field">
-            <label>Se envía *</label>
+            <label>Frecuencia *</label>
             <select id="rep-modo-envio" onchange="onModoEnvioChange()">
-                <option value="semana">En días de la semana</option>
-                <option value="mes">Un día del mes</option>
+                <option value="semana">Semanal</option>
+                <option value="mes">Mensual</option>
             </select>
         </div>
 
@@ -1946,10 +1950,14 @@
     }
 
     const VENTANA_NOMBRE = {
-        '7d':   'Últimos 7 días',
-        '15d':  'Últimos 15 días',
-        '30d':  'Últimos 30 días',
-        '365d': 'Último año'
+        'semana_actual':    'Esta semana',
+        'semana_pasada':    'Semana pasada',
+        'mes_actual':       'Este mes',
+        'mes_pasado':       'El mes pasado',
+        'trimestre_actual': 'Este trimestre',
+        'trimestre_pasado': 'Trimestre pasado',
+        'ano_actual':       'Este año',
+        'ano_pasado':       'El año pasado'
     };
 
     /** Texto legible para la lista: qué cubre y cuándo llega. */
@@ -1958,7 +1966,7 @@
 
         const cubre = r.ventana === 'personalizado'
             ? `Últimos ${r.ventana_dias || '?'} días`
-            : (VENTANA_NOMBRE[r.ventana] || 'Últimos 7 días');
+            : (VENTANA_NOMBRE[r.ventana] || 'Semana pasada');
 
         let cuando;
         if (r.modo_envio === 'mes') {
@@ -1993,7 +2001,7 @@
 
         // Estado base
         document.getElementById('rep-nombre').value = '';
-        document.getElementById('rep-ventana').value = '7d';
+        document.getElementById('rep-ventana').value = 'semana_pasada';
         document.getElementById('rep-ventana-dias').value = '21';
         document.getElementById('rep-modo-envio').value = 'semana';
         document.getElementById('rep-dia-mes').value = '1';
@@ -2104,8 +2112,15 @@
         }
     }
 
-    /** Días que cubre la ventana elegida, para el aviso de cobertura. */
-    const VENTANA_DIAS = { '7d': 7, '15d': 15, '30d': 30, '365d': 365 };
+    /** Días aproximados por ventana. Sólo alimenta el aviso de
+     *  cobertura, así que la aproximación basta: el rango real lo
+     *  calcula el servidor con el calendario. */
+    const VENTANA_DIAS = {
+        'semana_actual':  7,  'semana_pasada':  7,
+        'mes_actual':    30,  'mes_pasado':    30,
+        'trimestre_actual': 91, 'trimestre_pasado': 91,
+        'ano_actual':   365,  'ano_pasado':   365
+    };
 
     function diasDeVentana() {
         const v = document.getElementById('rep-ventana').value;
@@ -2132,28 +2147,52 @@
     }
 
     /**
-     * Avisa cuando la ventana es más corta que el intervalo entre envíos.
-     * No lo bloquea —puede ser deliberado— pero el usuario debe saber que
-     * va a quedar con días sin reportar entre un correo y otro.
+     * Avisa cuando la combinación de periodo y frecuencia no tiene
+     * sentido. No la bloquea —puede ser deliberada— pero el usuario
+     * debe enterarse antes de programarla.
      */
     function actualizarAvisoCobertura() {
         const aviso = document.getElementById('rep-cobertura-aviso');
         if (!aviso) return;
+        aviso.textContent = '';
 
+        const ventana   = document.getElementById('rep-ventana').value;
         const porSemana = document.getElementById('rep-modo-envio').value === 'semana';
-        if (!porSemana) { aviso.textContent = ''; return; }
+        const cerrado   = /_(pasado|pasada)$/.test(ventana);
 
-        const marcados = document.querySelectorAll('#rep-dias-wrap input:checked').length;
-        if (!marcados) {
-            aviso.textContent = 'Sin días marcados el reporte no se enviaría nunca.';
-            return;
+        if (porSemana) {
+            const marcados = document.querySelectorAll('#rep-dias-wrap input:checked').length;
+            if (!marcados) {
+                aviso.textContent = 'Sin días marcados el reporte no se enviaría nunca.';
+                return;
+            }
+            // Un periodo cerrado sólo cambia una vez por periodo: enviarlo
+            // varias veces repite el mismo contenido.
+            if (cerrado && ventana.startsWith('mes') && marcados >= 1) {
+                aviso.textContent = 'El mes pasado no cambia durante el mes: '
+                                  + 'con envío semanal llegará el mismo reporte varias veces.';
+                return;
+            }
+            if (cerrado && ventana.startsWith('trimestre')) {
+                aviso.textContent = 'El trimestre pasado no cambia: conviene frecuencia mensual.';
+                return;
+            }
+            if (ventana === 'semana_actual' && marcados === 1) {
+                aviso.textContent = 'Si el envío cae en lunes, la semana en curso '
+                                  + 'todavía no tendrá días completos.';
+                return;
+            }
+            const intervalo = Math.round(7 / marcados);
+            if (diasDeVentana() < intervalo) {
+                aviso.textContent = `Cada envío cubre ~${diasDeVentana()} días, pero pasan `
+                                  + `~${intervalo} entre uno y otro: quedarán días sin reportar.`;
+            }
+        } else {
+            if (ventana.startsWith('semana')) {
+                aviso.textContent = 'Con frecuencia mensual y periodo semanal, '
+                                  + 'quedarán tres semanas de cada mes sin reportar.';
+            }
         }
-
-        // Con un envío por semana el hueco es de 7 días; con dos, de ~3.
-        const intervalo = Math.round(7 / marcados);
-        aviso.textContent = diasDeVentana() < intervalo
-            ? `Cada envío cubre ${diasDeVentana()} días, pero pasan ~${intervalo} entre uno y otro: quedarán días sin reportar.`
-            : '';
     }
 
     // ── Destinatarios ──────────────────────────────────────────

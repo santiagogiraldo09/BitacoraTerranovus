@@ -7922,7 +7922,7 @@ def _normalizar_reporte(data):
     """
     ventana = data.get('ventana')
     if ventana not in VENTANAS_VALIDAS:
-        ventana = '7d'
+        ventana = VENTANA_POR_DEFECTO
 
     if ventana == 'personalizado':
         try:
@@ -8100,57 +8100,159 @@ MESES_ES = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
             'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']
 
 
-# Días que cubre cada ventana fija. 'personalizado' los toma de
-# ventana_dias, que la base ya garantiza entre 1 y 730.
-VENTANAS_DIAS = {'7d': 7, '15d': 15, '30d': 30, '365d': 365}
+# ════════════════════════════════════════════════════════════════
+#  PERIODOS DE CALENDARIO
+#  Cada ventana es (tipo, desplazamiento): 0 es el periodo en curso,
+#  -1 el anterior. 'personalizado' sigue siendo una ventana móvil de
+#  N días, que la base garantiza entre 1 y 730.
+# ════════════════════════════════════════════════════════════════
+
+VENTANAS = {
+    'semana_actual':    ('semana',     0),
+    'semana_pasada':    ('semana',    -1),
+    'mes_actual':       ('mes',        0),
+    'mes_pasado':       ('mes',       -1),
+    'trimestre_actual': ('trimestre',  0),
+    'trimestre_pasado': ('trimestre', -1),
+    'ano_actual':       ('ano',        0),
+    'ano_pasado':       ('ano',       -1),
+}
+
+VENTANA_POR_DEFECTO = 'semana_pasada'
 
 
 def _dias_de_ventana(ventana, ventana_dias=None):
-    """Cuántos días cubre la ventana. Ante un valor desconocido
-    devuelve 7, que es el comportamiento menos sorpresivo."""
-    if ventana == 'personalizado':
-        try:
-            return min(max(int(ventana_dias or 7), 1), 730)
-        except (TypeError, ValueError):
-            return 7
-    return VENTANAS_DIAS.get(ventana, 7)
+    """Sólo aplica a 'personalizado'. Los periodos de calendario no
+    tienen un número fijo de días: se calculan del rango resuelto."""
+    try:
+        return min(max(int(ventana_dias or 7), 1), 730)
+    except (TypeError, ValueError):
+        return 7
+
+
+def _sumar_meses(d, n):
+    """Primer día del mes que resulta de correr n meses desde d."""
+    total = (d.year * 12 + d.month - 1) + n
+    return d.replace(year=total // 12, month=total % 12 + 1, day=1)
+
+
+def _rango_periodo(tipo, desp, hoy):
+    """(inicio, fin_exclusivo) del periodo de calendario.
+
+    El periodo EN CURSO se corta al comienzo de hoy. Si hoy es el
+    primer día del periodo, el rango queda vacío — es correcto, no
+    hay días completos todavía.
+    """
+    if tipo == 'semana':
+        ini = hoy - timedelta(days=hoy.weekday()) + timedelta(weeks=desp)
+        fin = ini + timedelta(weeks=1)
+    elif tipo == 'mes':
+        ini = _sumar_meses(hoy, desp)
+        fin = _sumar_meses(ini, 1)
+    elif tipo == 'trimestre':
+        inicio_trim = hoy.replace(month=3 * ((hoy.month - 1) // 3) + 1, day=1)
+        ini = _sumar_meses(inicio_trim, 3 * desp)
+        fin = _sumar_meses(ini, 3)
+    else:   # año
+        ini = hoy.replace(year=hoy.year + desp, month=1, day=1)
+        fin = ini.replace(year=ini.year + 1)
+
+    if desp == 0:
+        fin = min(fin, hoy)
+    return ini, fin
+
+
+def _etiqueta_periodo(ventana, d1, d2):
+    """Texto legible del periodo. d2 es exclusivo."""
+    if d1 >= d2:
+        return 'Sin días completos todavía'
+
+    ultimo = d2 - timedelta(days=1)
+    tipo   = VENTANAS.get(ventana, ('', 0))[0]
+
+    if tipo == 'mes':
+        base = f"{MESES_ES[d1.month].capitalize()} de {d1.year}"
+    elif tipo == 'trimestre':
+        base = f"Trimestre {((d1.month - 1) // 3) + 1} de {d1.year}"
+    elif tipo == 'ano':
+        base = str(d1.year)
+    else:
+        base = (f"{d1.strftime('%d/%m/%Y')} al "
+                f"{ultimo.strftime('%d/%m/%Y')}")
+
+    # Un periodo en curso está incompleto: decirlo evita que el lector
+    # crea que al mes le faltan datos.
+    if ventana.endswith('_actual') and tipo in ('mes', 'trimestre', 'ano'):
+        base += f" (al {ultimo.strftime('%d/%m')})"
+    return base
+
+
+def _clave_periodo(ventana, d1, hoy):
+    """Identificador para no enviar dos veces lo mismo.
+
+    Un periodo cerrado se identifica por el periodo: sólo tiene
+    sentido un envío por cada uno. Un periodo en curso y una ventana
+    móvil se identifican por la fecha de envío, porque ahí sí se
+    espera un correo en cada envío programado.
+    """
+    if not (ventana.endswith('_pasado') or ventana.endswith('_pasada')):
+        return hoy.strftime('%Y-%m-%d')
+
+    tipo = VENTANAS.get(ventana, ('', 0))[0]
+    if tipo == 'semana':
+        iso = d1.isocalendar()
+        return f"{iso[0]}-W{iso[1]:02d}"
+    if tipo == 'mes':
+        return d1.strftime('%Y-%m')
+    if tipo == 'trimestre':
+        return f"{d1.year}-Q{((d1.month - 1) // 3) + 1}"
+    return str(d1.year)
 
 
 def _ventana_reporte(ventana, ventana_dias, zona_horaria, referencia=None):
     """Rango de datos que cubre el reporte, en la zona de la operación.
 
-    La ventana siempre TERMINA al comienzo del día de hoy. El día en
-    curso está incompleto, y si se incluyera, dos envíos del mismo día
-    darían cifras distintas sobre el mismo periodo.
-
-    Pasar referencia=desde devuelve la ventana inmediatamente anterior,
-    del mismo largo: así se calcula la comparación sin duplicar lógica.
-
     Devuelve (desde, hasta, clave, etiqueta). 'hasta' es exclusivo.
     """
-    tz    = ZoneInfo(zona_horaria or 'America/Bogota')
-    ahora = referencia.astimezone(tz) if referencia else datetime.now(tz)
-    hoy   = ahora.date()
+    tz  = ZoneInfo(zona_horaria or 'America/Bogota')
+    hoy = (referencia.astimezone(tz) if referencia
+           else datetime.now(tz)).date()
 
-    dias = _dias_de_ventana(ventana, ventana_dias)
-    d2   = hoy                              # exclusivo
-    d1   = hoy - timedelta(days=dias)
+    if ventana in VENTANAS:
+        tipo, desp = VENTANAS[ventana]
+        d1, d2 = _rango_periodo(tipo, desp, hoy)
+    else:   # personalizado o valor desconocido
+        dias   = _dias_de_ventana(ventana, ventana_dias)
+        d1, d2 = hoy - timedelta(days=dias), hoy
 
     desde = datetime.combine(d1, dt_time.min, tzinfo=tz)
     hasta = datetime.combine(d2, dt_time.min, tzinfo=tz)
 
-    # La clave de idempotencia es la FECHA DE ENVÍO, no el periodo.
-    # Una ventana móvil no corresponde a ninguna semana ISO ni mes
-    # calendario, así que no hay otra etiqueta estable que usar.
-    clave = hoy.strftime('%Y-%m-%d')
+    return (desde, hasta,
+            _clave_periodo(ventana, d1, hoy),
+            _etiqueta_periodo(ventana, d1, d2))
 
-    if dias == 1:
-        etiqueta = d1.strftime('%d/%m/%Y')
-    else:
-        etiqueta = (f"{d1.strftime('%d/%m/%Y')} al "
-                    f"{(d2 - timedelta(days=1)).strftime('%d/%m/%Y')}")
 
-    return desde, hasta, clave, etiqueta
+def _ventana_anterior(ventana, zona_horaria, desde, hasta):
+    """El periodo contra el que se compara: el inmediatamente anterior,
+    recortado al mismo número de días.
+
+    Sin el recorte, 'este mes' compararía 20 días de octubre contra los
+    30 de septiembre y cualquier porcentaje saldría falso.
+    """
+    tz   = ZoneInfo(zona_horaria or 'America/Bogota')
+    d1   = desde.astimezone(tz).date()
+    dias = (hasta.astimezone(tz).date() - d1).days
+    tipo = VENTANAS.get(ventana, ('', 0))[0]
+
+    if   tipo == 'semana':    p1 = d1 - timedelta(weeks=1)
+    elif tipo == 'mes':       p1 = _sumar_meses(d1, -1)
+    elif tipo == 'trimestre': p1 = _sumar_meses(d1, -3)
+    elif tipo == 'ano':       p1 = d1.replace(year=d1.year - 1)
+    else:                     p1 = d1 - timedelta(days=dias)
+
+    return (datetime.combine(p1, dt_time.min, tzinfo=tz),
+            datetime.combine(p1 + timedelta(days=dias), dt_time.min, tzinfo=tz))
 
 def _cifras_reporte(cursor, proyecto_id, formulario_ids, desde, hasta):
     """Métricas del periodo. Todo sale de SQL: estos números nunca
