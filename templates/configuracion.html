@@ -722,8 +722,8 @@
                             las actividades reportadas en Bitácora actualizan su
                             estado en Synchro sin digitación manual.
                         </p>
-                        <button class="integracion-btn" disabled>
-                            <i class="fas fa-clock"></i> En desarrollo
+                        <button class="integracion-btn" onclick="abrirModalSynchro()">
+                            <i class="fas fa-link"></i> Conectar
                         </button>
                     </div>
 
@@ -1195,6 +1195,44 @@
                 vienen en su propia URL y se relacionan por <code>registro_id</code>.
             </p>
         </details>
+    </div>
+</div>
+
+<!-- MODAL: SYNCHRO CONTROL -->
+<div class="invite-overlay" id="modal-synchro">
+    <div class="invite-modal">
+        <div class="invite-header">
+            <h3><i class="fas fa-cubes"></i> Synchro Control</h3>
+            <button class="invite-close" onclick="cerrarModalSynchro()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <p class="invite-subtitle">
+            Conecta tu cuenta para llenar formularios de Synchro Control
+            desde Bitácora, sin salir de la aplicación.
+        </p>
+
+        <div id="synchro-estado"
+             style="padding:24px 0;text-align:center;color:var(--gris-texto);">
+            Comprobando…
+        </div>
+
+        <div style="background:#f9fafb;border:1px solid var(--gris-borde,#e5e7eb);
+                    border-radius:9px;padding:14px 16px;margin-top:4px;">
+            <p style="font-size:12.5px;font-weight:600;color:#374151;margin-bottom:8px;">
+                Qué necesitas
+            </p>
+            <ul style="font-size:12.5px;color:#6b7280;line-height:1.7;
+                       margin:0;padding-left:18px;">
+                <li>Una cuenta de Bentley — la misma con la que entras a Synchro.</li>
+                <li>Estar en el proyecto con permiso para ver y crear formularios.</li>
+                <li>Autorizar Bitácora una vez.</li>
+            </ul>
+            <p style="font-size:11.5px;color:#9ca3af;line-height:1.6;margin-top:10px;">
+                Vas a iniciar sesión en la página de Bentley. Tu contraseña
+                no pasa por Bitácora ni queda guardada aquí.
+            </p>
+        </div>
     </div>
 </div>
 
@@ -1820,6 +1858,79 @@
         // visible si alguien vuelve a abrir el modal más tarde.
         document.getElementById('pbi-token-nuevo').style.display = 'none';
         document.getElementById('pbi-token-valor').textContent = '';
+    }
+
+    // ── Synchro Control ────────────────────────────────────────
+    async function abrirModalSynchro() {
+        document.getElementById('modal-synchro').style.display = 'flex';
+        const caja = document.getElementById('synchro-estado');
+        caja.innerHTML = 'Comprobando…';
+
+        try {
+            const res = await fetch('/api/integraciones/synchro/estado');
+            const d   = await res.json();
+
+            if (!d.configurado) {
+                caja.innerHTML = `
+                    <i class="fas fa-triangle-exclamation"
+                       style="font-size:22px;color:#d97706;"></i>
+                    <p style="margin-top:10px;font-size:13px;color:#6b7280;
+                              line-height:1.6;">
+                        La integración todavía no está habilitada.<br>
+                        IAC debe registrar la aplicación en Bentley antes de
+                        que puedas conectar tu cuenta.
+                    </p>`;
+                return;
+            }
+
+            if (d.conectado) {
+                caja.innerHTML = `
+                    <i class="fas fa-circle-check"
+                       style="font-size:22px;color:#16a34a;"></i>
+                    <p style="margin-top:10px;font-size:13px;color:#374151;">
+                        Conectado como <strong>${d.cuenta || ''}</strong>
+                    </p>
+                    <button class="integracion-btn" style="margin-top:14px;"
+                            onclick="desconectarSynchro()">
+                        <i class="fas fa-link-slash"></i> Desconectar
+                    </button>`;
+                return;
+            }
+
+            caja.innerHTML = `
+                <button class="integracion-btn" onclick="conectarSynchro()">
+                    <i class="fas fa-arrow-up-right-from-square"></i>
+                    Conectar con Bentley
+                </button>`;
+
+        } catch {
+            caja.innerHTML = `<p style="font-size:13px;color:#dc2626;">
+                No se pudo comprobar el estado de la integración.</p>`;
+        }
+    }
+
+    function cerrarModalSynchro() {
+        document.getElementById('modal-synchro').style.display = 'none';
+    }
+
+    /** Lleva al usuario a la página de Bentley. Se usa la ventana
+     *  actual y no una emergente: los bloqueadores matan las emergentes
+     *  y el flujo vuelve aquí por el callback. */
+    function conectarSynchro() {
+        window.location.href = '/integraciones/synchro/conectar';
+    }
+
+    async function desconectarSynchro() {
+        const ok = await confirmar({
+            titulo:  'Desconectar Synchro Control',
+            mensaje: '¿Seguro que deseas desconectar tu cuenta?',
+            detalle: 'Los formularios ya enviados no se ven afectados.',
+            textoOk: 'Desconectar',
+            peligro: true
+        });
+        if (!ok) return;
+        await fetch('/api/integraciones/synchro/desconectar', { method: 'POST' });
+        abrirModalSynchro();
     }
 
     function togglePbiForm(mostrar) {
