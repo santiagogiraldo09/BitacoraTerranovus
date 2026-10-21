@@ -1057,6 +1057,10 @@
 
         <p class="invite-feedback" id="rep-feedback"></p>
 
+        <button class="rep-btn-prueba" id="rep-btn-previsualizar"
+                onclick="previsualizarInforme()">
+            <i class="fas fa-file-pdf"></i> Previsualizar el informe
+        </button>
         <button class="rep-btn-prueba" onclick="probarReporte()">
             <i class="fas fa-vial"></i> Enviarme una prueba ahora
         </button>
@@ -2474,6 +2478,55 @@
         } catch {
             fb.textContent = 'Error de conexión.';
             fb.className   = 'invite-feedback error';
+        }
+    }
+
+    /** Genera el PDF con lo que hay en pantalla y lo abre en otra
+     *  pestaña. No guarda el reporte ni envía correos. */
+    async function previsualizarInforme() {
+        const cfg = recogerConfiguracionReporte();
+        const fb  = document.getElementById('rep-feedback');
+        fb.textContent = '';
+
+        if (!cfg.proyecto_id)   { fb.textContent = 'Selecciona un proyecto.'; return; }
+        if (!cfg.plantilla_id)  { fb.textContent = 'Selecciona la plantilla del informe.'; return; }
+        if (!cfg.tableros.length){ fb.textContent = 'Selecciona al menos un tablero.'; return; }
+
+        // La pestaña se abre ANTES del fetch: si se abriera después, el
+        // navegador la bloquearía por no venir de un clic directo.
+        const pestana = window.open('', '_blank');
+
+        const btn   = document.getElementById('rep-btn-previsualizar');
+        const antes = btn.innerHTML;
+        btn.disabled  = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generando…';
+
+        try {
+            const res = await fetch('/api/reportes/previsualizar', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify(cfg)
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || 'No se pudo generar el informe');
+            }
+
+            const url = URL.createObjectURL(await res.blob());
+            if (pestana) {
+                pestana.location = url;
+            } else {
+                const a = document.createElement('a');
+                a.href = url; a.download = 'previsualizacion.pdf'; a.click();
+            }
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+
+        } catch (e) {
+            if (pestana) pestana.close();
+            fb.textContent = e.message;
+        } finally {
+            btn.disabled  = false;
+            btn.innerHTML = antes;
         }
     }
 

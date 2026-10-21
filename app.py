@@ -1804,6 +1804,44 @@ def calcular_datos_viz(datasets, filtros, empresa_id, cursor_ext=None):
     return {'labels': labels, 'valores': valores, 'total': round(sum(valores), 2)}
 
 
+@app.route('/api/reportes/previsualizar', methods=['POST'])
+def previsualizar_reporte():
+    """Genera el PDF con la configuración que está en pantalla.
+
+    No guarda nada ni envía nada: sirve para ver el informe antes de
+    programarlo, y es la misma ruta de código que usará el cron.
+    """
+    if session.get('user_rol') != 'admin':
+        return jsonify({'error': 'No autorizado'}), 403
+
+    from flask import Response
+    data       = request.get_json() or {}
+    empresa_id = session.get('empresa_id')
+
+    if not data.get('proyecto_id'):
+        return jsonify({'error': 'Selecciona un proyecto'}), 400
+    if not data.get('tableros'):
+        return jsonify({'error': 'Selecciona al menos un tablero'}), 400
+
+    try:
+        from generador_informe import generar
+
+        cfg = _normalizar_reporte(data)
+        cfg['proyecto_id'] = data['proyecto_id']
+
+        with db_connection() as (conn, cursor):
+            pdf = generar(cursor, empresa_id, cfg, {
+                'usuario': session.get('user_name', '')
+            })
+
+        return Response(pdf, mimetype='application/pdf', headers={
+            'Content-Disposition': 'inline; filename="previsualizacion.pdf"'
+        })
+
+    except Exception as e:
+        app.logger.exception('previsualizar_reporte')
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/bi/datos', methods=['POST'])
 def bi_datos():
     if 'user_id' not in session:
