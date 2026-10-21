@@ -882,14 +882,34 @@
             <span class="rep-hint" id="rep-proyecto-hint"></span>
         </div>
 
-        <div class="invite-field">
+        <!-- El contenido del informe ahora son tableros. Este bloque se
+             conserva oculto porque cargarDatosProyecto() escribe en él
+             al cargar los usuarios del proyecto. -->
+        <div class="invite-field" style="display:none;">
             <label>Formularios incluidos</label>
             <div id="rep-formularios-lista" class="rep-lista-check">
                 <p class="rep-vacio">Elige primero un proyecto.</p>
             </div>
+        </div>
+
+        <div class="invite-field">
+            <label>Plantilla del informe *</label>
+            <select id="rep-plantilla">
+                <option value="">Selecciona una plantilla</option>
+            </select>
             <span class="rep-hint">
-                Si no marcas ninguno, se incluyen todos los del proyecto,
-                incluidos los que se agreguen después.
+                Define la portada, el encabezado y el pie de página.
+            </span>
+        </div>
+
+        <div class="invite-field">
+            <label>Tableros incluidos *</label>
+            <div id="rep-tableros-lista" class="rep-lista-check">
+                <p class="rep-vacio">Cargando tableros…</p>
+            </div>
+            <span class="rep-hint">
+                El informe trae los gráficos que cada tablero tenga el día
+                del envío, filtrados por el proyecto y el periodo.
             </span>
         </div>
 
@@ -1284,6 +1304,54 @@
 
         renderCamposDisponiblesProyecto();
         renderCanvasProyecto();
+    }
+
+
+    // ── Plantilla y tableros del informe ───────────────────────
+    let plantillasReporte = [];
+    let tablerosReporte   = [];
+
+    /** Se cargan una vez al abrir Reportes, no en cada apertura del
+     *  modal: son listas cortas y cambian poco. */
+    async function cargarOpcionesInforme() {
+        try {
+            const [rp, rt] = await Promise.all([
+                fetch('/api/plantillas-informe'),
+                fetch('/api/bi/tableros')
+            ]);
+            plantillasReporte = (await rp.json()).plantillas || [];
+            tablerosReporte   = (await rt.json()).tableros   || [];
+        } catch {
+            plantillasReporte = [];
+            tablerosReporte   = [];
+        }
+    }
+
+    function renderOpcionesInforme(plantillaId, tablerosMarcados) {
+        const sel = document.getElementById('rep-plantilla');
+        sel.innerHTML = '<option value="">Selecciona una plantilla</option>';
+        plantillasReporte.forEach(p => sel.appendChild(new Option(p.nombre, p.id)));
+        sel.value = plantillaId || '';
+
+        const cont = document.getElementById('rep-tableros-lista');
+        if (!tablerosReporte.length) {
+            cont.innerHTML = `<p class="rep-vacio">
+                No hay tableros creados todavía.</p>`;
+            return;
+        }
+        const marcados = tablerosMarcados || [];
+        cont.innerHTML = tablerosReporte.map(t => `
+            <label class="rep-check-item">
+                <input type="checkbox" value="${t.id}"
+                       ${marcados.includes(t.id) ? 'checked' : ''}>
+                <span>${t.nombre}</span>
+            </label>`).join('');
+    }
+
+    function tablerosSeleccionados() {
+        return Array.from(
+            document.querySelectorAll('#rep-tableros-lista input:checked')
+        ).map(c => parseInt(c.value));
     }
 
     function cerrarBuilderProyecto() {
@@ -1999,6 +2067,13 @@
         selProy.innerHTML = '<option value="">Selecciona un proyecto</option>';
         proyectosReporte.forEach(p => selProy.appendChild(new Option(p.nombre, p.id)));
 
+        // Plantillas y tableros: se cargan una sola vez por sesión.
+        if (!plantillasReporte.length && !tablerosReporte.length) {
+            await cargarOpcionesInforme();
+        }
+        const r0 = reporteId ? reportesCargados.find(x => x.id === reporteId) : null;
+        renderOpcionesInforme(r0?.plantilla_id, r0?.tableros);
+
         // Estado base
         document.getElementById('rep-nombre').value = '';
         document.getElementById('rep-ventana').value = 'semana_pasada';
@@ -2255,6 +2330,10 @@
             nombre:      document.getElementById('rep-nombre').value.trim(),
             proyecto_id: parseInt(document.getElementById('rep-proyecto').value) || null,
 
+            // Qué contiene el informe
+            plantilla_id: parseInt(document.getElementById('rep-plantilla').value) || null,
+            tableros:     tablerosSeleccionados(),
+
             // Qué periodo cubre
             ventana,
             ventana_dias: ventana === 'personalizado'
@@ -2288,6 +2367,13 @@
     function validarReporte(cfg, fb) {
         if (!cfg.nombre)      { fb.textContent = 'Ponle un nombre al reporte.'; return false; }
         if (!cfg.proyecto_id) { fb.textContent = 'Selecciona un proyecto.';     return false; }
+
+        if (!cfg.plantilla_id) {
+            fb.textContent = 'Selecciona la plantilla del informe.'; return false;
+        }
+        if (!cfg.tableros.length) {
+            fb.textContent = 'Selecciona al menos un tablero para incluir.'; return false;
+        }
 
         if (cfg.ventana === 'personalizado') {
             const d = cfg.ventana_dias;

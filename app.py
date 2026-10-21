@@ -1417,299 +1417,287 @@ def bi_guardar_visualizaciones(tablero_id):
         return jsonify({'error': str(e)}), 500
 
 
-# ── BI: datos para una visualización ─────────────────────────────────
-@app.route('/api/bi/datos', methods=['POST'])
-def bi_datos():
-    if 'user_id' not in session:
-        return jsonify({'error': 'No autorizado'}), 401
-    try:
-        data       = request.get_json()
-        datasets   = data.get('datasets', [])
-        filtros    = data.get('filtros', {})
-        desde      = filtros.get('desde', '')
-        hasta      = filtros.get('hasta', '')
-        proyecto   = filtros.get('proyecto_id', '')
-        empresa_id = session.get('empresa_id')
-        acumulado  = {}
+# ── BI: cálculo de datos de una visualización ────────────────────────
+#
+# La agregación vive en una función pura, separada de la vista, porque
+# la necesitan dos clientes: el navegador por HTTP, y el generador de
+# informes programados, que corre en un cron sin red hacia sí mismo.
+# Si cada uno tuviera su copia, tarde o temprano darían números
+# distintos sobre los mismos datos.
 
-        if proyecto:
-            with db_connection() as (conn, cursor):
-                cursor.execute("""
-                    SELECT 1
-                    FROM proyectos
-                    WHERE id = %s
-                    AND empresa_id = %s
-                """, (proyecto, empresa_id))
+from contextlib import contextmanager
 
-                if not cursor.fetchone():
-                    return jsonify({'error': 'Proyecto no encontrado'}), 404
 
-        def buscar_valor_en_bloque(bloque, ids_posibles):
-            """Para campos numéricos — devuelve el valor crudo."""
-            for cid in ids_posibles:
-                val = bloque.get(cid)
+@contextmanager
+def _cursor_opcional(cursor_ext):
+    """Usa el cursor que le pasen, o abre uno propio.
+
+    Permite que el generador de informes reutilice su transacción en
+    vez de abrir una conexión por cada gráfico del tablero.
+    """
+    if cursor_ext is not None:
+        yield cursor_ext
+    else:
+        with db_connection() as (conn, cur):
+            yield cur
+
+
+def calcular_datos_viz(datasets, filtros, empresa_id, cursor_ext=None):
+    """Agrega los datos de una o más visualizaciones.
+
+    Devuelve el mismo diccionario que responde /api/bi/datos. Ante un
+    problema devuelve {'error': ..., 'estado': <código>}.
+    """
+    datasets  = datasets or []
+    filtros   = filtros or {}
+    desde     = filtros.get('desde', '')
+    hasta     = filtros.get('hasta', '')
+    proyecto  = filtros.get('proyecto_id', '')
+    acumulado = {}
+
+    if proyecto:
+        with _cursor_opcional(cursor_ext) as cursor:
+            cursor.execute("""
+                SELECT 1 FROM proyectos
+                WHERE id = %s AND empresa_id = %s
+            """, (proyecto, empresa_id))
+            if not cursor.fetchone():
+                return {'error': 'Proyecto no encontrado', 'estado': 404}
+
+    def buscar_valor_en_bloque(bloque, ids_posibles):
+        """Para campos numéricos — devuelve el valor crudo."""
+        for cid in ids_posibles:
+            val = bloque.get(cid)
+            if val is not None:
+                return val
+        return None
+
+    def buscar_label_en_bloque(bloque, ids_posibles, parte='valor'):
+        """Para campos de agrupación — respeta si el admin eligió código o causa."""
+        for cid in ids_posibles:
+            if parte == 'causa':
+                texto = bloque.get(cid + '_codigo')
+                if texto:
+                    return texto
+            elif parte == 'codigo':
+                val = bloque.get(cid + '_codigo')
                 if val is not None:
                     return val
-            return None
+            else:
+                texto = bloque.get(cid) or bloque.get(cid + '_codigo')
+                if texto is not None:
+                    return texto
+        return None
 
-        def buscar_label_en_bloque(bloque, ids_posibles, parte='valor'):
-            """Para campos de agrupación — respeta si el admin eligió código o causa."""
-            for cid in ids_posibles:
-                if parte == 'causa':
-                    texto = bloque.get(cid + '_codigo')
-                    if texto:
-                        return texto
-                elif parte == 'codigo':
-                    # El id del registro de origen se guarda en cid + '_codigo'
-                    val = bloque.get(cid + '_codigo')
-                    if val is not None:
-                        return val
-                else:
-                    # 'valor' debe devolver la etiqueta visible, que vive en cid
-                    texto = bloque.get(cid) or bloque.get(cid + '_codigo')
-                    if texto is not None:
-                        return texto
-            return None
+    def obtener_label(resp, bloque, ids_posibles, parte, label_raiz=''):
+        """Label de agrupación, desde la raíz o desde el bloque.
 
-        def obtener_label(resp, bloque, ids_posibles, parte, label_raiz=''):
-            """Obtiene el label de agrupación desde raíz o desde el bloque.
+        Puede devolver una lista cuando el campo es de selección
+        múltiple: los puntos de acumulación la desdoblan.
+        """
+        if label_raiz:
+            return label_raiz
 
-            Puede devolver una lista cuando el campo es de selección múltiple.
-            Los puntos de acumulación se encargan de desdoblarla: un registro
-            con tres opciones marcadas cuenta en las tres categorías.
-            """
-            if label_raiz:
-                return label_raiz
+        if bloque:
+            v = buscar_label_en_bloque(bloque, ids_posibles, parte)
+            if isinstance(v, list):
+                return v or 'Sin dato'
+            return str(v) if v is not None else 'Sin dato'
 
-            if bloque:
-                v = buscar_label_en_bloque(bloque, ids_posibles, parte)
-                if isinstance(v, list):
-                    return v or 'Sin dato'
-                return str(v) if v is not None else 'Sin dato'
+        for cid in ids_posibles:
+            if parte == 'causa':
+                v = resp.get(cid + '_codigo')
+            elif parte == 'codigo':
+                v = resp.get(cid)
+            else:
+                v = resp.get(cid + '_codigo') or resp.get(cid)
+            if v:
+                # La lista se devuelve sin convertir: str() la volvería
+                # "['A', 'B']" y crearía una categoría inútil.
+                return v if isinstance(v, list) else str(v)
+        return 'Sin dato'
 
-            # Nivel raíz sin bloque
-            for cid in ids_posibles:
-                if parte == 'causa':
-                    v = resp.get(cid + '_codigo')
-                elif parte == 'codigo':
-                    v = resp.get(cid)
-                else:
-                    v = resp.get(cid + '_codigo') or resp.get(cid)
-                if v:
-                    # La lista se devuelve sin convertir a texto; str() la
-                    # volvería "['A', 'B']" y crearía una categoría inútil.
-                    return v if isinstance(v, list) else str(v)
-            return 'Sin dato'
+    def etiquetas(label):
+        """Desdobla un label en las categorías a las que contribuye."""
+        vals = label if isinstance(label, list) else [label]
+        vals = [str(v) for v in vals if v not in (None, '')]
+        return vals or ['Sin dato']
 
-        def etiquetas(label):
-            """Desdobla un label en las categorías a las que contribuye.
+    for ds in datasets:
+        formulario_id           = ds.get('formulario_id')
+        campo_valor             = str(ds.get('campo_valor', ''))
+        campo_valor_nombre      = ds.get('campo_valor_nombre', '')
+        campo_agrupacion        = str(ds.get('campo_agrupacion', ''))
+        campo_agrupacion_nombre = ds.get('campo_agrupacion_nombre', '')
+        parte_agrupacion        = ds.get('parte_agrupacion', 'valor')
+        agregacion              = ds.get('agregacion', 'suma')
+        es_grupo                = ds.get('es_grupo', False)
+        gid                     = ds.get('gid', '')
+        campo_fecha_id          = str(ds.get('campo_fecha_id', ''))
+        es_tabla                = ds.get('es_tabla', False)
+        columnas                = ds.get('columnas', [])
+        es_temporal             = ds.get('es_temporal', False)
+        granularidad            = ds.get('granularidad', 'dia')
+        es_agrupado             = ds.get('es_agrupado', False)
+        campo_serie             = str(ds.get('campo_serie', ''))
+        campo_serie_nombre      = ds.get('campo_serie_nombre', '')
 
-            Un campo de selección múltiple devuelve lista: el registro cuenta
-            una vez por cada opción marcada. Cualquier otro tipo devuelve una
-            sola categoría, así que el resto del código no cambia de forma.
-            """
-            vals = label if isinstance(label, list) else [label]
-            vals = [str(v) for v in vals if v not in (None, '')]
-            return vals or ['Sin dato']
+        if not formulario_id or (not campo_valor and not es_tabla):
+            continue
 
-        for ds in datasets:
-            formulario_id           = ds.get('formulario_id')
-            campo_valor             = str(ds.get('campo_valor', ''))
-            campo_valor_nombre      = ds.get('campo_valor_nombre', '')
-            campo_agrupacion        = str(ds.get('campo_agrupacion', ''))
-            campo_agrupacion_nombre = ds.get('campo_agrupacion_nombre', '')
-            parte_agrupacion        = ds.get('parte_agrupacion', 'valor')
-            agregacion              = ds.get('agregacion', 'suma')
-            es_grupo                = ds.get('es_grupo', False)
-            gid                     = ds.get('gid', '')
-            campo_fecha_id          = str(ds.get('campo_fecha_id', ''))
-            es_tabla  = ds.get('es_tabla', False)
-            columnas  = ds.get('columnas', [])
-            es_temporal             = ds.get('es_temporal', False)
-            granularidad            = ds.get('granularidad', 'dia')
-            es_agrupado             = ds.get('es_agrupado', False)
-            campo_serie             = str(ds.get('campo_serie', ''))
-            campo_serie_nombre      = ds.get('campo_serie_nombre', '')
-
-            print(f"[BI-TABLA] es_tabla: {es_tabla}")
-            print(f"[BI-TABLA] columnas: {columnas}")
-            print(f"[BI-TABLA] formulario_id: {formulario_id}")
-            print(f"[BI-TABLA] registros encontrados: {len(registros) if 'registros' in dir() else 'aún no consultado'}")
-
-            if not formulario_id or (not campo_valor and not es_tabla):
+        with _cursor_opcional(cursor_ext) as cursor:
+            cursor.execute("""
+                SELECT id FROM formularios
+                WHERE id = %s AND empresa_id = %s
+            """, (formulario_id, empresa_id))
+            if not cursor.fetchone():
                 continue
 
-            with db_connection() as (conn, cursor):
+            query  = ("SELECT rf.respuestas FROM respuestas_formulario rf "
+                      "WHERE rf.formulario_id = %s")
+            params = [formulario_id]
+
+            if proyecto:
+                query += " AND rf.id_proyecto = %s"
+                params.append(proyecto)
+            if desde and campo_fecha_id:
+                query += f" AND NULLIF(rf.respuestas->>'{campo_fecha_id}', '')::date >= %s"
+                params.append(desde)
+            if hasta and campo_fecha_id:
+                query += f" AND NULLIF(rf.respuestas->>'{campo_fecha_id}', '')::date <= %s"
+                params.append(hasta)
+
+            cursor.execute(query, params)
+            registros = [r[0] for r in cursor.fetchall() if isinstance(r[0], dict)]
+
+            # IDs posibles del campo de agrupación
+            ids_posibles_agrupacion = [campo_agrupacion]
+            if campo_agrupacion_nombre:
                 cursor.execute("""
-                    SELECT id FROM formularios
-                    WHERE id = %s AND empresa_id = %s
-                """, (formulario_id, empresa_id))
-                if not cursor.fetchone():
+                    SELECT id FROM campos_globales
+                    WHERE nombre = %s ORDER BY id DESC
+                """, (campo_agrupacion_nombre,))
+                encontrados = [str(r[0]) for r in cursor.fetchall()]
+                if encontrados:
+                    ids_posibles_agrupacion = list(dict.fromkeys(
+                        [campo_agrupacion] + encontrados))
+
+            # IDs posibles del campo de valor
+            ids_posibles_valor = [campo_valor]
+            if campo_valor_nombre:
+                cursor.execute("""
+                    SELECT id FROM campos_globales
+                    WHERE nombre = %s ORDER BY id DESC
+                """, (campo_valor_nombre,))
+                encontrados = [str(r[0]) for r in cursor.fetchall()]
+                if encontrados:
+                    ids_posibles_valor = list(dict.fromkeys(
+                        [campo_valor] + encontrados))
+
+            # IDs posibles del campo de serie (barras agrupadas)
+            ids_posibles_serie = [campo_serie] if campo_serie else []
+            if campo_serie_nombre and es_agrupado:
+                cursor.execute("""
+                    SELECT id FROM campos_globales
+                    WHERE nombre = %s ORDER BY id DESC
+                """, (campo_serie_nombre,))
+                encontrados = [str(r[0]) for r in cursor.fetchall()]
+                if encontrados:
+                    ids_posibles_serie = list(dict.fromkeys(
+                        ([campo_serie] if campo_serie else []) + encontrados))
+
+        # ── Modo tabla: devuelve filas completas ──
+        if es_tabla and columnas:
+            filas = []
+            for resp in registros:
+                fila = {}
+                tiene_datos = False
+                for col in columnas:
+                    cid          = str(col.get('campo_id', ''))
+                    # Nombre propio: 'es_grupo' pisaría el del dataset.
+                    col_es_grupo = col.get('es_grupo', False)
+                    gid_col      = col.get('gid', '')
+
+                    if col_es_grupo and gid_col:
+                        bloques = (resp.get('__repeticiones') or {}).get(gid_col, [])
+                        if bloques:
+                            val = (bloques[0].get(cid + '_codigo')
+                                   or bloques[0].get(cid) or '')
+                            fila[cid] = str(val) if val else '—'
+                            tiene_datos = True
+                        else:
+                            fila[cid] = '—'
+                    else:
+                        val = resp.get(cid + '_codigo') or resp.get(cid) or ''
+                        fila[cid] = str(val) if val else '—'
+                        if val:
+                            tiene_datos = True
+
+                if tiene_datos:
+                    filas.append(fila)
+
+            return {
+                'filas':    filas,
+                'columnas': [{'campo_id': str(c.get('campo_id', '')),
+                              'nombre':   c.get('campo_nombre', ''),
+                              'tipo':     c.get('campo_tipo', '')} for c in columnas],
+                'total':    len(filas)
+            }
+
+        for resp in registros:
+            # ── Modo temporal: agrupar por fecha (gráfico de línea) ──
+            if es_temporal and campo_fecha_id:
+                fecha_raw = resp.get(campo_fecha_id, '')
+                if not fecha_raw:
+                    continue
+                try:
+                    fecha = datetime.strptime(fecha_raw[:10], '%Y-%m-%d')
+                    if granularidad == 'mes':
+                        label = fecha.strftime('%Y-%m')
+                    elif granularidad == 'semana':
+                        label = f"{fecha.isocalendar()[0]}-S{fecha.isocalendar()[1]:02d}"
+                    else:
+                        label = fecha.strftime('%Y-%m-%d')
+                except Exception:
                     continue
 
-                query  = "SELECT rf.respuestas FROM respuestas_formulario rf WHERE rf.formulario_id = %s"
-                params = [formulario_id]
-
-                if proyecto:
-                    query += " AND rf.id_proyecto = %s"
-                    params.append(proyecto)
-                if desde and campo_fecha_id:
-                    query += f" AND NULLIF(rf.respuestas->>'{campo_fecha_id}', '')::date >= %s"
-                    params.append(desde)
-                if hasta and campo_fecha_id:
-                    query += f" AND NULLIF(rf.respuestas->>'{campo_fecha_id}', '')::date <= %s"
-                    params.append(hasta)
-
-                cursor.execute(query, params)
-                registros = [r[0] for r in cursor.fetchall() if isinstance(r[0], dict)]
-
-                # Resolver IDs posibles para campo de agrupación
-                ids_posibles_agrupacion = [campo_agrupacion]
-                if campo_agrupacion_nombre:
-                    cursor.execute("""
-                        SELECT id FROM campos_globales
-                        WHERE nombre = %s ORDER BY id DESC
-                    """, (campo_agrupacion_nombre,))
-                    ids_encontrados = [str(r[0]) for r in cursor.fetchall()]
-                    if ids_encontrados:
-                        ids_posibles_agrupacion = list(dict.fromkeys(
-                            [campo_agrupacion] + ids_encontrados
-                        ))
-
-                # Resolver IDs posibles para campo de valor
-                ids_posibles_valor = [campo_valor]
-                if campo_valor_nombre:
-                    cursor.execute("""
-                        SELECT id FROM campos_globales
-                        WHERE nombre = %s ORDER BY id DESC
-                    """, (campo_valor_nombre,))
-                    ids_encontrados = [str(r[0]) for r in cursor.fetchall()]
-                    if ids_encontrados:
-                        ids_posibles_valor = list(dict.fromkeys(
-                            [campo_valor] + ids_encontrados
-                        ))
-
-                # Resolver IDs posibles para campo de serie (barras agrupadas)
-                ids_posibles_serie = [campo_serie] if campo_serie else []
-                if campo_serie_nombre and es_agrupado:
-                    cursor.execute("""
-                        SELECT id FROM campos_globales
-                        WHERE nombre = %s ORDER BY id DESC
-                    """, (campo_serie_nombre,))
-                    ids_encontrados = [str(r[0]) for r in cursor.fetchall()]
-                    if ids_encontrados:
-                        ids_posibles_serie = list(dict.fromkeys(
-                            ([campo_serie] if campo_serie else []) + ids_encontrados
-                        ))
-
-            # ── Modo tabla: devuelve filas completas ──
-            if es_tabla and columnas:
-                filas = []
-                for resp in registros:
-                    fila = {}
-                    tiene_datos = False
-                    for col in columnas:
-                        cid      = str(col.get('campo_id', ''))
-                        es_grupo = col.get('es_grupo', False)
-                        gid_col  = col.get('gid', '')
-                        tipo_col = col.get('campo_tipo', '')
-
-                        if es_grupo and gid_col:
-                            # Para campos de grupo toma el primer bloque
-                            bloques = (resp.get('__repeticiones') or {}).get(gid_col, [])
-                            if bloques:
-                                val = bloques[0].get(cid + '_codigo') or bloques[0].get(cid) or ''
-                                fila[cid] = str(val) if val else '—'
-                                tiene_datos = True
-                            else:
-                                fila[cid] = '—'
-                        else:
-                            val = resp.get(cid + '_codigo') or resp.get(cid) or ''
-                            fila[cid] = str(val) if val else '—'
-                            if val:
-                                tiene_datos = True
-
-                    if tiene_datos:
-                        filas.append(fila)
-
-                return jsonify({
-                    'filas':    filas,
-                    'columnas': [{'campo_id': str(c.get('campo_id','')),
-                                'nombre':   c.get('campo_nombre',''),
-                                'tipo':     c.get('campo_tipo','')} for c in columnas],
-                    'total':    len(filas)
-                })
-
-            # Procesar cada registro
-            for resp in registros:
-                # ── Modo temporal: agrupar por fecha (gráfico de línea) ──
-                if es_temporal and campo_fecha_id:
-                    fecha_raw = resp.get(campo_fecha_id, '')
-                    if not fecha_raw:
-                        continue
-                    try:
-                        from datetime import datetime
-                        fecha = datetime.strptime(fecha_raw[:10], '%Y-%m-%d')
-                        if granularidad == 'mes':
-                            label = fecha.strftime('%Y-%m')
-                        elif granularidad == 'semana':
-                            label = f"{fecha.isocalendar()[0]}-S{fecha.isocalendar()[1]:02d}"
-                        else:
-                            label = fecha.strftime('%Y-%m-%d')
-                    except:
-                        continue
-
-                    if es_grupo and gid:
-                        for bloque in (resp.get('__repeticiones') or {}).get(gid, []):
-                            val_raw = buscar_valor_en_bloque(bloque, ids_posibles_valor)
-                            try:    val = float(val_raw or 0)
-                            except: continue
-                            acumulado[label] = acumulado.get(label, 0) + val
-                    else:
-                        val_raw = resp.get(campo_valor)
+                if es_grupo and gid:
+                    for bloque in (resp.get('__repeticiones') or {}).get(gid, []):
+                        val_raw = buscar_valor_en_bloque(bloque, ids_posibles_valor)
                         try:    val = float(val_raw or 0)
                         except: continue
                         acumulado[label] = acumulado.get(label, 0) + val
+                else:
+                    val_raw = resp.get(campo_valor)
+                    try:    val = float(val_raw or 0)
+                    except: continue
+                    acumulado[label] = acumulado.get(label, 0) + val
 
-                # ── Modo agrupado: barras con múltiples series ──
-                elif es_agrupado and ids_posibles_serie:
-                    if es_grupo and gid:
-                        label_raiz = ''
-                        for cid in ids_posibles_agrupacion:
-                            if parte_agrupacion == 'causa':
-                                label_raiz = str(resp.get(cid + '_codigo') or '')
-                            elif parte_agrupacion == 'codigo':
-                                label_raiz = str(resp.get(cid) or '')
-                            else:
-                                label_raiz = str(resp.get(cid + '_codigo') or resp.get(cid) or '')
-                            if label_raiz:
-                                break
+            # ── Modo agrupado: barras con múltiples series ──
+            elif es_agrupado and ids_posibles_serie:
+                if es_grupo and gid:
+                    label_raiz = ''
+                    for cid in ids_posibles_agrupacion:
+                        if parte_agrupacion == 'causa':
+                            label_raiz = str(resp.get(cid + '_codigo') or '')
+                        elif parte_agrupacion == 'codigo':
+                            label_raiz = str(resp.get(cid) or '')
+                        else:
+                            label_raiz = str(resp.get(cid + '_codigo')
+                                             or resp.get(cid) or '')
+                        if label_raiz:
+                            break
 
-                        for bloque in (resp.get('__repeticiones') or {}).get(gid, []):
-                            label = obtener_label(resp, bloque, ids_posibles_agrupacion,
-                                                  parte_agrupacion, label_raiz)
-                            serie = str(
-                                buscar_label_en_bloque(bloque, ids_posibles_serie, 'valor')
-                                or resp.get(campo_serie + '_codigo')
-                                or resp.get(campo_serie)
-                                or 'Sin dato'
-                            )
-                            val_raw = buscar_valor_en_bloque(bloque, ids_posibles_valor)
-                            try:    val = float(val_raw or 0)
-                            except: continue
-
-                            for lb in etiquetas(label):
-                                if lb not in acumulado:
-                                    acumulado[lb] = {}
-                                acumulado[lb][serie] = acumulado[lb].get(serie, 0) + val
-                    else:
-                        label = obtener_label(resp, None, ids_posibles_agrupacion, parte_agrupacion)
+                    for bloque in (resp.get('__repeticiones') or {}).get(gid, []):
+                        label = obtener_label(resp, bloque, ids_posibles_agrupacion,
+                                              parte_agrupacion, label_raiz)
                         serie = str(
-                            resp.get(campo_serie + '_codigo')
+                            buscar_label_en_bloque(bloque, ids_posibles_serie, 'valor')
+                            or resp.get(campo_serie + '_codigo')
                             or resp.get(campo_serie)
                             or 'Sin dato'
                         )
-                        val_raw = resp.get(campo_valor)
+                        val_raw = buscar_valor_en_bloque(bloque, ids_posibles_valor)
                         try:    val = float(val_raw or 0)
                         except: continue
 
@@ -1717,91 +1705,117 @@ def bi_datos():
                             if lb not in acumulado:
                                 acumulado[lb] = {}
                             acumulado[lb][serie] = acumulado[lb].get(serie, 0) + val
-
-                # ── Modo normal: una sola serie ──
                 else:
-                    if es_grupo and gid:
-                        label_raiz = ''
-                        for cid in ids_posibles_agrupacion:
-                            if parte_agrupacion == 'causa':
-                                label_raiz = str(resp.get(cid + '_codigo') or '')
-                            elif parte_agrupacion == 'codigo':
-                                label_raiz = str(resp.get(cid) or '')
-                            else:
-                                label_raiz = str(resp.get(cid + '_codigo') or resp.get(cid) or '')
-                            if label_raiz:
-                                break
+                    label = obtener_label(resp, None, ids_posibles_agrupacion,
+                                          parte_agrupacion)
+                    serie = str(resp.get(campo_serie + '_codigo')
+                                or resp.get(campo_serie) or 'Sin dato')
+                    val_raw = resp.get(campo_valor)
+                    try:    val = float(val_raw or 0)
+                    except: continue
 
-                        for bloque in (resp.get('__repeticiones') or {}).get(gid, []):
-                            label = obtener_label(resp, bloque, ids_posibles_agrupacion,
-                                                  parte_agrupacion, label_raiz)
-                            val_raw = buscar_valor_en_bloque(bloque, ids_posibles_valor)
-                            try:    val = float(val_raw or 0)
-                            except: continue
+                    for lb in etiquetas(label):
+                        if lb not in acumulado:
+                            acumulado[lb] = {}
+                        acumulado[lb][serie] = acumulado[lb].get(serie, 0) + val
 
-                            for lb in etiquetas(label):
-                                if agregacion == 'promedio':
-                                    if lb not in acumulado:
-                                        acumulado[lb] = {'suma': 0, 'n': 0}
-                                    acumulado[lb]['suma'] += val
-                                    acumulado[lb]['n']    += 1
-                                else:
-                                    acumulado[lb] = acumulado.get(lb, 0) + val
-                    else:
-                        label = obtener_label(resp, None, ids_posibles_agrupacion, parte_agrupacion)
-                        val_raw = resp.get(campo_valor)
+            # ── Modo normal: una sola serie ──
+            else:
+                if es_grupo and gid:
+                    label_raiz = ''
+                    for cid in ids_posibles_agrupacion:
+                        if parte_agrupacion == 'causa':
+                            label_raiz = str(resp.get(cid + '_codigo') or '')
+                        elif parte_agrupacion == 'codigo':
+                            label_raiz = str(resp.get(cid) or '')
+                        else:
+                            label_raiz = str(resp.get(cid + '_codigo')
+                                             or resp.get(cid) or '')
+                        if label_raiz:
+                            break
+
+                    for bloque in (resp.get('__repeticiones') or {}).get(gid, []):
+                        label = obtener_label(resp, bloque, ids_posibles_agrupacion,
+                                              parte_agrupacion, label_raiz)
+                        val_raw = buscar_valor_en_bloque(bloque, ids_posibles_valor)
                         try:    val = float(val_raw or 0)
                         except: continue
 
                         for lb in etiquetas(label):
-                            if agregacion == 'conteo':
-                                acumulado[lb] = acumulado.get(lb, 0) + 1
-                            elif agregacion == 'promedio':
+                            if agregacion == 'promedio':
                                 if lb not in acumulado:
                                     acumulado[lb] = {'suma': 0, 'n': 0}
                                 acumulado[lb]['suma'] += val
                                 acumulado[lb]['n']    += 1
                             else:
                                 acumulado[lb] = acumulado.get(lb, 0) + val
+                else:
+                    label = obtener_label(resp, None, ids_posibles_agrupacion,
+                                          parte_agrupacion)
+                    val_raw = resp.get(campo_valor)
+                    try:    val = float(val_raw or 0)
+                    except: continue
 
-        # ── Calcular promedios finales (modo normal) ──
-        if any(isinstance(v, dict) and 'suma' in v for v in acumulado.values()):
-            acumulado = {
-                k: round(v['suma'] / v['n'], 2)
-                for k, v in acumulado.items()
-                if isinstance(v, dict) and 'suma' in v and v['n']
-            }
+                    for lb in etiquetas(label):
+                        if agregacion == 'conteo':
+                            acumulado[lb] = acumulado.get(lb, 0) + 1
+                        elif agregacion == 'promedio':
+                            if lb not in acumulado:
+                                acumulado[lb] = {'suma': 0, 'n': 0}
+                            acumulado[lb]['suma'] += val
+                            acumulado[lb]['n']    += 1
+                        else:
+                            acumulado[lb] = acumulado.get(lb, 0) + val
 
-        # ── Respuesta para modo agrupado ──
-        if any(ds.get('es_agrupado') for ds in datasets):
-            labels = sorted(acumulado.keys())
-            series_nombres = []
-            for v in acumulado.values():
-                if isinstance(v, dict):
-                    for s in v.keys():
-                        if s not in series_nombres:
-                            series_nombres.append(s)
+    # ── Promedios finales (modo normal) ──
+    if any(isinstance(v, dict) and 'suma' in v for v in acumulado.values()):
+        acumulado = {
+            k: round(v['suma'] / v['n'], 2)
+            for k, v in acumulado.items()
+            if isinstance(v, dict) and 'suma' in v and v['n']
+        }
 
-            series = [
-                {
-                    'nombre':  s,
-                    'valores': [round(acumulado.get(label, {}).get(s, 0), 2) for label in labels]
-                }
-                for s in series_nombres
-            ]
-            total = round(sum(v for serie in series for v in serie['valores']), 2)
-            return jsonify({'labels': labels, 'series': series, 'total': total})
+    # ── Respuesta en modo agrupado ──
+    if any(ds.get('es_agrupado') for ds in datasets):
+        labels = sorted(acumulado.keys())
+        series_nombres = []
+        for v in acumulado.values():
+            if isinstance(v, dict):
+                for s in v.keys():
+                    if s not in series_nombres:
+                        series_nombres.append(s)
 
-        # ── Respuesta para modo normal y temporal ──
-        if any(ds.get('es_temporal') for ds in datasets):
-            ordenado = sorted(acumulado.items(), key=lambda x: x[0])
-        else:
-            ordenado = sorted(acumulado.items(), key=lambda x: x[1], reverse=True)
+        series = [
+            {'nombre': s,
+             'valores': [round(acumulado.get(lb, {}).get(s, 0), 2) for lb in labels]}
+            for s in series_nombres
+        ]
+        total = round(sum(v for serie in series for v in serie['valores']), 2)
+        return {'labels': labels, 'series': series, 'total': total}
 
-        labels  = [x[0] for x in ordenado]
-        valores = [round(x[1], 2) for x in ordenado]
-        return jsonify({'labels': labels, 'valores': valores, 'total': round(sum(valores), 2)})
+    # ── Respuesta en modo normal y temporal ──
+    if any(ds.get('es_temporal') for ds in datasets):
+        ordenado = sorted(acumulado.items(), key=lambda x: x[0])
+    else:
+        ordenado = sorted(acumulado.items(), key=lambda x: x[1], reverse=True)
 
+    labels  = [x[0] for x in ordenado]
+    valores = [round(x[1], 2) for x in ordenado]
+    return {'labels': labels, 'valores': valores, 'total': round(sum(valores), 2)}
+
+
+@app.route('/api/bi/datos', methods=['POST'])
+def bi_datos():
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+    try:
+        data = request.get_json() or {}
+        res  = calcular_datos_viz(data.get('datasets', []),
+                                  data.get('filtros', {}),
+                                  session.get('empresa_id'))
+        if 'error' in res:
+            return jsonify({'error': res['error']}), res.get('estado', 400)
+        return jsonify(res)
     except Exception as e:
         print(f"Error en bi_datos: {e}")
         import traceback; traceback.print_exc()
@@ -7740,7 +7754,7 @@ def listar_reportes():
                        (SELECT COUNT(*) FROM reportes_destinatarios d
                          WHERE d.reporte_id = r.id AND d.activo) AS total_dest,
                        ult.enviado_en, ult.estado,
-                       r.modo_envio
+                       r.modo_envio, r.plantilla_id, r.tableros
                 FROM reportes_programados r
                 JOIN proyectos p ON p.id = r.proyecto_id
                 LEFT JOIN LATERAL (
@@ -7766,9 +7780,12 @@ def listar_reportes():
                     'activo': row[13], 'total_destinatarios': row[14],
                     'ultimo_envio': row[15].strftime('%d/%m/%Y %H:%M') if row[15] else None,
                     'ultimo_estado': row[16],
-                    # modo_envio va de último en el SELECT a propósito:
-                    # meterlo en medio corre todos los índices de abajo.
-                    'modo_envio': row[17],
+                    # Las columnas nuevas van al final del SELECT a
+                    # propósito: meterlas en medio corre todos los
+                    # índices de arriba.
+                    'modo_envio':   row[17],
+                    'plantilla_id': row[18],
+                    'tableros':     row[19] or [],
                     'formularios': [], 'destinatarios': []
                 })
                 ids.append(row[0])
@@ -7958,7 +7975,19 @@ def _normalizar_reporte(data):
     except (TypeError, ValueError):
         hora = 7
 
+    try:
+        tableros = sorted({int(t) for t in (data.get('tableros') or [])})
+    except (TypeError, ValueError):
+        tableros = []
+
+    try:
+        plantilla_id = int(data.get('plantilla_id')) or None
+    except (TypeError, ValueError):
+        plantilla_id = None
+
     return {
+        'plantilla_id': plantilla_id,
+        'tableros':     tableros,
         'ventana':      ventana,
         'ventana_dias': ventana_dias,
         'modo_envio':   modo,
@@ -7995,8 +8024,9 @@ def crear_reporte():
                 INSERT INTO reportes_programados
                     (proyecto_id, nombre, ventana, ventana_dias, modo_envio,
                      dias_semana, dia_mes, hora_envio, zona_horaria, fecha_inicio,
-                     incluir_resumen, enviar_sin_actividad, creado_por)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                     incluir_resumen, enviar_sin_actividad, creado_por,
+                     plantilla_id, tableros)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 RETURNING id
             """, (
                 data['proyecto_id'], data['nombre'].strip(),
@@ -8005,7 +8035,8 @@ def crear_reporte():
                 cfg['hora_envio'], cfg['zona_horaria'], cfg['fecha_inicio'],
                 bool(data.get('incluir_resumen', True)),
                 bool(data.get('enviar_sin_actividad', True)),
-                user_id
+                user_id,
+                cfg['plantilla_id'], cfg['tableros']
             ))
             reporte_id = cursor.fetchone()[0]
             _guardar_relaciones_reporte(cursor, reporte_id, data, user_id)
@@ -8041,7 +8072,8 @@ def editar_reporte(reporte_id):
                 SET nombre = %s, ventana = %s, ventana_dias = %s,
                     modo_envio = %s, dias_semana = %s, dia_mes = %s,
                     hora_envio = %s, zona_horaria = %s, fecha_inicio = %s,
-                    incluir_resumen = %s, enviar_sin_actividad = %s
+                    incluir_resumen = %s, enviar_sin_actividad = %s,
+                    plantilla_id = %s, tableros = %s
                 WHERE id = %s
             """, (
                 data['nombre'].strip(),
@@ -8050,6 +8082,7 @@ def editar_reporte(reporte_id):
                 cfg['hora_envio'], cfg['zona_horaria'], cfg['fecha_inicio'],
                 bool(data.get('incluir_resumen', True)),
                 bool(data.get('enviar_sin_actividad', True)),
+                cfg['plantilla_id'], cfg['tableros'],
                 reporte_id
             ))
             _guardar_relaciones_reporte(cursor, reporte_id, data, user_id)
