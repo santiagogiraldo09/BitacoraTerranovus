@@ -33,6 +33,7 @@ perfil para que el modelo lo juzgue leyendo el nombre del campo.
 import os
 import json
 import hashlib
+import unicodedata
 
 from flask import Blueprint, request, jsonify, session, current_app
 
@@ -139,6 +140,35 @@ def _numero(v):
 #  PERFIL
 # ══════════════════════════════════════════════════════════════════════
 
+def _clave(t):
+    """Forma canónica de un valor, para agrupar variantes de escritura."""
+    base = unicodedata.normalize('NFKD', t.lower().strip())
+    base = ''.join(c for c in base if not unicodedata.combining(c))
+    return ' '.join(base.split())
+
+
+def _agrupar(textos):
+    """Agrupa valores que sólo difieren en mayúsculas, acentos o espacios.
+
+    'Solidworks' y 'SolidWorks' son el mismo interés; contarlos aparte
+    parte en dos una tendencia real y el modelo reporta la mitad.
+
+    La etiqueta que se muestra es la forma más usada por la gente, no
+    una versión normalizada: el dato del usuario se respeta.
+    """
+    grupos = {}
+    for t in textos:
+        k = _clave(t)
+        if not k:
+            continue
+        g = grupos.setdefault(k, {'veces': 0, 'formas': {}})
+        g['veces'] += 1
+        g['formas'][t] = g['formas'].get(t, 0) + 1
+    for g in grupos.values():
+        g['etiqueta'] = max(g['formas'].items(), key=lambda x: x[1])[0]
+        g.pop('formas')
+    return grupos
+
 def _resumen_campo(campo, filas):
     """Retrato de un campo, sea del tipo que sea.
 
@@ -153,12 +183,10 @@ def _resumen_campo(campo, filas):
     if not textos:
         return None
 
-    conteo = {}
-    for t in textos:
-        conteo[t] = conteo.get(t, 0) + 1
-    frecuentes = sorted(conteo.items(), key=lambda x: -x[1])[:TOP_VALORES]
+    grupos     = _agrupar(textos)
+    frecuentes = sorted(grupos.values(), key=lambda g: -g['veces'])[:TOP_VALORES]
 
-    distintos = len(conteo)
+    distintos = len(grupos)
     ratio     = distintos / len(textos)
 
     r = {
@@ -177,7 +205,7 @@ def _resumen_campo(campo, filas):
     # Concentración: lo que convierte "hay varias empresas" en
     # "tres empresas acaparan el 62%".
     if distintos > 1:
-        top3 = sum(n for _, n in frecuentes[:3])
+        top3 = sum(g['veces'] for g in frecuentes[:3])
         r['concentracion_top3_pct'] = round(100 * top3 / len(textos), 1)
 
     # Aritmética, cuando los valores la admiten
@@ -209,6 +237,9 @@ def _resumen_campo(campo, filas):
 
     return r
 
+def _etiqueta_dominante(formas):
+    return max(formas.items(), key=lambda x: x[1])[0]
+
 
 def _cruces(agrupables, medibles, filas):
     """Suma de una medida por cada valor de una categoría."""
@@ -219,24 +250,26 @@ def _cruces(agrupables, medibles, filas):
                 continue
             grupos = {}
             for f in filas:
-                e = _texto(f.get(cat['id']))
+                t = _texto(f.get(cat['id']))
                 n = _numero(f.get(num['id']))
-                if not e or n is None:
+                if not t or n is None:
                     continue
-                g = grupos.setdefault(e, {'suma': 0.0, 'veces': 0})
+                g = grupos.setdefault(_clave(t),
+                                      {'suma': 0.0, 'veces': 0, 'formas': {}})
                 g['suma']  += n
                 g['veces'] += 1
+                g['formas'][t] = g['formas'].get(t, 0) + 1
             if len(grupos) < 2:
                 continue
-            orden = sorted(grupos.items(), key=lambda x: -x[1]['suma'])[:TOP_VALORES]
+            orden = sorted(grupos.values(), key=lambda g: -g['suma'])[:TOP_VALORES]
             salida.append({
                 'agrupado_por': cat['nombre'],
                 'medida':       num['nombre'],
-                'filas': [{'valor': v[:120],
-                           'suma': round(d['suma'], 2),
-                           'veces': d['veces'],
-                           'promedio': round(d['suma'] / d['veces'], 2)}
-                          for v, d in orden],
+                'filas': [{'valor': _etiqueta_dominante(g['formas'])[:120],
+                           'suma': round(g['suma'], 2),
+                           'veces': g['veces'],
+                           'promedio': round(g['suma'] / g['veces'], 2)}
+                          for g in orden],
             })
     return salida
 
@@ -254,32 +287,40 @@ def _coincidencias(agrupables, filas):
         for b, rb in agrupables[i + 1:5]:
             pares = {}
             for f in filas:
-                va, vb = _texto(f.get(a['id'])), _texto(f.get(b['id']))
-                if not va or not vb:
+                ta, tb = _texto(f.get(a['id'])), _texto(f.get(b['id']))
+                if not ta or not tb:
                     continue
-                pares.setdefault(va, {})
-                pares[va][vb] = pares[va].get(vb, 0) + 1
+                p = pares.setdefault(_clave(ta), {'formas': {}, 'dist': {}})
+                p['formas'][ta] = p['formas'].get(ta, 0) + 1
+                d = p['dist'].setdefault(_clave(tb), {'veces': 0, 'formas': {}})
+                d['veces'] += 1
+                d['formas'][tb] = d['formas'].get(tb, 0) + 1
             if len(pares) < 2:
                 continue
 
             filas_out = []
-            for va, dist in sorted(pares.items(),
-                                   key=lambda x: -sum(x[1].values()))[:6]:
-                total = sum(dist.values())
+            for p in sorted(pares.values(),
+                            key=lambda x: -sum(d['veces'] for d in x['dist'].values()))[:6]:
+                total = sum(d['veces'] for d in p['dist'].values())
                 if total < 3:
                     continue
-                vb, n = max(dist.items(), key=lambda x: x[1])
-                pct = round(100 * n / total, 1)
+                mejor = max(p['dist'].values(), key=lambda d: d['veces'])
+                pct   = round(100 * mejor['veces'] / total, 1)
                 # Sin predominio no hay nada que inferir.
                 if pct < 50:
                     continue
-                filas_out.append({'valor': va[:120], 'registros': total,
-                                  'predomina': vb[:120], 'pct': pct})
+                filas_out.append({
+                    'valor':      _etiqueta_dominante(p['formas'])[:120],
+                    'registros':  total,
+                    'predomina':  _etiqueta_dominante(mejor['formas'])[:120],
+                    'pct':        pct,
+                })
 
             if len(filas_out) >= 2:
                 salida.append({'campo': a['nombre'], 'contra': b['nombre'],
                                'filas': filas_out})
     return salida
+
 
 
 def _actividad(filas):
