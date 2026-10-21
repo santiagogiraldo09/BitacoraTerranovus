@@ -1933,6 +1933,28 @@
         abrirModalSynchro();
     }
 
+    // El callback de Bentley devuelve con ?synchro=<resultado>.
+    (function avisarSynchro() {
+        const p = new URLSearchParams(window.location.search).get('synchro');
+        if (!p) return;
+
+        const mensajes = {
+            ok:               '✅ Synchro Control conectado',
+            rechazado:        'Cancelaste la autorización en Bentley',
+            no_configurado:   'La integración no está habilitada todavía',
+            estado_invalido:  '❌ La sesión cambió durante la conexión, intenta de nuevo',
+            sin_codigo:       '❌ Bentley no devolvió el código de autorización',
+            sin_refresh:      '❌ Bentley no concedió acceso prolongado (offline_access)',
+            error_token:      '❌ No se pudo completar la conexión con Bentley',
+            error:            '❌ Error inesperado al conectar'
+        };
+        mostrarToast(mensajes[p] || p);
+
+        // Limpia la URL para que no reaparezca al recargar.
+        window.history.replaceState({}, '', '/configuracion#integraciones');
+        if (p === 'ok') abrirModalSynchro();
+    })();
+
     function togglePbiForm(mostrar) {
         document.getElementById('pbi-form-nuevo').style.display = mostrar ? '' : 'none';
         document.getElementById('pbi-lista-wrap').style.display = mostrar ? 'none' : '';

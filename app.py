@@ -1842,24 +1842,6 @@ def previsualizar_reporte():
         app.logger.exception('previsualizar_reporte')
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/integraciones/synchro/estado', methods=['GET'])
-def synchro_estado():
-    """Qué puede hacer este usuario con Synchro ahora mismo.
-
-    Mientras la aplicación no esté registrada en Bentley, la integración
-    no está habilitada para nadie. Decirlo es mejor que mostrar un botón
-    que no va a funcionar.
-    """
-    if 'user_id' not in session:
-        return jsonify({'error': 'No autorizado'}), 401
-
-    configurado = bool(os.environ.get('SYNCHRO_CLIENT_ID')
-                       and os.environ.get('SYNCHRO_CLIENT_SECRET'))
-
-    # La conexión por usuario llega en el siguiente paso, con su tabla.
-    return jsonify({'configurado': configurado,
-                    'conectado':   False,
-                    'cuenta':      None})
 
 @app.route('/api/bi/datos', methods=['POST'])
 def bi_datos():
@@ -10218,6 +10200,8 @@ from bi_publica import bi_publica_bp
 app.register_blueprint(bi_publica_bp)
 from resumen_ia import resumen_bp
 app.register_blueprint(resumen_bp)
+from synchro import synchro_bp
+app.register_blueprint(synchro_bp)
 
 if __name__ == '__main__':
     app.run(debug=True)
