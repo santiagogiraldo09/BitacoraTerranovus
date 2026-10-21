@@ -51,6 +51,10 @@ MAX_DISTINTOS_GRUPO = 25
 # Si casi todos los valores son distintos, el campo identifica filas en
 # vez de medirlas. No se oculta: se marca.
 RATIO_IDENTIFICADOR = 0.9
+# Dígitos a partir de los cuales un número uniforme huele a matrícula.
+DIGITOS_IDENTIFICADOR = 7
+# Por debajo de esto no hay patrones que detectar, sólo coincidencias.
+MIN_FILAS_ANALISIS = 10
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -169,6 +173,36 @@ def _agrupar(textos):
         g.pop('formas')
     return grupos
 
+def _es_identificador(textos, numeros):
+    """Un campo que identifica filas en vez de medirlas.
+
+    Dos señales independientes, porque ninguna basta sola:
+
+    - Casi todos sus valores son distintos. Útil con muchos registros,
+      inútil con pocos: con cinco filas cualquier campo parece único.
+    - Todos sus números tienen la misma cantidad de dígitos y son
+      largos. Un teléfono siempre tiene diez; un valor en pesos varía
+      entre seis y diez. Esa uniformidad delata una matrícula aunque
+      haya tres filas, que es justo donde falla la primera señal.
+    """
+    if not textos:
+        return False
+
+    ratio = len(set(_clave(t) for t in textos)) / len(textos)
+    casi_unicos = ratio >= RATIO_IDENTIFICADOR and len(textos) >= 3
+
+    uniforme = False
+    if numeros and len(numeros) >= 3:
+        try:
+            digitos = {len(str(abs(int(n)))) for n in numeros
+                       if float(n).is_integer()}
+            uniforme = (len(digitos) == 1
+                        and digitos.pop() >= DIGITOS_IDENTIFICADOR)
+        except (ValueError, OverflowError):
+            uniforme = False
+
+    return casi_unicos or uniforme
+
 def _resumen_campo(campo, filas):
     """Retrato de un campo, sea del tipo que sea.
 
@@ -196,8 +230,11 @@ def _resumen_campo(campo, filas):
         'respondidos': len(textos),
         'de_filas':    len(filas),
         'distintos':   distintos,
-        # La señal que permite distinguir una medida de una matrícula.
-        'casi_todos_distintos': ratio > RATIO_IDENTIFICADOR and len(textos) >= 10,
+        # Dos datos para que el modelo distinga una medida de una
+        # matrícula: el hecho crudo y nuestra lectura de él.
+        'casi_todos_distintos': ratio > RATIO_IDENTIFICADOR,
+        'parece_identificador': _es_identificador(
+            textos, [n for n in (_numero(v) for v in crudos) if n is not None]),
         'valores_frecuentes': [{'valor': v[:120], 'veces': n}
                                for v, n in frecuentes],
     }
@@ -359,13 +396,20 @@ def _perfil(campos, filas):
     # sigue apareciendo completo arriba: aquí sólo se decide qué tiene
     # sentido sumar o cruzar.
     agrupables = [(c, r) for c, r in resumenes
-                  if 1 < r['distintos'] <= MAX_DISTINTOS_GRUPO]
+                  if 1 < r['distintos'] <= MAX_DISTINTOS_GRUPO
+                  and not r['parece_identificador']]
     medibles   = [(c, r) for c, r in resumenes
-                  if 'numerico' in r and not r['casi_todos_distintos']]
+                  if 'numerico' in r and not r['parece_identificador']]
 
     perfil['cruces']        = _cruces(agrupables, medibles, filas)
     perfil['coincidencias'] = _coincidencias(agrupables, filas)
     perfil['actividad']     = _actividad(filas)
+
+    # Con pocos registros los cálculos siguen siendo correctos, pero un
+    # porcentaje deja de ser informativo: con cinco filas cada registro
+    # mueve el resultado veinte puntos. Se marca para que el análisis se
+    # exprese en conteos y no finja una precisión que no tiene.
+    perfil['pocos_registros'] = len(filas) < MIN_FILAS_ANALISIS
 
     # Lo que la gente escribió. Cualquier campo puede traer prosa, sin
     # importar su tipo: lo que la delata es que sus valores sean largos
@@ -403,6 +447,18 @@ sus totales y su máximo no significan nada y no se citan. Uno llamado
 "Cantidad" con 12 valores distintos es una medida: ahí sí. Usa el
 nombre primero y el indicador "casi_todos_distintos" para confirmar.
 Ningún campo está excluido de antemano: tú decides cuáles importan.
+
+Si "pocos_registros" es true, hay menos de veinte filas. Los cálculos
+siguen siendo correctos, pero un porcentaje sobre cinco registros no
+informa: cada fila mueve el resultado veinte puntos. En ese caso
+expresa todo en conteos absolutos —"3 de 5 registros", nunca "el 60%"—,
+no hables de tendencias ni de predominios, y limítate a describir con
+precisión lo que hay. Describir cinco registros bien es útil; fingir
+una tendencia sobre cinco registros no.
+
+El indicador "parece_identificador" marca los campos que identifican
+filas —teléfonos, cédulas, códigos— en vez de medirlas. Sus totales,
+máximos y sumas no significan nada y no se citan nunca.
 
 Las secciones del perfil:
 - campos          : qué hay en cada campo y qué tan concentrado está
