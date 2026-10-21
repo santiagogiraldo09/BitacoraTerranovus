@@ -191,7 +191,7 @@
                 </button>
                 <button class="tb-tipo-btn" data-tipo="resumen_ia" onclick="seleccionarTipo('resumen_ia')">
                     <i class="fas fa-wand-magic-sparkles"></i>
-                    <span>Resumen con IA</span>
+                    <span>Hallazgos con IA</span>
                 </button>
             </div>
 
@@ -602,10 +602,10 @@
     }
 
     /**
-     * Widget de análisis con IA. Python calcula todas las cifras —
-     * distribuciones, totales y cruces entre campos — y el modelo sólo
-     * escoge cuáles importan y las explica. Por eso ningún número de
-     * esta tarjeta puede estar mal calculado.
+     * Hallazgos con IA. Python calcula todas las cifras —incluidas las
+     * del gráfico— y el modelo sólo decide cuáles contar y cuál bloque
+     * merece dibujarse. Por eso ninguna barra puede traer un número
+     * inventado: el modelo nombra el bloque, el servidor pone los datos.
      */
     async function renderVizResumenIA(viz) {
         const cuerpo = document.getElementById(`viz-body-${viz.id}`);
@@ -614,8 +614,8 @@
         const esc = t => String(t ?? '')
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-        const aviso = txt => `<p style="color:#9ca3af;font-size:13px;
-            padding:16px 2px;margin:0;">${esc(txt)}</p>`;
+        const num = n => Number(n).toLocaleString('es-CO',
+            { maximumFractionDigits: 2 });
 
         try {
             const res = await fetch('/api/bi/resumen-ia', {
@@ -634,10 +634,15 @@
                     <i class="fas fa-exclamation-circle"></i> ${esc(d.error)}</p>`;
                 return;
             }
-            if (d.sin_datos) { cuerpo.innerHTML = aviso(d.texto); return; }
+            if (d.sin_datos) {
+                cuerpo.innerHTML = `<p style="color:#9ca3af;font-size:13px;
+                    padding:16px 2px;margin:0;">${esc(d.texto)}</p>`;
+                return;
+            }
 
+            // ── Métricas ──
             const metricas = (d.metricas || []).map(m => `
-                <div style="flex:1;min-width:120px;background:#fafafa;
+                <div style="flex:1;min-width:118px;background:#fafafa;
                             border:1px solid #eef0f2;border-radius:9px;padding:11px 13px;">
                     <div style="font-size:10.5px;text-transform:uppercase;
                                 letter-spacing:.4px;color:#9ca3af;margin-bottom:4px;">
@@ -645,6 +650,41 @@
                     <div style="font-size:17px;font-weight:700;color:#1f2937;
                                 line-height:1.25;">${esc(m.valor)}</div>
                 </div>`).join('');
+
+            // ── Gráfico de barras del bloque destacado ──
+            let grafico = '';
+            const dest = d.destacado;
+            if (dest && Array.isArray(dest.filas) && dest.filas.length) {
+                const tope = Math.max(...dest.filas.map(f => Number(f.cantidad) || 0)) || 1;
+                const barras = dest.filas.slice(0, 8).map(f => {
+                    const pct = Math.max(2, Math.round(100 * (Number(f.cantidad) || 0) / tope));
+                    return `
+                    <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px;">
+                        <div style="flex:0 0 38%;font-size:12px;color:#4b5563;
+                                    overflow:hidden;text-overflow:ellipsis;
+                                    white-space:nowrap;" title="${esc(f.valor)}">
+                            ${esc(f.valor)}</div>
+                        <div style="flex:1;background:#f1f2f4;border-radius:4px;height:16px;">
+                            <div style="width:${pct}%;height:100%;border-radius:4px;
+                                        background:var(--naranja,#FBAF33);"></div>
+                        </div>
+                        <div style="flex:0 0 54px;text-align:right;font-size:12px;
+                                    font-weight:600;color:#1f2937;">
+                            ${esc(num(f.cantidad))}</div>
+                    </div>`;
+                }).join('');
+
+                grafico = `
+                    <div style="margin:4px 0 15px;">
+                        ${dest.titulo ? `<div style="font-size:11px;font-weight:600;
+                            text-transform:uppercase;letter-spacing:.3px;color:#9ca3af;
+                            margin-bottom:9px;">${esc(dest.titulo)}</div>` : ''}
+                        ${barras}
+                        ${dest.unidad ? `<div style="font-size:10.5px;color:#b6bac1;
+                            text-align:right;margin-top:3px;">
+                            en ${esc(dest.unidad)}</div>` : ''}
+                    </div>`;
+            }
 
             const hallazgos = (d.hallazgos || []).map(h => `
                 <li style="margin-bottom:7px;line-height:1.55;">${esc(h)}</li>`).join('');
@@ -659,6 +699,8 @@
                     ${metricas ? `<div style="display:flex;flex-wrap:wrap;gap:9px;
                         margin-bottom:15px;">${metricas}</div>` : ''}
 
+                    ${grafico}
+
                     ${hallazgos ? `<ul style="margin:0 0 12px;padding-left:18px;">
                         ${hallazgos}</ul>` : ''}
 
@@ -671,14 +713,14 @@
                                 color:var(--naranja,#FBAF33);border-top:1px solid #f1f2f4;
                                 padding-top:10px;">
                         <i class="fas fa-wand-magic-sparkles"></i>
-                        Análisis con IA sobre ${d.registros || 0} registros
+                        Hallazgos con IA sobre ${d.registros || 0} registros
                     </div>
                 </div>`;
 
         } catch (e) {
             console.error(e);
             cuerpo.innerHTML = `<p class="tb-viz-error">
-                <i class="fas fa-exclamation-circle"></i> Error al generar el análisis</p>`;
+                <i class="fas fa-exclamation-circle"></i> Error al generar los hallazgos</p>`;
         }
     }
 
