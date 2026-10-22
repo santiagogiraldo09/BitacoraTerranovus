@@ -12,11 +12,17 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
     <script>
-        (function() {
-            const p = "{{ color_primario | default('#FFAF33') }}";
-            document.documentElement.style.setProperty('--naranja', p);
-        })();
-    </script>
+    (function() {
+        const p = "{{ color_primario | default('#FFAF33') }}";
+        const s = document.documentElement.style;
+        const n = parseInt(p.slice(1), 16);
+        const r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255;
+        const osc = c => Math.max(0, c - 20).toString(16).padStart(2, '0');
+        s.setProperty('--naranja',       p);
+        s.setProperty('--naranja-dark',  '#' + osc(r) + osc(g) + osc(b));
+        s.setProperty('--naranja-light', `rgba(${r},${g},${b},0.12)`);
+    })();
+</script>
 </head>
 <body>
 
