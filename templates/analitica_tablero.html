@@ -206,6 +206,22 @@
                 <option value="">Selecciona un formulario...</option>
             </select>
 
+            <div id="viz-prompt-wrap" style="display:none;">
+                <label class="tb-label" style="margin-top:14px;">
+                    QUÉ QUIERES SABER
+                    <span style="font-weight:400;text-transform:none;color:#9ca3af;">(opcional)</span>
+                </label>
+                <textarea id="viz-prompt-ia" class="tb-input" rows="3" maxlength="500"
+                          style="resize:vertical;font-family:inherit;"
+                          placeholder="Ej: enfócate en los interesados en SolidWorks y qué empresas representan"></textarea>
+                <p style="font-size:11.5px;color:#9ca3af;line-height:1.55;margin-top:6px;">
+                    Déjalo vacío y la IA busca por su cuenta lo que haya de
+                    relevante. Si escribes algo, orienta el análisis hacia
+                    eso — pero sólo puede responder con los datos que el
+                    formulario captura.
+                </p>
+            </div>
+
             <div id="viz-campos-wrap" style="display:none;">
 
                 <label class="tb-label" style="margin-top:14px;" id="label-campo-valor">CAMPO A MEDIR (numérico)</label>
@@ -630,6 +646,7 @@
                 body: JSON.stringify({
                     formulario_id:    ds.formulario_id || null,
                     visualizacion_id: viz.id,
+                    prompt:           ds.prompt_ia || '',
                     filtros:          filtrosActivos
                 })
             });
@@ -1494,15 +1511,19 @@
                 if (lbl) lbl.style.display = 'none';
             });
 
+            ocultar(['viz-prompt-wrap'], '');
             if (vizEnEdicion === null) {
                 document.getElementById('viz-ancho-completo').checked = true;
+                const cp = document.getElementById('viz-prompt-ia');
+                if (cp) cp.value = '';      // tarjeta nueva, prompt en blanco
             }
             return;
         }
 
         // Al volver de 'resumen_ia' hay que restaurar lo que sólo él
         // oculta; el resto lo maneja la lógica de abajo.
-        ocultar(['viz-campo-fecha'], '');
+        ocultar(['viz-prompt-wrap'], 'none');
+        ocultar(['viz-campo-fecha'], '');            
         const lblFecha = document.getElementById('viz-campo-fecha')?.previousElementSibling;
         if (lblFecha) lblFecha.style.display = '';
 
@@ -1943,6 +1964,9 @@
         // ── Construir dataset ──
         const dataset = {
             formulario_id:           parseInt(formularioId),
+            prompt_ia:               esResumen
+                ? (document.getElementById('viz-prompt-ia')?.value || '').trim().slice(0, 500)
+                : '',
             campo_valor:             sinCampos ? '' : campoValor.campo_id,
             campo_valor_nombre:      campoValorNombre,
             campo_agrupacion:        (esLinea || sinCampos) ? '' : campoAgrupa.campo_id,
@@ -2058,6 +2082,11 @@
         if (!viz) return;
 
         vizEnEdicion = vizId;
+
+        // El prompt se restaura aquí y no en seleccionarTipo(), que no
+        // sabe qué visualización se está editando.
+        const campoPrompt = document.getElementById('viz-prompt-ia');
+        if (campoPrompt) campoPrompt.value = viz.config?.datasets?.[0]?.prompt_ia || '';
         const ds = viz.config.datasets?.[0] || {};
 
         // Llenar el modal con los valores actuales
