@@ -677,9 +677,13 @@
             // ── Gráfico de barras del bloque destacado ──
             let grafico = '';
             const dest = d.destacado;
-            if (dest && Array.isArray(dest.filas) && dest.filas.length) {
-                const tope = Math.max(...dest.filas.map(f => Number(f.cantidad) || 0)) || 1;
-                const barras = dest.filas.slice(0, 8).map(f => {
+            // Sólo filas con valor numérico real: nunca se dibuja un NaN.
+            const filasDest = (dest && Array.isArray(dest.filas))
+                ? dest.filas.filter(f => Number.isFinite(Number(f.cantidad)))
+                : [];
+            if (filasDest.length >= 2) {
+                const tope = Math.max(...filasDest.map(f => Number(f.cantidad))) || 1;
+                const barras = filasDest.slice(0, 8).map(f => {
                     const pct = Math.max(2, Math.round(100 * (Number(f.cantidad) || 0) / tope));
                     return `
                     <div style="display:flex;align-items:center;gap:9px;margin-bottom:6px;">
