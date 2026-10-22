@@ -13,6 +13,8 @@
     --sombra:        0 2px 8px rgba(0,0,0,0.07);
     --danger:        #e53935;
     --success:       #2e7d32;
+    --color-primario:       var(--naranja);
+    --color-primario-light: var(--naranja-light);
 }
 
 /* ─── Reset ──────────────────────────────────────────────────── */
@@ -572,7 +574,7 @@ button { font-family: inherit; cursor: pointer; }
     font-weight: 700;
     cursor: pointer;
     transition: background 0.2s, transform 0.1s;
-    box-shadow: 0 4px 14px rgba(255,175,51,0.35);
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--naranja) 35%, transparent);
 }
 
 .btn-guardar:hover  { background: var(--naranja-dark); }

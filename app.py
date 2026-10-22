@@ -9226,11 +9226,26 @@ def plan():
     if session.get('user_rol') != 'admin':
         return redirect(url_for('registros'))
 
+    logo_actual, color_primario, nombre_empresa = None, '#FFAF33', ''
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT logo_url, color_primario, nombre
+                FROM empresas WHERE id = %s
+            """, (session.get('empresa_id'),))
+            emp = cursor.fetchone()
+            if emp:
+                logo_actual    = emp[0]
+                color_primario = emp[1] or '#FFAF33'
+                nombre_empresa = emp[2] or ''
+    except Exception as e:
+        print(f"[PLAN] Error cargando datos de la empresa: {e}")
+
     return render_template(
         'plan.html',
-        logo_actual     = session.get('logo_url'),
-        color_primario  = session.get('color_primario', '#FFAF33'),
-        nombre_empresa  = session.get('nombre_empresa', '')
+        logo_actual    = logo_actual,
+        color_primario = color_primario,
+        nombre_empresa = nombre_empresa
     )
 
 @app.route('/api/distribuir-campos', methods=['POST'])

@@ -448,7 +448,7 @@ button { font-family: inherit; cursor: pointer; }
     font-size: 15px;
     font-weight: 600;
     font-family: 'DM Sans', sans-serif;
-    box-shadow: 0 4px 16px rgba(255,175,51,0.5);
+    box-shadow: 0 4px 16px color-mix(in srgb, var(--naranja) 50%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
