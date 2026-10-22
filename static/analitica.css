@@ -411,7 +411,7 @@
     width: 44px;
     height: 44px;
     border-radius: 10px;
-    background: #fff8ee;
+    background: color-mix(in srgb, var(--naranja, #FFAF33) 10%, white);
     color: var(--naranja, #FFAF33);
     display: flex;
     align-items: center;

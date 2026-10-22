@@ -318,7 +318,7 @@
 
 .tb-tipo-btn.activo {
     border-color: var(--naranja, #FFAF33);
-    background: #fff8ee;
+    background: color-mix(in srgb, var(--naranja, #FFAF33) 10%, white);
     color: var(--an-texto, #111827);
 }
 
