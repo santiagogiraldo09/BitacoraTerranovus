@@ -24,6 +24,7 @@ todas las cuentas de Bentley de golpe.
 """
 
 import os
+import json
 import time
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -457,12 +458,14 @@ def listar_formularios():
 
 @synchro_bp.route('/api/integraciones/synchro/definicion', methods=['GET'])
 def ver_definicion():
-    """TEMPORAL — busca un formulario con campos y vuelca su definición.
+    """TEMPORAL — vuelca la definición cruda de un formulario.
 
-    Recorre los proyectos del usuario contando los controles de cada
-    definición. Devuelve el inventario completo más la primera que
-    tenga contenido: las plantillas de fábrica vienen vacías y no
-    sirven para entender el formato.
+    Sin parámetros recorre los proyectos del usuario hasta dar con uno
+    que tenga formularios aprobados y devuelve el primero. Se puede
+    acotar con ?itwin_id= o ?id= si se quiere uno concreto.
+
+    Existe sólo para inspeccionar el formato de 'definition', que la
+    documentación de Bentley no describe. Se borra después.
     """
     import json as _j
     if 'user_id' not in session:
@@ -472,73 +475,246 @@ def ver_definicion():
     if not token:
         return jsonify({'error': 'Reconecta tu cuenta de Synchro'}), 409
 
-    def contar(nodo):
-        """Controles dentro del árbol, a cualquier profundidad."""
-        n = 0
-        if isinstance(nodo, dict):
-            for clave, valor in nodo.items():
-                if clave == 'Children' and isinstance(valor, list):
-                    n += len(valor)
-                n += contar(valor)
-        elif isinstance(nodo, list):
-            for x in nodo:
-                n += contar(x)
-        return n
-
     try:
-        r = _get(token, f'{API}/itwins/',
-                 {'subClass': 'Project', 'status': 'Active', '$top': 50},
-                 version='v1')
+        definicion_id = request.args.get('id')
+
+        if not definicion_id:
+            itwins = ([request.args.get('itwin_id')]
+                      if request.args.get('itwin_id') else [])
+
+            if not itwins:
+                r = _get(token, f'{API}/itwins/',
+                         {'subClass': 'Project', 'status': 'Active', '$top': 50},
+                         version='v1')
+                if r.status_code != 200:
+                    return jsonify({'paso': 'itwins', 'estado': r.status_code,
+                                    'detalle': r.text[:400]}), 502
+                itwins = [t.get('id') for t in (r.json().get('iTwins') or [])]
+
+            if not itwins:
+                return jsonify({'error': 'No tienes proyectos en Synchro'}), 404
+
+            for tid in itwins:
+                r = _get(token, f'{API}/forms/form-definitions',
+                         {'iTwinId': tid}, version='v2')
+                if r.status_code != 200:
+                    continue
+                defs = r.json().get('formDefinitions') or []
+                if defs:
+                    definicion_id = defs[0].get('id')
+                    break
+
+            if not definicion_id:
+                return jsonify({'error': 'Ninguno de tus proyectos tiene '
+                                         'formularios aprobados',
+                                'proyectos_revisados': len(itwins)}), 404
+
+        r = _get(token, f'{API}/forms/form-definitions/{definicion_id}',
+                 version='v2')
         if r.status_code != 200:
-            return jsonify({'paso': 'itwins', 'estado': r.status_code,
+            return jsonify({'paso': 'definicion', 'estado': r.status_code,
                             'detalle': r.text[:400]}), 502
 
-        inventario, con_campos = [], None
+        d = (r.json() or {}).get('formDefinition') or {}
+        bruto = d.get('definition')
+        try:
+            d['definition'] = _j.loads(bruto) if isinstance(bruto, str) else bruto
+        except Exception:
+            d['definition_parseo'] = 'no se pudo parsear'
 
-        for t in (r.json().get('iTwins') or []):
-            tid = t.get('id')
-            rd = _get(token, f'{API}/forms/form-definitions',
-                      {'iTwinId': tid}, version='v2')
-            if rd.status_code != 200:
-                continue
-
-            for d in (rd.json().get('formDefinitions') or []):
-                rf = _get(token, f'{API}/forms/form-definitions/{d.get("id")}',
-                          version='v2')
-                if rf.status_code != 200:
-                    continue
-                full = (rf.json() or {}).get('formDefinition') or {}
-                try:
-                    arbol = _j.loads(full.get('definition') or '{}')
-                except Exception:
-                    arbol = {}
-
-                n = contar(arbol)
-                inventario.append({
-                    'proyecto':  t.get('displayName'),
-                    'formulario': full.get('displayName'),
-                    'id':         full.get('id'),
-                    'controles':  n,
-                })
-                if n and con_campos is None:
-                    full['definition'] = arbol
-                    con_campos = full
-
-        return jsonify({'inventario': inventario,
-                        'con_campos': con_campos})
+        return jsonify(d)
 
     except Exception as e:
         current_app.logger.exception('synchro ver_definicion')
         return jsonify({'error': str(e)}), 500
 
 
-@synchro_bp.route('/api/integraciones/synchro/instancia', methods=['GET'])
-def ver_instancia():
-    """TEMPORAL — busca un formulario YA LLENO y lo devuelve completo.
+# ══════════════════════════════════════════════════════════════════════
+#  INTERPRETACIÓN DE UNA DEFINICIÓN
+#
+#  Synchro entrega el diseño del formulario como un árbol de controles
+#  pensado para su propio editor. Aquí se traduce a la forma que
+#  entiende Bitácora: una lista plana de campos con etiqueta, tipo y
+#  opciones, que sirve para tres cosas — dibujar el formulario, repartir
+#  un dictado entre sus campos, y armar el envío de vuelta.
+# ══════════════════════════════════════════════════════════════════════
 
-    La definición dice qué campos existen; una instancia dice cómo se
-    ven con datos. Es lo que hace falta para saber cómo armar el POST
-    que crea formularios desde Bitácora.
+# Bindings que no son campos propios del formulario sino atributos del
+# sistema: viven en la raíz de la instancia, no dentro de 'properties'.
+BINDINGS_SISTEMA = {
+    'Status':          'status',
+    '_DueDate':        'dueDate',
+    'AssignedTo':      'assignee',
+    '_AssignedUsers':  'assignees',
+    'Subject':         'subject',
+    'Description':     'description',
+}
+
+# Propiedades que calcula Synchro y que nunca se deben enviar.
+PROPIEDADES_SISTEMA = {'_AttachmentCount', '_ExternalFileCount',
+                       '_FormCount', 'Project'}
+
+
+def _tipo_bitacora(tipo_control, props, tipo_dato):
+    """Traduce el control de Synchro al vocabulario de campos de Bitácora."""
+    if tipo_control == 'TextBox':
+        if tipo_dato == 'date':
+            return 'fecha'
+        if tipo_dato in ('int', 'double', 'number'):
+            return 'numero'
+        return 'texto_corto' if props.get('IsSingleLine') else 'texto_largo'
+
+    if tipo_control == 'SelectList':
+        return 'seleccion_unica' if props.get('IsSingleSelect') else 'seleccion'
+
+    if tipo_control == 'ImageSelector':
+        return 'imagen'
+
+    if tipo_control == 'Weather':
+        return 'clima'
+
+    if tipo_control == 'CheckBox':
+        return 'booleano'
+
+    return 'texto_corto'
+
+
+def _opciones(props):
+    """Opciones de una lista desplegable.
+
+    'ListItems' llega como texto: o un arreglo JSON, o el marcador
+    '@userlist', que significa "los usuarios del proyecto" y hay que
+    resolver con otra llamada.
+    """
+    bruto = props.get('ListItems')
+    if not isinstance(bruto, str) or not bruto.strip():
+        return [], False
+    if bruto.strip() == '@userlist':
+        return [], True
+    try:
+        valores = json.loads(bruto)
+        return ([str(v) for v in valores], False) if isinstance(valores, list) else ([], False)
+    except Exception:
+        return [], False
+
+
+def _ruta_de(binding, etiqueta, rutas_conocidas):
+    """Dónde vive el valor dentro de la instancia.
+
+    Los campos propios van bajo 'properties' con su etiqueta como
+    llave; los del sistema tienen su propio sitio en la raíz. Se
+    comprueba contra las rutas que la API declaró, y sólo si no
+    aparece se recurre a la convención.
+    """
+    if binding in BINDINGS_SISTEMA:
+        return BINDINGS_SISTEMA[binding], 'sistema'
+
+    candidata = f'properties.{etiqueta}'
+    if candidata in rutas_conocidas or not rutas_conocidas:
+        return candidata, 'propiedad'
+
+    # La etiqueta no coincidió con ninguna ruta declarada: se deja la
+    # convención, pero se marca para no enviarla a ciegas.
+    return candidata, 'dudosa'
+
+
+def campos_de_definicion(definicion_completa):
+    """Lista de campos de un formulario de Synchro.
+
+    Recibe el objeto 'formDefinition' tal como lo devuelve la API, con
+    'definition' ya parseado o todavía como texto.
+    """
+    d = definicion_completa or {}
+
+    arbol = d.get('definition')
+    if isinstance(arbol, str):
+        try:
+            arbol = json.loads(arbol)
+        except Exception:
+            arbol = {}
+    form = (arbol or {}).get('Form') or {}
+
+    # Binding -> etiqueta y tipo del dato
+    bindings = {}
+    for item in (form.get('DataBindings') or []):
+        db = (item or {}).get('DataBinding') or {}
+        b = db.get('Binding')
+        if b and b not in bindings:
+            bindings[b] = {'etiqueta': db.get('DisplayLabel') or b,
+                           'tipo': (db.get('Type') or '').lower()}
+
+    rutas = {x.get('property') for x in (d.get('dataBindings') or [])
+             if isinstance(x, dict)}
+
+    campos, vistos = [], set()
+
+    def control(tipo_control, props, etiqueta_externa=None,
+                requerido_externo=None):
+        binding = props.get('Binding')
+        if not binding or binding in vistos:
+            return
+        vistos.add(binding)
+
+        info     = bindings.get(binding, {})
+        clave    = info.get('etiqueta') or binding
+        tipo_dato = info.get('tipo') or ''
+
+        if clave in PROPIEDADES_SISTEMA:
+            return
+
+        ruta, origen = _ruta_de(binding, clave, rutas)
+        opciones, es_usuarios = _opciones(props)
+
+        campos.append({
+            'binding':   binding,
+            'ruta':      ruta,
+            'origen':    origen,
+            'clave':     clave,
+            'etiqueta':  etiqueta_externa or props.get('DisplayLabel') or clave,
+            'tipo':      _tipo_bitacora(tipo_control, props, tipo_dato),
+            'requerido': bool(requerido_externo if requerido_externo is not None
+                              else props.get('IsRequired')),
+            'opciones':  opciones,
+            'usuarios':  es_usuarios,
+            'control':   tipo_control,
+        })
+
+    def recorrer(nodos):
+        for nodo in (nodos or []):
+            if not isinstance(nodo, dict):
+                continue
+            for tipo_control, props in nodo.items():
+                if not isinstance(props, dict):
+                    continue
+
+                if tipo_control == 'Panel':
+                    recorrer(props.get('Children'))
+
+                elif tipo_control == 'LabeledControl':
+                    # El control real va dentro; la etiqueta y el
+                    # obligatorio los pone el envoltorio.
+                    interno = props.get('Control') or {}
+                    for t2, p2 in interno.items():
+                        if isinstance(p2, dict):
+                            control(t2, p2, props.get('DisplayLabel'),
+                                    props.get('IsRequired'))
+
+                elif tipo_control == 'Label':
+                    pass        # decorativo
+
+                else:
+                    control(tipo_control, props)
+
+    recorrer(form.get('Controls'))
+    return campos
+
+
+@synchro_bp.route('/api/integraciones/synchro/campos', methods=['GET'])
+def ver_campos():
+    """TEMPORAL — interpreta todas las definiciones del usuario.
+
+    Permite comprobar el parser contra formularios reales antes de
+    construir nada encima.
     """
     if 'user_id' not in session:
         return jsonify({'error': 'No autorizado'}), 401
@@ -547,11 +723,7 @@ def ver_instancia():
     if not token:
         return jsonify({'error': 'Reconecta tu cuenta de Synchro'}), 409
 
-    cabeceras = {
-        'Authorization': f'Bearer {token}',
-        'Accept': 'application/vnd.bentley.itwin-platform.v2+json',
-        'Prefer': 'return=representation',
-    }
+    solo = request.args.get('id')
 
     try:
         r = _get(token, f'{API}/itwins/',
@@ -560,25 +732,34 @@ def ver_instancia():
         if r.status_code != 200:
             return jsonify({'paso': 'itwins', 'estado': r.status_code}), 502
 
-        conteo = []
+        salida = []
         for t in (r.json().get('iTwins') or []):
-            rf = requests.get(f'{API}/forms/', timeout=TIMEOUT,
-                              headers=cabeceras,
-                              params={'iTwinId': t.get('id'), '$top': 10})
-            if rf.status_code != 200:
+            rd = _get(token, f'{API}/forms/form-definitions',
+                      {'iTwinId': t.get('id')}, version='v2')
+            if rd.status_code != 200:
                 continue
-            instancias = rf.json().get('formDataInstances') or \
-                         rf.json().get('formsData') or \
-                         rf.json().get('forms') or []
-            conteo.append({'proyecto': t.get('displayName'),
-                           'instancias': len(instancias)})
-            if instancias:
-                return jsonify({'conteo': conteo,
-                                'ejemplo_crudo': rf.json()})
 
-        return jsonify({'conteo': conteo,
-                        'mensaje': 'No hay formularios llenos en ningún proyecto'})
+            for df in (rd.json().get('formDefinitions') or []):
+                if solo and df.get('id') != solo:
+                    continue
+                rf = _get(token, f'{API}/forms/form-definitions/{df.get("id")}',
+                          version='v2')
+                if rf.status_code != 200:
+                    continue
+                full = (rf.json() or {}).get('formDefinition') or {}
+                campos = campos_de_definicion(full)
+                salida.append({
+                    'proyecto':   t.get('displayName'),
+                    'itwin_id':   t.get('id'),
+                    'formulario': full.get('displayName'),
+                    'id':         full.get('id'),
+                    'tipo':       full.get('type'),
+                    'campos':     campos,
+                    'total':      len(campos),
+                })
+
+        return jsonify({'formularios': salida})
 
     except Exception as e:
-        current_app.logger.exception('synchro ver_instancia')
+        current_app.logger.exception('synchro ver_campos')
         return jsonify({'error': str(e)}), 500
