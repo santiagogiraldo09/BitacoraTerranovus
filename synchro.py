@@ -777,7 +777,21 @@ def ver_campos():
                     'total':      len(campos),
                 })
 
-        return jsonify({'formularios': salida})
+        # Conteo global: evita tener que leer la salida completa para
+        # saber si el parser interpretó bien todas las definiciones.
+        resumen = {'formularios': len(salida), 'campos': 0,
+                   'no_enviables': [], 'origenes': {}}
+
+        for f in salida:
+            for c in f['campos']:
+                resumen['campos'] += 1
+                o = c['origen']
+                resumen['origenes'][o] = resumen['origenes'].get(o, 0) + 1
+                if not c['enviable']:
+                    resumen['no_enviables'].append(
+                        f"{f['formulario']} · {c['etiqueta']} ({c['control']})")
+
+        return jsonify({'resumen': resumen, 'formularios': salida})
 
     except Exception as e:
         current_app.logger.exception('synchro ver_campos')
