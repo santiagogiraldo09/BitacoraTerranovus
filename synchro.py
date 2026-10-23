@@ -331,3 +331,70 @@ def desconectar():
     except Exception as e:
         current_app.logger.exception('synchro desconectar')
         return jsonify({'error': str(e)}), 500
+
+@synchro_bp.route('/api/integraciones/synchro/definicion')
+def ver_definicion():
+    """Temporal: vuelca la definición cruda de un formulario.
+
+    Sin parámetros recorre los proyectos del usuario hasta dar con uno
+    que tenga formularios aprobados y devuelve el primero. Se puede
+    acotar con ?itwin_id= o ?id= si se quiere uno concreto.
+    """
+    import json as _j
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    token = _token_actual()
+    if not token:
+        return jsonify({'error': 'Reconecta tu cuenta de Synchro'}), 409
+
+    definicion_id = request.args.get('id')
+
+    if not definicion_id:
+        itwins = [request.args.get('itwin_id')] if request.args.get('itwin_id') else []
+
+        if not itwins:
+            r = _get(token, f'{API}/itwins/',
+                     {'subClass': 'Project', 'status': 'Active', '$top': 50},
+                     version='v1')
+            if r.status_code != 200:
+                return jsonify({'paso': 'itwins', 'estado': r.status_code,
+                                'detalle': r.text[:400]}), 502
+            itwins = [t.get('id') for t in (r.json().get('iTwins') or [])]
+
+        if not itwins:
+            return jsonify({'error': 'No tienes proyectos en Synchro'}), 404
+
+        encontrados = []
+        for tid in itwins:
+            r = _get(token, f'{API}/forms/form-definitions',
+                     {'iTwinId': tid}, version='v2')
+            if r.status_code != 200:
+                continue
+            defs = r.json().get('formDefinitions') or []
+            if defs:
+                encontrados.append({'itwin_id': tid, 'formularios': [
+                    {'id': d.get('id'), 'nombre': d.get('displayName'),
+                     'tipo': d.get('type')} for d in defs]})
+                definicion_id = defs[0].get('id')
+                break
+
+        if not definicion_id:
+            return jsonify({'error': 'Ninguno de tus proyectos tiene '
+                                     'formularios aprobados',
+                            'proyectos_revisados': len(itwins)}), 404
+
+    r = _get(token, f'{API}/forms/form-definitions/{definicion_id}',
+             version='v2')
+    if r.status_code != 200:
+        return jsonify({'paso': 'definicion', 'estado': r.status_code,
+                        'detalle': r.text[:400]}), 502
+
+    d = (r.json() or {}).get('formDefinition') or {}
+    bruto = d.get('definition')
+    try:
+        d['definition'] = _j.loads(bruto) if isinstance(bruto, str) else bruto
+    except Exception:
+        d['definition_parseo'] = 'no se pudo parsear'
+
+    return jsonify(d)
