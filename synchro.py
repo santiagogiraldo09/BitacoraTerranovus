@@ -768,6 +768,11 @@ def ver_campos():
                 full = (rf.json() or {}).get('formDefinition') or {}
                 campos = campos_de_definicion(full)
                 salida.append({
+                    # Temporal: las rutas que la API declara, para poder
+                    # contrastar las que no coincidieron.
+                    '_rutas':     sorted(x.get('property') for x
+                                         in (full.get('dataBindings') or [])
+                                         if isinstance(x, dict)),
                     'proyecto':   t.get('displayName'),
                     'itwin_id':   t.get('id'),
                     'formulario': full.get('displayName'),
@@ -787,6 +792,14 @@ def ver_campos():
                 resumen['campos'] += 1
                 o = c['origen']
                 resumen['origenes'][o] = resumen['origenes'].get(o, 0) + 1
+                if c['origen'] == 'supuesta':
+                    resumen.setdefault('supuestos', []).append({
+                        'formulario': f['formulario'],
+                        'binding':    c['binding'],
+                        'clave':      c['clave'],
+                        'candidata':  c['ruta'],
+                        'declaradas': f['_rutas'],
+                    })
                 if not c['enviable']:
                     resumen['no_enviables'].append(
                         f"{f['formulario']} · {c['etiqueta']} ({c['control']})")
