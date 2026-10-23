@@ -883,8 +883,11 @@ def formularios_disponibles():
 
         proyectos = []
         for t in (r.json().get('iTwins') or []):
+            # El parámetro 'status' vale 'Approved' por defecto: sin
+            # 'any' no se ven las definiciones en borrador, en
+            # mantenimiento ni archivadas.
             rd = _get(token, f'{API}/forms/form-definitions',
-                      {'iTwinId': t.get('id')}, version='v2')
+                      {'iTwinId': t.get('id'), 'status': 'any'}, version='v2')
 
             # Ningún proyecto se descarta: si no trae formularios, se
             # dice por qué. Descartarlos en silencio hace imposible
@@ -909,11 +912,12 @@ def formularios_disponibles():
                     'definicion_id': d.get('id'),
                     'nombre':        d.get('displayName') or d.get('id'),
                     'tipo':          d.get('type') or '',
+                    'estado_def':    d.get('status') or '',
                     'vinculado':     d.get('id') in vinculados,
                 } for d in (rd.json().get('formDefinitions') or [])]
 
                 if not entrada['formularios']:
-                    entrada['aviso'] = 'Sin formularios aprobados'
+                    entrada['aviso'] = 'Este proyecto no tiene formularios'
 
             proyectos.append(entrada)
 
