@@ -472,7 +472,8 @@ def ver_definicion():
 
     token = _token_actual()
     if not token:
-        return jsonify({'error': 'Reconecta tu cuenta de Synchro'}), 409
+        return jsonify({'error': 'Reconecta tu cuenta de Synchro',
+                        'pista': 'Revisa el log por [SYNCHRO] refresh'}), 409
 
     try:
         definicion_id = request.args.get('id')
