@@ -457,14 +457,12 @@ def listar_formularios():
 
 @synchro_bp.route('/api/integraciones/synchro/definicion', methods=['GET'])
 def ver_definicion():
-    """TEMPORAL — vuelca la definición cruda de un formulario.
+    """TEMPORAL — busca un formulario con campos y vuelca su definición.
 
-    Sin parámetros recorre los proyectos del usuario hasta dar con uno
-    que tenga formularios aprobados y devuelve el primero. Se puede
-    acotar con ?itwin_id= o ?id= si se quiere uno concreto.
-
-    Existe sólo para inspeccionar el formato de 'definition', que la
-    documentación de Bentley no describe. Se borra después.
+    Recorre los proyectos del usuario contando los controles de cada
+    definición. Devuelve el inventario completo más la primera que
+    tenga contenido: las plantillas de fábrica vienen vacías y no
+    sirven para entender el formato.
     """
     import json as _j
     if 'user_id' not in session:
@@ -472,57 +470,62 @@ def ver_definicion():
 
     token = _token_actual()
     if not token:
-        return jsonify({'error': 'Reconecta tu cuenta de Synchro',
-                        'pista': 'Revisa el log por [SYNCHRO] refresh'}), 409
+        return jsonify({'error': 'Reconecta tu cuenta de Synchro'}), 409
+
+    def contar(nodo):
+        """Controles dentro del árbol, a cualquier profundidad."""
+        n = 0
+        if isinstance(nodo, dict):
+            for clave, valor in nodo.items():
+                if clave == 'Children' and isinstance(valor, list):
+                    n += len(valor)
+                n += contar(valor)
+        elif isinstance(nodo, list):
+            for x in nodo:
+                n += contar(x)
+        return n
 
     try:
-        definicion_id = request.args.get('id')
-
-        if not definicion_id:
-            itwins = ([request.args.get('itwin_id')]
-                      if request.args.get('itwin_id') else [])
-
-            if not itwins:
-                r = _get(token, f'{API}/itwins/',
-                         {'subClass': 'Project', 'status': 'Active', '$top': 50},
-                         version='v1')
-                if r.status_code != 200:
-                    return jsonify({'paso': 'itwins', 'estado': r.status_code,
-                                    'detalle': r.text[:400]}), 502
-                itwins = [t.get('id') for t in (r.json().get('iTwins') or [])]
-
-            if not itwins:
-                return jsonify({'error': 'No tienes proyectos en Synchro'}), 404
-
-            for tid in itwins:
-                r = _get(token, f'{API}/forms/form-definitions',
-                         {'iTwinId': tid}, version='v2')
-                if r.status_code != 200:
-                    continue
-                defs = r.json().get('formDefinitions') or []
-                if defs:
-                    definicion_id = defs[0].get('id')
-                    break
-
-            if not definicion_id:
-                return jsonify({'error': 'Ninguno de tus proyectos tiene '
-                                         'formularios aprobados',
-                                'proyectos_revisados': len(itwins)}), 404
-
-        r = _get(token, f'{API}/forms/form-definitions/{definicion_id}',
-                 version='v2')
+        r = _get(token, f'{API}/itwins/',
+                 {'subClass': 'Project', 'status': 'Active', '$top': 50},
+                 version='v1')
         if r.status_code != 200:
-            return jsonify({'paso': 'definicion', 'estado': r.status_code,
+            return jsonify({'paso': 'itwins', 'estado': r.status_code,
                             'detalle': r.text[:400]}), 502
 
-        d = (r.json() or {}).get('formDefinition') or {}
-        bruto = d.get('definition')
-        try:
-            d['definition'] = _j.loads(bruto) if isinstance(bruto, str) else bruto
-        except Exception:
-            d['definition_parseo'] = 'no se pudo parsear'
+        inventario, con_campos = [], None
 
-        return jsonify(d)
+        for t in (r.json().get('iTwins') or []):
+            tid = t.get('id')
+            rd = _get(token, f'{API}/forms/form-definitions',
+                      {'iTwinId': tid}, version='v2')
+            if rd.status_code != 200:
+                continue
+
+            for d in (rd.json().get('formDefinitions') or []):
+                rf = _get(token, f'{API}/forms/form-definitions/{d.get("id")}',
+                          version='v2')
+                if rf.status_code != 200:
+                    continue
+                full = (rf.json() or {}).get('formDefinition') or {}
+                try:
+                    arbol = _j.loads(full.get('definition') or '{}')
+                except Exception:
+                    arbol = {}
+
+                n = contar(arbol)
+                inventario.append({
+                    'proyecto':  t.get('displayName'),
+                    'formulario': full.get('displayName'),
+                    'id':         full.get('id'),
+                    'controles':  n,
+                })
+                if n and con_campos is None:
+                    full['definition'] = arbol
+                    con_campos = full
+
+        return jsonify({'inventario': inventario,
+                        'con_campos': con_campos})
 
     except Exception as e:
         current_app.logger.exception('synchro ver_definicion')
