@@ -573,7 +573,7 @@ def _tipo_bitacora(tipo_control, props, tipo_dato):
     if tipo_control == 'Weather':
         return 'clima'
 
-    if tipo_control == 'CheckBox':
+    if tipo_control.lower() in ('checkbox', 'check', 'toggle'):
         return 'booleano'
 
     return 'texto_corto'
@@ -599,23 +599,32 @@ def _opciones(props):
 
 
 def _ruta_de(binding, etiqueta, rutas_conocidas):
-    """Dónde vive el valor dentro de la instancia.
+    """Dónde vive el valor dentro de la instancia, y con cuánta certeza.
 
-    Los campos propios van bajo 'properties' con su etiqueta como
-    llave; los del sistema tienen su propio sitio en la raíz. Se
-    comprueba contra las rutas que la API declaró, y sólo si no
-    aparece se recurre a la convención.
+    Devuelve (ruta, origen), donde origen es uno de:
+      sistema              atributo conocido de la raíz
+      propiedad            ruta confirmada por la API
+      supuesta             se aplicó la convención, sin confirmar
+      sistema_desconocido  parece interno de Synchro y no sabemos dónde va
+
+    La distinción importa al escribir: sólo las dos primeras son
+    seguras de enviar.
     """
     if binding in BINDINGS_SISTEMA:
         return BINDINGS_SISTEMA[binding], 'sistema'
 
     candidata = f'properties.{etiqueta}'
-    if candidata in rutas_conocidas or not rutas_conocidas:
+
+    if candidata in rutas_conocidas:
         return candidata, 'propiedad'
 
-    # La etiqueta no coincidió con ninguna ruta declarada: se deja la
-    # convención, pero se marca para no enviarla a ciegas.
-    return candidata, 'dudosa'
+    # Los bindings con guion bajo son atributos internos. Si no está en
+    # la tabla de arriba, no sabemos su sitio: mejor marcarlo que
+    # mandarlo a ciegas bajo 'properties'.
+    if binding.startswith('_'):
+        return candidata, 'sistema_desconocido'
+
+    return candidata, 'supuesta'
 
 
 def campos_de_definicion(definicion_completa):
@@ -669,6 +678,10 @@ def campos_de_definicion(definicion_completa):
             'binding':   binding,
             'ruta':      ruta,
             'origen':    origen,
+            # 'clima' es un control compuesto de Synchro —temperatura,
+            # viento, condiciones— sin equivalente en Bitácora.
+            'enviable':  origen in ('sistema', 'propiedad')
+                         and tipo_control != 'Weather',
             'clave':     clave,
             'etiqueta':  etiqueta_externa or props.get('DisplayLabel') or clave,
             'tipo':      _tipo_bitacora(tipo_control, props, tipo_dato),
