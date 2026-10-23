@@ -725,7 +725,7 @@
                         <button class="integracion-btn" onclick="abrirModalSynchro()">
                             <i class="fas fa-link"></i> Conectar
                         </button>
-                        <button class="integracion-btn" onclick="abrirModalSynchro()">
+                        <button class="integracion-btn" onclick="abrirSynchroForms()">
                             <i class="fas fa-list-check"></i> Elegir formularios
                         </button>
                     </div>
@@ -1240,11 +1240,11 @@
 </div>
 
 <!-- MODAL: FORMULARIOS DE SYNCHRO -->
-<div class="invite-overlay" id="modal-synchro">
+<div class="invite-overlay" id="modal-synchro-forms">
     <div class="invite-modal">
         <div class="invite-header">
             <h3><i class="fas fa-cubes"></i> Formularios de Synchro</h3>
-            <button class="invite-close" onclick="cerrarModalSynchro()">
+            <button class="invite-close" onclick="cerrarSynchroForms()">
                 <i class="fas fa-times"></i>
             </button>
         </div>
@@ -1254,7 +1254,7 @@
             acceso.
         </p>
 
-        <div id="synchro-lista"></div>
+        <div id="synchro-forms-lista"></div>
 
         <p class="rep-hint" style="margin-top:14px;">
             Los campos se leen al vincular y quedan guardados. Si alguien
@@ -4232,33 +4232,36 @@
 
     // ══════════════════════════════════════════════════════════════
     //  SYNCHRO — formularios vinculados
+    //
+    //  Nombres propios ('…SynchroForms') porque el flujo de conexión
+    //  ya ocupa modal-synchro, abrirModalSynchro y cerrarModalSynchro.
     // ══════════════════════════════════════════════════════════════
 
-    let synchroDisponibles = [];   // [{itwin_id, proyecto, formularios:[…]}]
-    let synchroVinculados  = {};   // definicion_id → fila guardada
+    let sfDisponibles = [];   // [{itwin_id, proyecto, formularios:[…]}]
+    let sfVinculados  = {};   // definicion_id → fila guardada
 
-    function abrirModalSynchro() {
-        document.getElementById('modal-synchro').classList.add('active');
-        cargarSynchroFormularios();
+    function abrirSynchroForms() {
+        document.getElementById('modal-synchro-forms').classList.add('active');
+        cargarSynchroForms();
     }
 
-    function cerrarModalSynchro() {
-        document.getElementById('modal-synchro').classList.remove('active');
+    function cerrarSynchroForms() {
+        document.getElementById('modal-synchro-forms').classList.remove('active');
     }
 
     /** Busca a qué proyecto pertenece una definición. Se consulta en
-     *  memoria para no tener que pasar el nombre por el onclick, donde
-     *  las comillas de un proyecto se romperían. */
-    function _buscarSynchro(definicionId) {
-        for (const p of synchroDisponibles) {
+     *  memoria para no pasar el nombre por el onclick, donde las
+     *  comillas de un proyecto romperían el atributo. */
+    function _buscarSynchroForm(definicionId) {
+        for (const p of sfDisponibles) {
             const f = (p.formularios || []).find(x => x.definicion_id === definicionId);
             if (f) return { proyecto: p, formulario: f };
         }
         return null;
     }
 
-    async function cargarSynchroFormularios() {
-        const cont = document.getElementById('synchro-lista');
+    async function cargarSynchroForms() {
+        const cont = document.getElementById('synchro-forms-lista');
         cont.innerHTML = '<p class="rep-vacio">Consultando Synchro…</p>';
 
         try {
@@ -4275,32 +4278,32 @@
                 return;
             }
 
-            synchroDisponibles = disp.proyectos || [];
-            synchroVinculados  = {};
+            sfDisponibles = disp.proyectos || [];
+            sfVinculados  = {};
             (vinc.formularios || []).forEach(f => {
-                synchroVinculados[f.definicion_id] = f;
+                sfVinculados[f.definicion_id] = f;
             });
 
-            renderSynchroFormularios();
+            renderSynchroForms();
 
         } catch {
             cont.innerHTML = '<p class="rep-vacio">Error de conexión.</p>';
         }
     }
 
-    function renderSynchroFormularios() {
-        const cont = document.getElementById('synchro-lista');
+    function renderSynchroForms() {
+        const cont = document.getElementById('synchro-forms-lista');
 
-        if (!synchroDisponibles.length) {
+        if (!sfDisponibles.length) {
             cont.innerHTML = '<p class="rep-vacio">Tu cuenta no tiene proyectos ' +
-                            'con formularios aprobados en Synchro.</p>';
+                             'con formularios aprobados en Synchro.</p>';
             return;
         }
 
-        cont.innerHTML = synchroDisponibles.map(p => `
+        cont.innerHTML = sfDisponibles.map(p => `
             <div class="rep-bloque-titulo">${escHtml(p.proyecto)}</div>
             ${(p.formularios || []).map(f => {
-                const v  = synchroVinculados[f.definicion_id];
+                const v  = sfVinculados[f.definicion_id];
                 const id = f.definicion_id;
                 return `
                 <div class="pbi-item">
@@ -4316,25 +4319,25 @@
                     <div class="pbi-item-actions">
                         ${v
                             ? `<button class="icon-btn" title="Actualizar campos"
-                                    onclick="actualizarSynchro('${id}')">
-                                <i class="fas fa-rotate"></i>
-                            </button>
-                            <button class="icon-btn danger" title="Quitar"
-                                    onclick="desvincularSynchro('${id}')">
-                                <i class="fas fa-link-slash"></i>
-                            </button>`
+                                       onclick="actualizarSynchroForm('${id}')">
+                                   <i class="fas fa-rotate"></i>
+                               </button>
+                               <button class="icon-btn danger" title="Quitar"
+                                       onclick="desvincularSynchroForm('${id}')">
+                                   <i class="fas fa-link-slash"></i>
+                               </button>`
                             : `<button class="icon-btn" title="Vincular"
-                                    onclick="vincularSynchro('${id}')">
-                                <i class="fas fa-link"></i>
-                            </button>`}
+                                       onclick="vincularSynchroForm('${id}')">
+                                   <i class="fas fa-link"></i>
+                               </button>`}
                     </div>
                 </div>`;
             }).join('')}
         `).join('');
     }
 
-    async function vincularSynchro(definicionId) {
-        const hit = _buscarSynchro(definicionId);
+    async function vincularSynchroForm(definicionId) {
+        const hit = _buscarSynchroForm(definicionId);
         if (!hit) return;
 
         try {
@@ -4354,14 +4357,14 @@
                 return;
             }
             mostrarToast(`✅ ${data.nombre} — ${data.total} campos`);
-            cargarSynchroFormularios();
+            cargarSynchroForms();
 
         } catch {
             mostrarToast('❌ Error de conexión', true);
         }
     }
 
-    async function actualizarSynchro(definicionId) {
+    async function actualizarSynchroForm(definicionId) {
         try {
             const res  = await fetch(
                 `/api/integraciones/synchro/vinculados/${definicionId}/actualizar`,
@@ -4373,15 +4376,15 @@
                 return;
             }
             mostrarToast(`🔄 Campos actualizados — ${data.total}`);
-            cargarSynchroFormularios();
+            cargarSynchroForms();
 
         } catch {
             mostrarToast('❌ Error de conexión', true);
         }
     }
 
-    async function desvincularSynchro(definicionId) {
-        const hit = _buscarSynchro(definicionId);
+    async function desvincularSynchroForm(definicionId) {
+        const hit = _buscarSynchroForm(definicionId);
 
         const ok = await confirmar({
             titulo:  'Quitar este formulario',
@@ -4398,15 +4401,15 @@
             const data = await res.json();
             if (data.success) {
                 mostrarToast('🔗 Formulario desvinculado');
-                cargarSynchroFormularios();
+                cargarSynchroForms();
             }
         } catch {
             mostrarToast('❌ Error de conexión', true);
         }
     }
 
-    document.getElementById('modal-synchro')?.addEventListener('click', function(e) {
-        if (e.target === this) cerrarModalSynchro();
+    document.getElementById('modal-synchro-forms')?.addEventListener('click', function(e) {
+        if (e.target === this) cerrarSynchroForms();
     });
 </script>
 </body>
