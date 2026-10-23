@@ -530,3 +530,55 @@ def ver_definicion():
     except Exception as e:
         current_app.logger.exception('synchro ver_definicion')
         return jsonify({'error': str(e)}), 500
+
+
+@synchro_bp.route('/api/integraciones/synchro/instancia', methods=['GET'])
+def ver_instancia():
+    """TEMPORAL — busca un formulario YA LLENO y lo devuelve completo.
+
+    La definición dice qué campos existen; una instancia dice cómo se
+    ven con datos. Es lo que hace falta para saber cómo armar el POST
+    que crea formularios desde Bitácora.
+    """
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    token = _token_actual()
+    if not token:
+        return jsonify({'error': 'Reconecta tu cuenta de Synchro'}), 409
+
+    cabeceras = {
+        'Authorization': f'Bearer {token}',
+        'Accept': 'application/vnd.bentley.itwin-platform.v2+json',
+        'Prefer': 'return=representation',
+    }
+
+    try:
+        r = _get(token, f'{API}/itwins/',
+                 {'subClass': 'Project', 'status': 'Active', '$top': 50},
+                 version='v1')
+        if r.status_code != 200:
+            return jsonify({'paso': 'itwins', 'estado': r.status_code}), 502
+
+        conteo = []
+        for t in (r.json().get('iTwins') or []):
+            rf = requests.get(f'{API}/forms/', timeout=TIMEOUT,
+                              headers=cabeceras,
+                              params={'iTwinId': t.get('id'), '$top': 10})
+            if rf.status_code != 200:
+                continue
+            instancias = rf.json().get('formDataInstances') or \
+                         rf.json().get('formsData') or \
+                         rf.json().get('forms') or []
+            conteo.append({'proyecto': t.get('displayName'),
+                           'instancias': len(instancias)})
+            if instancias:
+                return jsonify({'conteo': conteo,
+                                'ejemplo_crudo': rf.json()})
+
+        return jsonify({'conteo': conteo,
+                        'mensaje': 'No hay formularios llenos en ningún proyecto'})
+
+    except Exception as e:
+        current_app.logger.exception('synchro ver_instancia')
+        return jsonify({'error': str(e)}), 500
