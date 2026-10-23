@@ -714,7 +714,7 @@
                             <div class="integracion-logo">
                                 <i class="fas fa-cubes"></i>
                             </div>
-                            <span class="integracion-badge">Próximamente</span>
+                            <span class="integracion-badge" id="synchro-badge">Próximamente</span>
                         </div>
                         <h4 class="integracion-nombre">Synchro Control</h4>
                         <p class="integracion-desc">
@@ -722,12 +722,16 @@
                             las actividades reportadas en Bitácora actualizan su
                             estado en Synchro sin digitación manual.
                         </p>
-                        <button class="integracion-btn" onclick="abrirModalSynchro()">
-                            <i class="fas fa-link"></i> Conectar
-                        </button>
-                        <button class="integracion-btn" onclick="abrirSynchroForms()">
-                            <i class="fas fa-list-check"></i> Elegir formularios
-                        </button>
+                        <div style="display:flex;flex-direction:column;gap:8px;">
+                            <button class="integracion-btn" id="synchro-btn-cuenta"
+                                    onclick="abrirModalSynchro()">
+                                <i class="fas fa-link"></i> Conectar
+                            </button>
+                            <button class="integracion-btn" id="synchro-btn-formularios"
+                                    onclick="abrirSynchroForms()">
+                                <i class="fas fa-list-check"></i> Elegir formularios
+                            </button>
+                        </div>
                     </div>
 
                 </div>
@@ -1958,6 +1962,7 @@
         if (!ok) return;
         await fetch('/api/integraciones/synchro/desconectar', { method: 'POST' });
         abrirModalSynchro();
+        estadoTarjetaSynchro();
     }
 
     // El callback de Bentley devuelve con ?synchro=<resultado>.
@@ -3519,6 +3524,9 @@
         //Cargar accesos de Power BI
         cargarTokensBI();
 
+        //Estado real de la tarjeta de Synchro
+        estadoTarjetaSynchro();
+
         document.getElementById('voc-instrucciones').addEventListener('input', function() {
             document.getElementById('voc-contador').textContent = this.value.length;
         });
@@ -4411,6 +4419,48 @@
     document.getElementById('modal-synchro-forms')?.addEventListener('click', function(e) {
         if (e.target === this) cerrarSynchroForms();
     });
+
+    /** Ajusta la tarjeta de Synchro a la conexión real. Sin esto dice
+     *  "Próximamente" y ofrece conectar aunque la cuenta ya lo esté. */
+    async function estadoTarjetaSynchro() {
+        const badge  = document.getElementById('synchro-badge');
+        const cuenta = document.getElementById('synchro-btn-cuenta');
+        const forms  = document.getElementById('synchro-btn-formularios');
+        if (!badge || !cuenta || !forms) return;
+
+        try {
+            const res = await fetch('/api/integraciones/synchro/estado');
+            const d   = await res.json();
+
+            if (!d.configurado) {
+                badge.textContent = 'Próximamente';
+                badge.className   = 'integracion-badge';
+                cuenta.disabled   = true;
+                forms.disabled    = true;
+                return;
+            }
+
+            if (d.conectado) {
+                badge.textContent = 'Conectado';
+                badge.className   = 'integracion-badge activa';
+                cuenta.innerHTML  = '<i class="fas fa-user-check"></i> Tu cuenta de Bentley';
+                cuenta.disabled   = false;
+                forms.disabled    = false;
+                return;
+            }
+
+            badge.textContent = 'Disponible';
+            badge.className   = 'integracion-badge activa';
+            cuenta.innerHTML  = '<i class="fas fa-link"></i> Conectar';
+            cuenta.disabled   = false;
+            // Sin conexión no hay formularios que listar.
+            forms.disabled    = true;
+
+        } catch {
+            // Si no se puede comprobar, se deja la tarjeta como está:
+            // bloquear botones por un fallo de red sería peor.
+        }
+    }
 </script>
 </body>
 </html>
