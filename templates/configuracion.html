@@ -4325,7 +4325,8 @@
                         </span>
                         <span class="pbi-item-meta">
                             ${escHtml(f.tipo || '—')}${f.estado_def && f.estado_def !== 'Approved'
-                                ? ' · ' + escHtml(f.estado_def) : ''}${v ? ` · ${v.total} campo${v.total === 1 ? '' : 's'}` : ''}
+                                ? ` · <span style="color:#d97706;">${escHtml(f.estado_def)} — no admite registros nuevos</span>`
+                                : ''}${v ? ` · ${v.total} campo${v.total === 1 ? '' : 's'}` : ''}
                         </span>
                     </div>
                     <div class="pbi-item-actions">
