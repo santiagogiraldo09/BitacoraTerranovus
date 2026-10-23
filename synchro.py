@@ -541,12 +541,18 @@ def ver_definicion():
 
 # Bindings que no son campos propios del formulario sino atributos del
 # sistema: viven en la raíz de la instancia, no dentro de 'properties'.
+# Synchro no es consistente con el guion bajo: manda 'Status' y
+# 'AssignedTo' pelados, pero '_Subject', '_DueDate' y '_AssignedUsers'
+# con prefijo. Se registran las dos formas de los que varían.
 BINDINGS_SISTEMA = {
     'Status':          'status',
-    '_DueDate':        'dueDate',
     'AssignedTo':      'assignee',
     '_AssignedUsers':  'assignees',
+    '_DueDate':        'dueDate',
+    'DueDate':         'dueDate',
+    '_Subject':        'subject',
     'Subject':         'subject',
+    '_Description':    'description',
     'Description':     'description',
 }
 
