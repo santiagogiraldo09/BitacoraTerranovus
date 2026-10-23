@@ -809,3 +809,253 @@ def ver_campos():
     except Exception as e:
         current_app.logger.exception('synchro ver_campos')
         return jsonify({'error': str(e)}), 500
+
+
+# ═════════════════════════════════════════════════════════════════════
+#  FORMULARIOS VINCULADOS
+#
+#  El usuario escoge qué formularios de Synchro quiere llenar desde
+#  Bitácora. Al vincular se interpreta la definición una sola vez y se
+#  guarda la lista de campos: armarla cuesta tres llamadas encadenadas
+#  a Bentley (iTwins → definiciones → detalle) y las definiciones casi
+#  nunca cambian.
+# ═════════════════════════════════════════════════════════════════════
+
+def _descargar_campos(token, definicion_id):
+    """Trae una definición y la interpreta. Devuelve (full, campos)."""
+    r = _get(token, f'{API}/forms/form-definitions/{definicion_id}',
+             version='v2')
+    if r.status_code != 200:
+        current_app.logger.warning("[SYNCHRO] definicion %s: %s",
+                                   r.status_code, r.text[:200])
+        return None, None
+    full = (r.json() or {}).get('formDefinition') or {}
+    return full, campos_de_definicion(full)
+
+
+def _fila(f):
+    """Normaliza una fila de synchro_formularios para el frontend."""
+    campos = f[5] or []
+    return {
+        'definicion_id': f[0],
+        'nombre':        f[1],
+        'tipo':          f[2],
+        'proyecto':      f[3],
+        'itwin_id':      f[4],
+        'campos':        campos,
+        'total':         len([c for c in campos if c.get('enviable')]),
+        'actualizado':   f[6].isoformat() if f[6] else None,
+    }
+
+
+@synchro_bp.route('/api/integraciones/synchro/disponibles', methods=['GET'])
+def formularios_disponibles():
+    """Proyectos de Synchro con sus formularios, marcando los vinculados.
+
+    No descarga el detalle de cada definición: para escoger basta el
+    nombre. Los campos se interpretan al vincular, que es cuando de
+    verdad se necesitan.
+    """
+    from app import db_connection
+
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    token = _token_actual()
+    if not token:
+        return jsonify({'error': 'Reconecta tu cuenta de Synchro'}), 409
+
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT definicion_id FROM synchro_formularios
+                WHERE user_id = %s
+            """, (session['user_id'],))
+            vinculados = {x[0] for x in cursor.fetchall()}
+
+        r = _get(token, f'{API}/itwins/',
+                 {'subClass': 'Project', 'status': 'Active', '$top': 50},
+                 version='v1')
+        if r.status_code != 200:
+            return jsonify({'error': f'Bentley respondio {r.status_code}'}), 502
+
+        proyectos = []
+        for t in (r.json().get('iTwins') or []):
+            rd = _get(token, f'{API}/forms/form-definitions',
+                      {'iTwinId': t.get('id')}, version='v2')
+
+            # 404 aquí suele ser falta de permiso sobre ese iTwin, no un
+            # error: se omite el proyecto en silencio.
+            if rd.status_code != 200:
+                continue
+
+            definiciones = [{
+                'definicion_id': d.get('id'),
+                'nombre':        d.get('displayName') or d.get('id'),
+                'tipo':          d.get('type') or '',
+                'vinculado':     d.get('id') in vinculados,
+            } for d in (rd.json().get('formDefinitions') or [])]
+
+            if definiciones:
+                proyectos.append({
+                    'itwin_id':    t.get('id'),
+                    'proyecto':    t.get('displayName'),
+                    'formularios': definiciones,
+                })
+
+        return jsonify({'proyectos': proyectos})
+
+    except Exception as e:
+        current_app.logger.exception('synchro disponibles')
+        return jsonify({'error': str(e)}), 500
+
+
+@synchro_bp.route('/api/integraciones/synchro/vinculados', methods=['GET'])
+def listar_vinculados():
+    """Los formularios ya vinculados. No toca Bentley: sale de la base."""
+    from app import db_connection
+
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT definicion_id, nombre, tipo, proyecto, itwin_id,
+                       campos, actualizado_en
+                FROM synchro_formularios
+                WHERE user_id = %s
+                ORDER BY proyecto, nombre
+            """, (session['user_id'],))
+            filas = cursor.fetchall()
+
+        return jsonify({'formularios': [_fila(f) for f in filas]})
+
+    except Exception as e:
+        current_app.logger.exception('synchro vinculados')
+        return jsonify({'error': str(e)}), 500
+
+
+@synchro_bp.route('/api/integraciones/synchro/vincular', methods=['POST'])
+def vincular_formulario():
+    """Interpreta una definición y la guarda para usarla desde Bitácora."""
+    from app import db_connection
+
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    datos         = request.get_json(silent=True) or {}
+    itwin_id      = (datos.get('itwin_id') or '').strip()
+    definicion_id = (datos.get('definicion_id') or '').strip()
+    proyecto      = (datos.get('proyecto') or '').strip()
+
+    if not itwin_id or not definicion_id:
+        return jsonify({'error': 'Faltan itwin_id y definicion_id'}), 400
+
+    token = _token_actual()
+    if not token:
+        return jsonify({'error': 'Reconecta tu cuenta de Synchro'}), 409
+
+    try:
+        full, campos = _descargar_campos(token, definicion_id)
+        if full is None:
+            return jsonify({'error': 'No se pudo leer la definicion en '
+                                     'Synchro'}), 502
+
+        enviables = [c for c in campos if c.get('enviable')]
+        if not enviables:
+            # Las plantillas de fábrica vienen sin controles: vincularlas
+            # dejaría una pantalla vacía.
+            return jsonify({'error': 'Ese formulario no tiene campos que '
+                                     'se puedan llenar desde Bitacora'}), 422
+
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                INSERT INTO synchro_formularios
+                    (empresa_id, user_id, itwin_id, proyecto,
+                     definicion_id, nombre, tipo, campos)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s::jsonb)
+                ON CONFLICT (user_id, definicion_id) DO UPDATE SET
+                    itwin_id       = EXCLUDED.itwin_id,
+                    proyecto       = EXCLUDED.proyecto,
+                    nombre         = EXCLUDED.nombre,
+                    tipo           = EXCLUDED.tipo,
+                    campos         = EXCLUDED.campos,
+                    actualizado_en = NOW()
+            """, (session.get('empresa_id'), session['user_id'],
+                  itwin_id, proyecto, definicion_id,
+                  full.get('displayName') or definicion_id,
+                  full.get('type') or '', json.dumps(campos)))
+            conn.commit()
+
+        return jsonify({'success': True,
+                        'nombre': full.get('displayName'),
+                        'total': len(enviables)})
+
+    except Exception as e:
+        current_app.logger.exception('synchro vincular')
+        return jsonify({'error': str(e)}), 500
+
+
+@synchro_bp.route('/api/integraciones/synchro/vincular/<definicion_id>',
+                  methods=['DELETE'])
+def desvincular_formulario(definicion_id):
+    """Quita la vinculación. No borra nada en Synchro."""
+    from app import db_connection
+
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                DELETE FROM synchro_formularios
+                WHERE user_id = %s AND definicion_id = %s
+            """, (session['user_id'], definicion_id))
+            conn.commit()
+
+        return jsonify({'success': True})
+
+    except Exception as e:
+        current_app.logger.exception('synchro desvincular')
+        return jsonify({'error': str(e)}), 500
+
+
+@synchro_bp.route('/api/integraciones/synchro/vinculados/<definicion_id>'
+                  '/actualizar', methods=['POST'])
+def actualizar_campos(definicion_id):
+    """Vuelve a leer la definición por si cambió en Synchro."""
+    from app import db_connection
+
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    token = _token_actual()
+    if not token:
+        return jsonify({'error': 'Reconecta tu cuenta de Synchro'}), 409
+
+    try:
+        full, campos = _descargar_campos(token, definicion_id)
+        if full is None:
+            return jsonify({'error': 'No se pudo leer la definicion'}), 502
+
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                UPDATE synchro_formularios
+                SET nombre = %s, tipo = %s, campos = %s::jsonb,
+                    actualizado_en = NOW()
+                WHERE user_id = %s AND definicion_id = %s
+            """, (full.get('displayName') or definicion_id,
+                  full.get('type') or '', json.dumps(campos),
+                  session['user_id'], definicion_id))
+            if cursor.rowcount == 0:
+                return jsonify({'error': 'Ese formulario no esta '
+                                         'vinculado'}), 404
+            conn.commit()
+
+        total = len([c for c in campos if c.get('enviable')])
+        return jsonify({'success': True, 'total': total})
+
+    except Exception as e:
+        current_app.logger.exception('synchro actualizar campos')
+        return jsonify({'error': str(e)}), 500
