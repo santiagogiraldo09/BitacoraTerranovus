@@ -725,6 +725,9 @@
                         <button class="integracion-btn" onclick="abrirModalSynchro()">
                             <i class="fas fa-link"></i> Conectar
                         </button>
+                        <button class="integracion-btn" onclick="abrirModalSynchro()">
+                            <i class="fas fa-list-check"></i> Elegir formularios
+                        </button>
                     </div>
 
                 </div>
@@ -1233,6 +1236,30 @@
                 no pasa por Bitácora ni queda guardada aquí.
             </p>
         </div>
+    </div>
+</div>
+
+<!-- MODAL: FORMULARIOS DE SYNCHRO -->
+<div class="invite-overlay" id="modal-synchro">
+    <div class="invite-modal">
+        <div class="invite-header">
+            <h3><i class="fas fa-cubes"></i> Formularios de Synchro</h3>
+            <button class="invite-close" onclick="cerrarModalSynchro()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <p class="invite-subtitle">
+            Elige qué formularios quieres llenar desde Bitácora. Solo
+            aparecen los proyectos a los que tu cuenta de Bentley tiene
+            acceso.
+        </p>
+
+        <div id="synchro-lista"></div>
+
+        <p class="rep-hint" style="margin-top:14px;">
+            Los campos se leen al vincular y quedan guardados. Si alguien
+            cambia el formulario en Synchro, usa el botón de actualizar.
+        </p>
     </div>
 </div>
 
@@ -4201,6 +4228,185 @@
 
     document.getElementById('modal-campo').addEventListener('click', function(e) {
         if (e.target === this) cerrarModalCampo();
+    });
+
+    // ══════════════════════════════════════════════════════════════
+    //  SYNCHRO — formularios vinculados
+    // ══════════════════════════════════════════════════════════════
+
+    let synchroDisponibles = [];   // [{itwin_id, proyecto, formularios:[…]}]
+    let synchroVinculados  = {};   // definicion_id → fila guardada
+
+    function abrirModalSynchro() {
+        document.getElementById('modal-synchro').classList.add('active');
+        cargarSynchroFormularios();
+    }
+
+    function cerrarModalSynchro() {
+        document.getElementById('modal-synchro').classList.remove('active');
+    }
+
+    /** Busca a qué proyecto pertenece una definición. Se consulta en
+     *  memoria para no tener que pasar el nombre por el onclick, donde
+     *  las comillas de un proyecto se romperían. */
+    function _buscarSynchro(definicionId) {
+        for (const p of synchroDisponibles) {
+            const f = (p.formularios || []).find(x => x.definicion_id === definicionId);
+            if (f) return { proyecto: p, formulario: f };
+        }
+        return null;
+    }
+
+    async function cargarSynchroFormularios() {
+        const cont = document.getElementById('synchro-lista');
+        cont.innerHTML = '<p class="rep-vacio">Consultando Synchro…</p>';
+
+        try {
+            const [rd, rv] = await Promise.all([
+                fetch('/api/integraciones/synchro/disponibles'),
+                fetch('/api/integraciones/synchro/vinculados')
+            ]);
+            const disp = await rd.json();
+            const vinc = await rv.json();
+
+            // 409 cuando la conexión con Bentley expiró o no existe.
+            if (disp.error) {
+                cont.innerHTML = `<p class="rep-vacio">${escHtml(disp.error)}</p>`;
+                return;
+            }
+
+            synchroDisponibles = disp.proyectos || [];
+            synchroVinculados  = {};
+            (vinc.formularios || []).forEach(f => {
+                synchroVinculados[f.definicion_id] = f;
+            });
+
+            renderSynchroFormularios();
+
+        } catch {
+            cont.innerHTML = '<p class="rep-vacio">Error de conexión.</p>';
+        }
+    }
+
+    function renderSynchroFormularios() {
+        const cont = document.getElementById('synchro-lista');
+
+        if (!synchroDisponibles.length) {
+            cont.innerHTML = '<p class="rep-vacio">Tu cuenta no tiene proyectos ' +
+                            'con formularios aprobados en Synchro.</p>';
+            return;
+        }
+
+        cont.innerHTML = synchroDisponibles.map(p => `
+            <div class="rep-bloque-titulo">${escHtml(p.proyecto)}</div>
+            ${(p.formularios || []).map(f => {
+                const v  = synchroVinculados[f.definicion_id];
+                const id = f.definicion_id;
+                return `
+                <div class="pbi-item">
+                    <div class="pbi-item-info">
+                        <span class="pbi-item-nombre">
+                            ${escHtml(f.nombre)}
+                            ${v ? '<span class="pbi-tag">vinculado</span>' : ''}
+                        </span>
+                        <span class="pbi-item-meta">
+                            ${escHtml(f.tipo || '—')}${v ? ` · ${v.total} campo${v.total === 1 ? '' : 's'}` : ''}
+                        </span>
+                    </div>
+                    <div class="pbi-item-actions">
+                        ${v
+                            ? `<button class="icon-btn" title="Actualizar campos"
+                                    onclick="actualizarSynchro('${id}')">
+                                <i class="fas fa-rotate"></i>
+                            </button>
+                            <button class="icon-btn danger" title="Quitar"
+                                    onclick="desvincularSynchro('${id}')">
+                                <i class="fas fa-link-slash"></i>
+                            </button>`
+                            : `<button class="icon-btn" title="Vincular"
+                                    onclick="vincularSynchro('${id}')">
+                                <i class="fas fa-link"></i>
+                            </button>`}
+                    </div>
+                </div>`;
+            }).join('')}
+        `).join('');
+    }
+
+    async function vincularSynchro(definicionId) {
+        const hit = _buscarSynchro(definicionId);
+        if (!hit) return;
+
+        try {
+            const res = await fetch('/api/integraciones/synchro/vincular', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({
+                    itwin_id:      hit.proyecto.itwin_id,
+                    proyecto:      hit.proyecto.proyecto,
+                    definicion_id: definicionId
+                })
+            });
+            const data = await res.json();
+
+            if (!data.success) {
+                mostrarToast('❌ ' + (data.error || 'No se pudo vincular'), true);
+                return;
+            }
+            mostrarToast(`✅ ${data.nombre} — ${data.total} campos`);
+            cargarSynchroFormularios();
+
+        } catch {
+            mostrarToast('❌ Error de conexión', true);
+        }
+    }
+
+    async function actualizarSynchro(definicionId) {
+        try {
+            const res  = await fetch(
+                `/api/integraciones/synchro/vinculados/${definicionId}/actualizar`,
+                { method: 'POST' });
+            const data = await res.json();
+
+            if (!data.success) {
+                mostrarToast('❌ ' + (data.error || 'No se pudo actualizar'), true);
+                return;
+            }
+            mostrarToast(`🔄 Campos actualizados — ${data.total}`);
+            cargarSynchroFormularios();
+
+        } catch {
+            mostrarToast('❌ Error de conexión', true);
+        }
+    }
+
+    async function desvincularSynchro(definicionId) {
+        const hit = _buscarSynchro(definicionId);
+
+        const ok = await confirmar({
+            titulo:  'Quitar este formulario',
+            mensaje: `Dejará de aparecer en Bitácora${hit ? ': ' + hit.formulario.nombre : ''}.`,
+            detalle: 'No se borra nada en Synchro, ni los registros ya enviados.',
+            textoOk: 'Quitar'
+        });
+        if (!ok) return;
+
+        try {
+            const res  = await fetch(
+                `/api/integraciones/synchro/vincular/${definicionId}`,
+                { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                mostrarToast('🔗 Formulario desvinculado');
+                cargarSynchroFormularios();
+            }
+        } catch {
+            mostrarToast('❌ Error de conexión', true);
+        }
+    }
+
+    document.getElementById('modal-synchro')?.addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalSynchro();
     });
 </script>
 </body>
