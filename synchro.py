@@ -46,7 +46,17 @@ SCOPES  = 'itwin-platform offline_access'
 TIMEOUT = 15
 MARGEN_EXPIRACION = 120     # segundos de colchón antes de renovar
 
-VUELTA = '/configuracion#integraciones'
+VUELTA = '/configuracion'
+
+
+def _volver(resultado):
+    """URL de regreso con el resultado del intento.
+
+    El parámetro va ANTES del ancla a propósito: en '/x#y?z=1' el
+    navegador considera '?z=1' parte del fragmento, location.search
+    queda vacío y la página nunca se entera de cómo fue la conexión.
+    """
+    return f'{VUELTA}?synchro={resultado}#integraciones'
 
 
 def _cfg(nombre):
@@ -88,7 +98,7 @@ def conectar():
     if 'user_id' not in session:
         return redirect('/')
     if not _configurado():
-        return redirect(VUELTA + '?synchro=no_configurado')
+        return redirect(_volver('no_configurado'))
 
     # El 'state' ata la vuelta a esta sesión: sin él, cualquiera podría
     # provocar que un usuario conecte una cuenta ajena.
@@ -119,16 +129,16 @@ def callback():
             "[SYNCHRO] Bentley rechazó: %s — %s",
             request.args.get('error'),
             request.args.get('error_description'))
-        return redirect(VUELTA + '?synchro=rechazado')
+        return redirect(_volver('rechazado'))
 
     estado_recibido = request.args.get('state')
     estado_esperado = session.pop('synchro_state', None)
     if not estado_esperado or estado_recibido != estado_esperado:
-        return redirect(VUELTA + '?synchro=estado_invalido')
+        return redirect(_volver('estado_invalido'))
 
     codigo = request.args.get('code')
     if not codigo:
-        return redirect(VUELTA + '?synchro=sin_codigo')
+        return redirect(_volver('sin_codigo'))
 
     try:
         r = requests.post(URL_TOKEN, timeout=TIMEOUT, data={
@@ -141,7 +151,7 @@ def callback():
         if r.status_code != 200:
             current_app.logger.warning("[SYNCHRO] token %s: %s",
                                        r.status_code, r.text[:400])
-            return redirect(VUELTA + '?synchro=error_token')
+            return redirect(_volver('error_token'))
 
         datos   = r.json()
         acceso  = datos.get('access_token')
@@ -154,7 +164,7 @@ def callback():
             current_app.logger.warning(
                 "[SYNCHRO] Bentley no devolvió refresh_token; "
                 "revisar que el scope offline_access esté concedido.")
-            return redirect(VUELTA + '?synchro=sin_refresh')
+            return redirect(_volver('sin_refresh'))
 
         cuenta, sub = _identidad(acceso)
 
@@ -177,11 +187,11 @@ def callback():
                   datetime.now(timezone.utc) + timedelta(seconds=expira)))
             conn.commit()
 
-        return redirect(VUELTA + '?synchro=ok')
+        return redirect(_volver('ok'))
 
     except Exception as e:
         current_app.logger.exception('synchro callback')
-        return redirect(VUELTA + '?synchro=error')
+        return redirect(_volver('error'))
 
 
 def _identidad(access_token):
@@ -332,13 +342,129 @@ def desconectar():
         current_app.logger.exception('synchro desconectar')
         return jsonify({'error': str(e)}), 500
 
-@synchro_bp.route('/api/integraciones/synchro/definicion')
+
+# ══════════════════════════════════════════════════════════════════════
+#  LECTURA DE SYNCHRO
+# ══════════════════════════════════════════════════════════════════════
+
+API = 'https://api.bentley.com'
+
+
+def _get(token, url, params=None, version='v1'):
+    """GET contra la plataforma iTwin con el token del usuario."""
+    return requests.get(url, params=params or {}, timeout=TIMEOUT, headers={
+        'Authorization': f'Bearer {token}',
+        'Accept': f'application/vnd.bentley.itwin-platform.{version}+json',
+    })
+
+
+def _token_actual():
+    """Token válido del usuario de la sesión, o None si hay que reconectar.
+
+    Abre su propia conexión porque token_de_usuario() puede renovar y
+    escribir en la tabla, y ese UPDATE necesita commit.
+    """
+    from app import db_connection
+    user_id = session.get('user_id')
+    if not user_id:
+        return None
+    with db_connection() as (conn, cursor):
+        token = token_de_usuario(cursor, user_id)
+        conn.commit()
+    return token
+
+
+@synchro_bp.route('/api/integraciones/synchro/itwins', methods=['GET'])
+def listar_itwins():
+    """Proyectos de Synchro a los que el usuario tiene acceso."""
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    token = _token_actual()
+    if not token:
+        return jsonify({'error': 'Reconecta tu cuenta de Synchro',
+                        'reconectar': True}), 409
+
+    try:
+        r = _get(token, f'{API}/itwins/', {
+            'subClass': 'Project',
+            'status':   'Active',
+            '$top':     100,
+        }, version='v1')
+
+        if r.status_code != 200:
+            current_app.logger.warning("[SYNCHRO] itwins %s: %s",
+                                       r.status_code, r.text[:300])
+            return jsonify({'error': f'Bentley respondio {r.status_code}'}), 502
+
+        proyectos = [{
+            'id':     t.get('id'),
+            'nombre': t.get('displayName') or t.get('number') or t.get('id'),
+            'numero': t.get('number') or '',
+        } for t in (r.json().get('iTwins') or [])]
+
+        return jsonify({'proyectos': proyectos})
+
+    except Exception as e:
+        current_app.logger.exception('synchro itwins')
+        return jsonify({'error': str(e)}), 500
+
+
+@synchro_bp.route('/api/integraciones/synchro/formularios', methods=['GET'])
+def listar_formularios():
+    """Definiciones de formulario de un proyecto de Synchro.
+
+    Sólo las aprobadas: las borradores y las archivadas no deberían
+    ofrecerse para que alguien las llene desde Bitácora.
+    """
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    itwin_id = request.args.get('itwin_id')
+    if not itwin_id:
+        return jsonify({'error': 'Falta el proyecto'}), 400
+
+    token = _token_actual()
+    if not token:
+        return jsonify({'error': 'Reconecta tu cuenta de Synchro',
+                        'reconectar': True}), 409
+
+    try:
+        r = _get(token, f'{API}/forms/form-definitions',
+                 {'iTwinId': itwin_id}, version='v2')
+
+        if r.status_code == 404:
+            # Bentley usa 404 también cuando falta permiso sobre el iTwin.
+            return jsonify({'formularios': [], 'sin_acceso': True})
+
+        if r.status_code != 200:
+            current_app.logger.warning("[SYNCHRO] form-definitions %s: %s",
+                                       r.status_code, r.text[:300])
+            return jsonify({'error': f'Bentley respondio {r.status_code}'}), 502
+
+        formularios = [{
+            'id':     f.get('id'),
+            'nombre': f.get('displayName') or f.get('id'),
+            'tipo':   f.get('type') or '',
+        } for f in (r.json().get('formDefinitions') or [])]
+
+        return jsonify({'formularios': formularios})
+
+    except Exception as e:
+        current_app.logger.exception('synchro form-definitions')
+        return jsonify({'error': str(e)}), 500
+
+
+@synchro_bp.route('/api/integraciones/synchro/definicion', methods=['GET'])
 def ver_definicion():
-    """Temporal: vuelca la definición cruda de un formulario.
+    """TEMPORAL — vuelca la definición cruda de un formulario.
 
     Sin parámetros recorre los proyectos del usuario hasta dar con uno
     que tenga formularios aprobados y devuelve el primero. Se puede
     acotar con ?itwin_id= o ?id= si se quiere uno concreto.
+
+    Existe sólo para inspeccionar el formato de 'definition', que la
+    documentación de Bentley no describe. Se borra después.
     """
     import json as _j
     if 'user_id' not in session:
@@ -348,53 +474,55 @@ def ver_definicion():
     if not token:
         return jsonify({'error': 'Reconecta tu cuenta de Synchro'}), 409
 
-    definicion_id = request.args.get('id')
-
-    if not definicion_id:
-        itwins = [request.args.get('itwin_id')] if request.args.get('itwin_id') else []
-
-        if not itwins:
-            r = _get(token, f'{API}/itwins/',
-                     {'subClass': 'Project', 'status': 'Active', '$top': 50},
-                     version='v1')
-            if r.status_code != 200:
-                return jsonify({'paso': 'itwins', 'estado': r.status_code,
-                                'detalle': r.text[:400]}), 502
-            itwins = [t.get('id') for t in (r.json().get('iTwins') or [])]
-
-        if not itwins:
-            return jsonify({'error': 'No tienes proyectos en Synchro'}), 404
-
-        encontrados = []
-        for tid in itwins:
-            r = _get(token, f'{API}/forms/form-definitions',
-                     {'iTwinId': tid}, version='v2')
-            if r.status_code != 200:
-                continue
-            defs = r.json().get('formDefinitions') or []
-            if defs:
-                encontrados.append({'itwin_id': tid, 'formularios': [
-                    {'id': d.get('id'), 'nombre': d.get('displayName'),
-                     'tipo': d.get('type')} for d in defs]})
-                definicion_id = defs[0].get('id')
-                break
+    try:
+        definicion_id = request.args.get('id')
 
         if not definicion_id:
-            return jsonify({'error': 'Ninguno de tus proyectos tiene '
-                                     'formularios aprobados',
-                            'proyectos_revisados': len(itwins)}), 404
+            itwins = ([request.args.get('itwin_id')]
+                      if request.args.get('itwin_id') else [])
 
-    r = _get(token, f'{API}/forms/form-definitions/{definicion_id}',
-             version='v2')
-    if r.status_code != 200:
-        return jsonify({'paso': 'definicion', 'estado': r.status_code,
-                        'detalle': r.text[:400]}), 502
+            if not itwins:
+                r = _get(token, f'{API}/itwins/',
+                         {'subClass': 'Project', 'status': 'Active', '$top': 50},
+                         version='v1')
+                if r.status_code != 200:
+                    return jsonify({'paso': 'itwins', 'estado': r.status_code,
+                                    'detalle': r.text[:400]}), 502
+                itwins = [t.get('id') for t in (r.json().get('iTwins') or [])]
 
-    d = (r.json() or {}).get('formDefinition') or {}
-    bruto = d.get('definition')
-    try:
-        d['definition'] = _j.loads(bruto) if isinstance(bruto, str) else bruto
-    except Exception:
-        d['definition_parseo'] = 'no se pudo parsear'
+            if not itwins:
+                return jsonify({'error': 'No tienes proyectos en Synchro'}), 404
 
-    return jsonify(d)
+            for tid in itwins:
+                r = _get(token, f'{API}/forms/form-definitions',
+                         {'iTwinId': tid}, version='v2')
+                if r.status_code != 200:
+                    continue
+                defs = r.json().get('formDefinitions') or []
+                if defs:
+                    definicion_id = defs[0].get('id')
+                    break
+
+            if not definicion_id:
+                return jsonify({'error': 'Ninguno de tus proyectos tiene '
+                                         'formularios aprobados',
+                                'proyectos_revisados': len(itwins)}), 404
+
+        r = _get(token, f'{API}/forms/form-definitions/{definicion_id}',
+                 version='v2')
+        if r.status_code != 200:
+            return jsonify({'paso': 'definicion', 'estado': r.status_code,
+                            'detalle': r.text[:400]}), 502
+
+        d = (r.json() or {}).get('formDefinition') or {}
+        bruto = d.get('definition')
+        try:
+            d['definition'] = _j.loads(bruto) if isinstance(bruto, str) else bruto
+        except Exception:
+            d['definition_parseo'] = 'no se pudo parsear'
+
+        return jsonify(d)
+
+    except Exception as e:
+        current_app.logger.exception('synchro ver_definicion')
+        return jsonify({'error': str(e)}), 500
