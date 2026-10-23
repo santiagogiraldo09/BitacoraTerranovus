@@ -4310,6 +4310,9 @@
 
         cont.innerHTML = sfDisponibles.map(p => `
             <div class="rep-bloque-titulo">${escHtml(p.proyecto)}</div>
+            ${!(p.formularios || []).length
+                ? `<p class="rep-vacio">${escHtml(p.aviso || 'Sin formularios')}</p>`
+                : ''}
             ${(p.formularios || []).map(f => {
                 const v  = sfVinculados[f.definicion_id];
                 const id = f.definicion_id;

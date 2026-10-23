@@ -483,9 +483,11 @@ def ver_definicion():
                       if request.args.get('itwin_id') else [])
 
             if not itwins:
+                # Sin filtro de estado: un proyecto en Trial o Inactive sigue
+                # siendo un proyecto al que te pueden haber agregado.
                 r = _get(token, f'{API}/itwins/',
-                         {'subClass': 'Project', 'status': 'Active', '$top': 50},
-                         version='v1')
+                        {'subClass': 'Project', '$top': 100},
+                        version='v1')
                 if r.status_code != 200:
                     return jsonify({'paso': 'itwins', 'estado': r.status_code,
                                     'detalle': r.text[:400]}), 502
@@ -884,24 +886,36 @@ def formularios_disponibles():
             rd = _get(token, f'{API}/forms/form-definitions',
                       {'iTwinId': t.get('id')}, version='v2')
 
-            # 404 aquí suele ser falta de permiso sobre ese iTwin, no un
-            # error: se omite el proyecto en silencio.
-            if rd.status_code != 200:
-                continue
+            # Ningún proyecto se descarta: si no trae formularios, se
+            # dice por qué. Descartarlos en silencio hace imposible
+            # distinguir "no tienes permiso" de "no existe".
+            entrada = {
+                'itwin_id':    t.get('id'),
+                'proyecto':    t.get('displayName'),
+                'estado':      t.get('status'),
+                'formularios': [],
+            }
 
-            definiciones = [{
-                'definicion_id': d.get('id'),
-                'nombre':        d.get('displayName') or d.get('id'),
-                'tipo':          d.get('type') or '',
-                'vinculado':     d.get('id') in vinculados,
-            } for d in (rd.json().get('formDefinitions') or [])]
+            if rd.status_code == 404:
+                # Bentley usa 404 tanto si el proyecto no tiene Forms
+                # habilitado como si tu cuenta no tiene permiso sobre él.
+                entrada['aviso'] = 'Sin acceso a los formularios de este proyecto'
 
-            if definiciones:
-                proyectos.append({
-                    'itwin_id':    t.get('id'),
-                    'proyecto':    t.get('displayName'),
-                    'formularios': definiciones,
-                })
+            elif rd.status_code != 200:
+                entrada['aviso'] = f'Bentley respondio {rd.status_code}'
+
+            else:
+                entrada['formularios'] = [{
+                    'definicion_id': d.get('id'),
+                    'nombre':        d.get('displayName') or d.get('id'),
+                    'tipo':          d.get('type') or '',
+                    'vinculado':     d.get('id') in vinculados,
+                } for d in (rd.json().get('formDefinitions') or [])]
+
+                if not entrada['formularios']:
+                    entrada['aviso'] = 'Sin formularios aprobados'
+
+            proyectos.append(entrada)
 
         return jsonify({'proyectos': proyectos})
 
