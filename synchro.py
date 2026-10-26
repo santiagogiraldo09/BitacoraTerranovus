@@ -1077,3 +1077,129 @@ def actualizar_campos(definicion_id):
     except Exception as e:
         current_app.logger.exception('synchro actualizar campos')
         return jsonify({'error': str(e)}), 500
+
+
+# ═════════════════════════════════════════════════════════════════════
+#  REGISTROS
+#
+#  Un registro se guarda SIEMPRE en Bitácora antes de intentar subirlo
+#  a Synchro. En obra hay mala señal, el token expira y Synchro a veces
+#  rechaza: nadie debe perder el trabajo de campo porque el envío falló.
+# ═════════════════════════════════════════════════════════════════════
+
+def _vinculado(cursor, user_id, definicion_id):
+    """La definición vinculada por este usuario, o None."""
+    cursor.execute("""
+        SELECT itwin_id, proyecto, nombre, campos
+        FROM synchro_formularios
+        WHERE user_id = %s AND definicion_id = %s
+    """, (user_id, definicion_id))
+    return cursor.fetchone()
+
+
+def _vacio(valor):
+    """Un campo obligatorio sin contestar."""
+    return valor is None or valor == '' or valor == []
+
+
+@synchro_bp.route('/api/integraciones/synchro/registros', methods=['POST'])
+def guardar_registro():
+    """Guarda un formulario lleno. No lo sube todavía: queda pendiente."""
+    from app import db_connection
+
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    datos         = request.get_json(silent=True) or {}
+    definicion_id = (datos.get('definicion_id') or '').strip()
+    entrantes     = datos.get('respuestas')
+
+    if not definicion_id:
+        return jsonify({'error': 'Falta definicion_id'}), 400
+    if not isinstance(entrantes, dict):
+        return jsonify({'error': 'respuestas debe ser un objeto'}), 400
+
+    try:
+        with db_connection() as (conn, cursor):
+            fila = _vinculado(cursor, session['user_id'], definicion_id)
+            if not fila:
+                return jsonify({'error': 'Ese formulario no esta vinculado '
+                                         'a tu cuenta'}), 404
+
+            itwin_id, proyecto, nombre, campos = fila
+            campos = campos or []
+
+            # Solo se guarda lo que la definición declara enviable. Una
+            # llave que no esté ahí viene de una pantalla desactualizada
+            # o de una petición manipulada, y guardarla sería basura que
+            # el envío rechazaría después.
+            enviables  = {c['binding'] for c in campos if c.get('enviable')}
+            respuestas = {k: v for k, v in entrantes.items() if k in enviables}
+            ignoradas  = sorted(set(entrantes) - enviables)
+
+            faltantes = [c.get('etiqueta') or c['binding'] for c in campos
+                         if c.get('enviable') and c.get('requerido')
+                         and _vacio(respuestas.get(c['binding']))]
+            if faltantes:
+                return jsonify({'error': 'Faltan campos obligatorios',
+                                'campos': faltantes}), 422
+
+            cursor.execute("""
+                INSERT INTO synchro_registros
+                    (empresa_id, user_id, itwin_id, proyecto,
+                     definicion_id, formulario, respuestas)
+                VALUES (%s,%s,%s,%s,%s,%s,%s::jsonb)
+                RETURNING id
+            """, (session.get('empresa_id'), session['user_id'],
+                  itwin_id, proyecto, definicion_id, nombre,
+                  json.dumps(respuestas)))
+            registro_id = cursor.fetchone()[0]
+            conn.commit()
+
+        return jsonify({'success': True, 'id': registro_id,
+                        'estado': 'pendiente', 'ignoradas': ignoradas})
+
+    except Exception as e:
+        current_app.logger.exception('synchro guardar_registro')
+        return jsonify({'error': str(e)}), 500
+
+
+@synchro_bp.route('/api/integraciones/synchro/registros', methods=['GET'])
+def listar_registros():
+    """Historial del usuario. Con ?definicion_id= se acota a un formulario."""
+    from app import db_connection
+
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    definicion_id = request.args.get('definicion_id')
+
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT id, definicion_id, formulario, proyecto, respuestas,
+                       estado, error, synchro_numero, enviado_en, creado_en
+                FROM synchro_registros
+                WHERE user_id = %s
+                  AND (%s IS NULL OR definicion_id = %s)
+                ORDER BY creado_en DESC
+                LIMIT 200
+            """, (session['user_id'], definicion_id, definicion_id))
+            filas = cursor.fetchall()
+
+        return jsonify({'registros': [{
+            'id':             f[0],
+            'definicion_id':  f[1],
+            'formulario':     f[2],
+            'proyecto':       f[3],
+            'respuestas':     f[4] or {},
+            'estado':         f[5],
+            'error':          f[6],
+            'synchro_numero': f[7],
+            'enviado':        f[8].isoformat() if f[8] else None,
+            'creado':         f[9].isoformat() if f[9] else None,
+        } for f in filas]})
+
+    except Exception as e:
+        current_app.logger.exception('synchro listar_registros')
+        return jsonify({'error': str(e)}), 500
