@@ -240,10 +240,8 @@
         }
     }
 
-    // La pantalla de llenado es el siguiente paso; el botón ya está aquí
-    // para no tener que rehacer la lista después.
     function llenar(definicionId) {
-        alert('La pantalla de llenado llega en el siguiente paso.');
+        window.location.href = '/synchro/' + encodeURIComponent(definicionId);
     }
 
     document.addEventListener('DOMContentLoaded', () => {

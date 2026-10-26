@@ -7606,6 +7606,38 @@ def pantalla_synchro():
                            logo_actual=logo_actual,
                            color_primario=color_primario)
 
+@app.route('/synchro/<definicion_id>')
+def pantalla_synchro_llenar(definicion_id):
+    """Llenado de un formulario de Synchro vinculado.
+
+    Los campos no se cargan aquí: los pide el navegador a la API, que
+    ya valida que la definición esté vinculada a este usuario.
+    """
+    if 'user_id' not in session:
+        return redirect(url_for('principalscreen'))
+    if not puede('synchro'):
+        return redirect(url_for('registros'))
+
+    logo_actual    = None
+    color_primario = '#FFAF33'
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT logo_url, color_primario FROM empresas
+                WHERE id = %s
+            """, (session.get('empresa_id'),))
+            emp = cursor.fetchone()
+            if emp:
+                logo_actual    = emp[0]
+                color_primario = emp[1] or '#FFAF33'
+    except Exception as e:
+        print(f"Error cargando empresa en synchro_llenar: {e}")
+
+    return render_template('synchro_llenar.html',
+                           definicion_id=definicion_id,
+                           logo_actual=logo_actual,
+                           color_primario=color_primario)
+
 @app.route('/analitica/tablero/<int:tablero_id>')
 def analitica_tablero(tablero_id):
     if 'user_id' not in session or session.get('user_rol') != 'admin':
