@@ -7615,8 +7615,6 @@ def pantalla_synchro_llenar(definicion_id):
     """
     if 'user_id' not in session:
         return redirect(url_for('principalscreen'))
-    if session.get('empresa_id') != 1:
-        return redirect(url_for('registros'))
 
     logo_actual    = None
     color_primario = '#FFAF33'
