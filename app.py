@@ -7576,6 +7576,36 @@ def analitica_paros():
                            logo_actual=logo_actual,
                            color_primario=color_primario)
 
+@app.route('/synchro')
+def pantalla_synchro():
+    """Formularios de Synchro vinculados por el usuario.
+
+    A diferencia de Analítica o Configuración, esta pantalla NO se
+    restringe a administradores: la vinculación es personal y cualquiera
+    con su cuenta de Bentley conectada llena los suyos.
+    """
+    if 'user_id' not in session:
+        return redirect(url_for('principalscreen'))
+
+    logo_actual    = None
+    color_primario = '#FFAF33'
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT logo_url, color_primario FROM empresas
+                WHERE id = %s
+            """, (session.get('empresa_id'),))
+            emp = cursor.fetchone()
+            if emp:
+                logo_actual    = emp[0]
+                color_primario = emp[1] or '#FFAF33'
+    except Exception as e:
+        print(f"Error cargando empresa en synchro: {e}")
+
+    return render_template('synchro.html',
+                           logo_actual=logo_actual,
+                           color_primario=color_primario)
+
 @app.route('/analitica/tablero/<int:tablero_id>')
 def analitica_tablero(tablero_id):
     if 'user_id' not in session or session.get('user_rol') != 'admin':
