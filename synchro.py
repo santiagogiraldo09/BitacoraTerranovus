@@ -1325,13 +1325,20 @@ def enviar_registro(registro_id):
 
         cuerpo = _sobre(definicion_id, campos, respuestas or {})
 
+        # Se registra lo que se manda: sin esto, un 500 de Bentley no
+        # dice nada sobre si el problema está en el sobre o en la ruta.
+        current_app.logger.warning('[SYNCHRO] cuerpo -> %s',
+                                   json.dumps(cuerpo)[:900])
+
         r = None
         for version in VERSIONES_CREACION:
             r = _post(token, f'{API}/forms/', cuerpo, version=version)
             current_app.logger.warning('[SYNCHRO] crear (%s) -> %s: %s',
                                        version, r.status_code, r.text[:500])
-            # Sólo se reintenta cuando el fallo puede ser de versión.
-            if r.status_code not in (404, 406, 415):
+            # Se reintenta con la otra versión ante cualquier fallo que
+            # pueda deberse a la ruta o al encabezado, incluido el 500
+            # de su pasarela.
+            if r.status_code < 500 and r.status_code not in (404, 406, 415):
                 break
 
         if r.status_code in (200, 201):
@@ -1366,8 +1373,13 @@ def enviar_registro(registro_id):
             """, (f'{r.status_code}: {detalle}', registro_id))
             conn.commit()
 
-        return jsonify({'error': f'Synchro respondio {r.status_code}',
-                        'detalle': detalle}), 502
+        # Se responde 200 a propósito: el envío falló, pero la petición
+        # a nuestra API se atendió bien. Devolver 502 hace que Cloudflare
+        # reemplace el cuerpo por su propia página de error y el detalle
+        # de Bentley no llegue nunca al navegador.
+        return jsonify({'success': False, 'estado': r.status_code,
+                        'error': f'Synchro respondio {r.status_code}',
+                        'detalle': detalle})
 
     except Exception as e:
         current_app.logger.exception('synchro enviar_registro')
