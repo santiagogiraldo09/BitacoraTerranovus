@@ -65,6 +65,26 @@
         .sl-aviso   { font-size:13.5px; margin-top:14px; line-height:1.6; }
         .sl-aviso.error { color:#b91c1c; }
         .sl-aviso.ok    { color:#15803d; }
+
+        .sl-voz     { display:flex; align-items:center; gap:12px;
+                      background:#f9fafb; border:1px solid #e5e7eb;
+                      border-radius:10px; padding:13px 16px; margin-bottom:22px; }
+        .sl-voz-btn { border:none; border-radius:8px; padding:10px 18px;
+                      font-family:'DM Sans',sans-serif; font-size:13.5px;
+                      font-weight:600; cursor:pointer;
+                      background:var(--naranja,#FFAF33); color:#fff; }
+        .sl-voz-btn.grabando { background:#dc2626; }
+        .sl-voz-est { font-size:13px; color:#6b7280; }
+
+        .sl-trans   { font-size:13px; color:#4B5563; line-height:1.6;
+                      background:#fff; border:1px solid #e5e7eb;
+                      border-radius:8px; padding:11px 13px; margin-bottom:20px; }
+        .sl-trans b { color:#374151; }
+
+        /* Campo llenado por la IA: se marca para que el usuario sepa
+           qué revisar antes de guardar. */
+        .sl-campo.sl-ia { border-left:3px solid var(--naranja,#FFAF33);
+                          padding-left:10px; margin-left:-13px; }
     </style>
 </head>
 <body>
@@ -124,6 +144,17 @@
 
             <h1 class="sl-titulo" id="sl-nombre">Cargando…</h1>
             <p class="sl-sub" id="sl-proyecto"></p>
+
+            <div class="sl-voz" id="sl-voz" style="display:none;">
+                <button class="sl-voz-btn" id="sl-voz-btn" onclick="alternarGrabacion()">
+                    <i class="fas fa-microphone"></i> Dictar
+                </button>
+                <span class="sl-voz-est" id="sl-voz-est">
+                    Dicte todo el reporte de corrido. La IA lo reparte entre los campos.
+                </span>
+            </div>
+
+            <div class="sl-trans" id="sl-trans" style="display:none;"></div>
 
             <form id="sl-form" onsubmit="return false;"></form>
 
@@ -263,6 +294,7 @@
             }
 
             document.getElementById('sl-acciones').style.display = '';
+            document.getElementById('sl-voz').style.display      = 'flex';
 
         } catch {
             document.getElementById('sl-nombre').textContent = 'Error al cargar';
@@ -356,6 +388,149 @@
             btn.disabled  = false;
             btn.innerHTML = antes;
         }
+    }
+
+
+    // ── Dictado ────────────────────────────────────────────────────
+    // Reutiliza /transcribe-audio y /api/distribuir-campos tal como los
+    // usa el formulario dinámico. A la IA se le mandan los campos con
+    // el índice como id: coincide con el id del control en pantalla
+    // ('sl-0', 'sl-1'…), así que lo que devuelve se aplica directo.
+    let grabadora = null;
+    let trozos    = [];
+
+    function estadoVoz(texto, grabando = false) {
+        const btn = document.getElementById('sl-voz-btn');
+        document.getElementById('sl-voz-est').textContent = texto;
+        btn.classList.toggle('grabando', grabando);
+        btn.innerHTML = grabando
+            ? '<i class="fas fa-stop"></i> Detener'
+            : '<i class="fas fa-microphone"></i> Dictar';
+    }
+
+    function alternarGrabacion() {
+        if (grabadora && grabadora.state === 'recording') {
+            grabadora.stop();
+            return;
+        }
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                trozos    = [];
+                grabadora = new MediaRecorder(stream);
+                grabadora.ondataavailable = e => { if (e.data.size) trozos.push(e.data); };
+                grabadora.onstop = () => {
+                    stream.getTracks().forEach(t => t.stop());
+                    procesarAudio();
+                };
+                grabadora.start();
+                estadoVoz('Grabando… hable con normalidad.', true);
+            })
+            .catch(() => estadoVoz('No se pudo acceder al micrófono.'));
+    }
+
+    /** Los campos tal como los entiende la IA. Se excluyen los de
+     *  usuarios y los de archivo: no se dictan. */
+    function camposParaIA() {
+        const salida = [];
+        camposEditables().forEach((c, i) => {
+            if (c.usuarios || c.tipo === 'imagen' || c.tipo === 'adjunto') return;
+            const info = {
+                id:        String(i),
+                nombre:    c.etiqueta,
+                tipo:      c.tipo,
+                requerido: !!c.requerido
+            };
+            if (c.opciones && c.opciones.length) info.opciones = c.opciones;
+            salida.push(info);
+        });
+        return salida;
+    }
+
+    async function procesarAudio() {
+        estadoVoz('Transcribiendo…');
+        const fd = new FormData();
+        fd.append('audio', new Blob(trozos, { type: 'audio/webm' }), 'audio.webm');
+
+        try {
+            const t = await (await fetch('/transcribe-audio',
+                                         { method: 'POST', body: fd })).json();
+            if (!t.text) { estadoVoz('No se detectó audio.'); return; }
+
+            const caja = document.getElementById('sl-trans');
+            caja.style.display = '';
+            caja.innerHTML = '<b>Lo que se dictó:</b> ' + esc(t.text);
+
+            estadoVoz('Repartiendo en los campos…');
+
+            const res = await fetch('/api/distribuir-campos', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({
+                    transcripcion: t.text,
+                    sueltos:       camposParaIA(),
+                    grupos:        []        // Synchro no tiene grupos repetibles
+                })
+            });
+            const d = await res.json();
+
+            const n = aplicarDistribucion(d.campos);
+            let aviso = n
+                ? `${n} campo${n === 1 ? '' : 's'} llenado${n === 1 ? '' : 's'}. Revise antes de guardar.`
+                : 'No se pudo ubicar nada. El texto queda arriba para copiarlo a mano.';
+
+            // Lo que la IA no supo ubicar o vio ambiguo se dice, en vez
+            // de dejar que el usuario lo descubra al guardar.
+            const pendientes = [...(d.ambiguedades || []), ...(d.faltantes || [])]
+                .map(x => typeof x === 'string' ? x : (x.pregunta || x.campo || ''))
+                .filter(Boolean);
+            if (pendientes.length) {
+                caja.innerHTML += '<br><br><b>Quedó pendiente:</b> ' +
+                                  esc(pendientes.join(' · '));
+            }
+            estadoVoz(aviso);
+
+        } catch {
+            estadoVoz('Error al procesar el dictado.');
+        }
+    }
+
+    function aplicarDistribucion(campos) {
+        const editables = camposEditables();
+        let llenados = 0;
+
+        Object.entries(campos || {}).forEach(([clave, valor]) => {
+            const i = parseInt(clave, 10);
+            const c = editables[i];
+            if (!c || valor === null || valor === undefined || valor === '') return;
+
+            const el = document.getElementById('sl-' + i);
+            if (!el) return;
+
+            if (c.tipo === 'booleano') {
+                const v = String(valor).toLowerCase();
+                el.checked = (valor === true || v === 'true' || v === 'sí' || v === 'si');
+
+            } else if (c.tipo === 'seleccion') {
+                const lista = Array.isArray(valor)
+                    ? valor.map(String)
+                    : String(valor).split(',').map(s => s.trim());
+                document.querySelectorAll(`[data-grupo="${i}"]`).forEach(chk => {
+                    chk.checked = lista.includes(chk.value);
+                });
+
+            } else {
+                // En selección única, un valor que no esté entre las
+                // opciones deja el desplegable vacío. Es lo correcto:
+                // mejor en blanco que con algo que Synchro rechazará.
+                el.value = String(valor);
+            }
+
+            const caja = el.closest('.sl-campo');
+            if (caja) caja.classList.add('sl-ia');
+            llenados++;
+        });
+
+        return llenados;
     }
 
     document.addEventListener('DOMContentLoaded', cargar);
