@@ -959,6 +959,35 @@ def api_movil_config():
         current_app.logger.exception("api_movil_config")
         return jsonify({"error": "error_servidor", "detalle": str(ex)}), 500
 
+@api_movil.route("/api/movil/identidad", methods=["GET"])
+@requiere_token
+def api_movil_identidad():
+    """Identidad visual (logo + colores) de la empresa del token.
+    Abierto a CUALQUIER miembro, no solo admin. empresa_id sale del token."""
+    from app import supabase_client
+    import re
+    u = request.usuario
+    empresa_id = _num(u["empresa_id"])
+
+    def _hex(c, d):
+        c = (c or "").strip()
+        return c if re.match(r"^#[0-9a-fA-F]{6}$", c) else d
+
+    try:
+        r = (supabase_client.table("empresas")
+             .select("logo_url, color_primario, color_secundario")
+             .eq("id", empresa_id).limit(1).execute())
+        e = (r.data or [{}])[0]
+        return jsonify({
+            "empresa_id": empresa_id,
+            "empresa_nombre": _nombre_empresa(empresa_id),
+            "logo_url": e.get("logo_url") or "",
+            "color_primario": _hex(e.get("color_primario"), "#FFAF33"),
+            "color_secundario": _hex(e.get("color_secundario"), "#E3E3E3"),
+        })
+    except Exception as ex:
+        current_app.logger.exception("api_movil_identidad")
+        return jsonify({"error": "error_servidor", "detalle": str(ex)}), 500
 
 # ======================= VOZ / IA (reusa app.py) =====================
 # La lógica de distribución (prompt + OpenAI) vive en app.py, en una
