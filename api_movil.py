@@ -500,6 +500,42 @@ def _crear_url_firmada_foto(ruta, expires_in=3600):
     return None
 
 
+def _mapa_fotos_firmadas(valor, acc=None):
+    """{ruta_interna: url_firmada} para cada foto del registro. Sirve
+    para pintar miniaturas sin tocar las rutas que se van a guardar."""
+    if acc is None:
+        acc = {}
+    if isinstance(valor, dict):
+        for v in valor.values():
+            _mapa_fotos_firmadas(v, acc)
+    elif isinstance(valor, list):
+        for v in valor:
+            _mapa_fotos_firmadas(v, acc)
+    elif isinstance(valor, str):
+        ruta = _extraer_ruta_foto(valor)
+        if ruta and ruta not in acc:
+            try:
+                url = _crear_url_firmada_foto(ruta)
+                if url:
+                    acc[ruta] = url
+            except Exception:
+                current_app.logger.exception("No se pudo firmar %s", ruta)
+    return acc
+
+
+def _normalizar_rutas_fotos(valor):
+    """Copia de respuestas con cada referencia de foto reducida a su ruta
+    interna (registros/...). Lo demás queda igual. Evita guardar URLs
+    firmadas (que vencen en 1 h) al editar."""
+    if isinstance(valor, dict):
+        return {k: _normalizar_rutas_fotos(v) for k, v in valor.items()}
+    if isinstance(valor, list):
+        return [_normalizar_rutas_fotos(v) for v in valor]
+    if isinstance(valor, str):
+        ruta = _extraer_ruta_foto(valor)
+        return ruta if ruta else valor
+    return valor
+
 def _firmar_fotos_en_respuestas(valor):
     """
     Recorre recursivamente respuestas_formulario y sustituye referencias
@@ -743,6 +779,71 @@ def api_movil_guardar_respuesta():
         current_app.logger.exception("api_movil_guardar_respuesta")
         return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
 
+@api_movil.route("/api/movil/respuestas-formulario/<int:registro_id>", methods=["PUT"])
+@requiere_token
+def api_movil_actualizar_respuesta(registro_id):
+    """Edita un registro. Autor o admin, misma empresa. Misma regla que el
+    PUT web, pero autenticado por token."""
+    from app import supabase_client
+    from datetime import datetime, timezone
+    u = request.usuario
+    empresa_id = _num(u["empresa_id"])
+    data = request.get_json(silent=True) or {}
+    respuestas = data.get("respuestas")
+    base_updated_at = data.get("base_updated_at")   # opcional (lo usará el outbox)
+
+    if not isinstance(respuestas, dict):
+        return jsonify({"error": "datos_incompletos"}), 400
+
+    try:
+        # 1. Registro + barrera de empresa (la tabla no tiene empresa_id)
+        r = (supabase_client.table("respuestas_formulario")
+             .select("id, id_proyecto, user_id, updated_at")
+             .eq("id", registro_id).limit(1).execute())
+        if not (r.data or []):
+            return jsonify({"error": "no_encontrado"}), 404
+        reg = r.data[0]
+
+        proy = (supabase_client.table("proyectos")
+                .select("empresa_id")
+                .eq("id", reg["id_proyecto"]).limit(1).execute())
+        if not (proy.data or []) or _num(proy.data[0].get("empresa_id")) != empresa_id:
+            return jsonify({"error": "no_encontrado"}), 404
+
+        # 2. Permiso: autor o admin. El rol se LEE DE LA BD, no del token
+        #    (el token dura 30 días y el rol pudo cambiar).
+        es_autor = _num(reg.get("user_id")) == _num(u["uid"])
+        es_admin = False
+        ur = (supabase_client.table("usuario")
+              .select("rol").eq("user_id", _num(u["uid"])).limit(1).execute())
+        if ur.data:
+            es_admin = (ur.data[0].get("rol") or "").lower() in ("admin", "administrador")
+        if not es_autor and not es_admin:
+            return jsonify({"error": "sin_permiso"}), 403
+
+        # 3. Concurrencia (opcional): si llega la versión que se abrió y ya
+        #    no coincide, alguien más editó → 409. En edición online no se
+        #    envía, así que gana la última escritura, igual que la web.
+        if base_updated_at and str(reg.get("updated_at")) != str(base_updated_at):
+            return jsonify({"error": "conflicto",
+                            "actual": {"updated_at": reg.get("updated_at")}}), 409
+
+        # 4. Nunca guardar URLs firmadas: todo a ruta interna.
+        respuestas = _normalizar_rutas_fotos(respuestas)
+
+        # 5. Guardar (updated_at explícito, como el PUT web con NOW()).
+        ahora = datetime.now(timezone.utc).isoformat()
+        (supabase_client.table("respuestas_formulario")
+         .update({"respuestas": respuestas,
+                  "updated_by": _num(u["uid"]),
+                  "updated_at": ahora})
+         .eq("id", registro_id).execute())
+
+        return jsonify({"success": True, "id": registro_id, "updated_at": ahora})
+
+    except Exception as e:
+        current_app.logger.exception("api_movil_actualizar_respuesta")
+        return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
 
 @api_movil.route("/api/movil/registro/<int:registro_id>", methods=["GET"])
 @requiere_token
@@ -754,7 +855,7 @@ def api_movil_registro(registro_id):
 
     try:
         r = (supabase_client.table("respuestas_formulario")
-             .select("id, formulario_id, id_proyecto, respuestas, user_id, created_at")
+             .select("id, formulario_id, id_proyecto, respuestas, user_id, created_at, updated_at")
              .eq("id", registro_id).limit(1).execute())
         if not (r.data or []):
             return jsonify({"error": "no_encontrado"}), 404
@@ -765,8 +866,8 @@ def api_movil_registro(registro_id):
         proy = (supabase_client.table("proyectos")
                 .select("empresa_id")
                 .eq("id", reg["id_proyecto"]).limit(1).execute())
-        if proy.data and _num(proy.data[0].get("empresa_id")) != empresa_id:
-            return jsonify({"error": "no_autorizado"}), 403
+        if not (proy.data or []) or _num(proy.data[0].get("empresa_id")) != empresa_id:
+            return jsonify({"error": "no_encontrado"}), 404
 
         autor = "Usuario"
         if reg.get("user_id"):
@@ -780,9 +881,13 @@ def api_movil_registro(registro_id):
             "formulario_id": reg["formulario_id"],
             "id_proyecto": reg["id_proyecto"],
             "respuestas": _firmar_fotos_en_respuestas(reg.get("respuestas") or {}),
+            "respuestas_crudas": _normalizar_rutas_fotos(reg.get("respuestas") or {}),
+            "fotos": _mapa_fotos_firmadas(reg.get("respuestas") or {}),
             "autor": autor,
             "es_autor": _num(reg.get("user_id")) == _num(u["uid"]),
+            "puede_editar": (_num(reg.get("user_id")) == _num(u["uid"])) or _es_admin(u),
             "created_at": reg.get("created_at"),
+            "updated_at": reg.get("updated_at"),
         })
 
     except Exception as e:
