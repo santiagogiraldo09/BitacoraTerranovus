@@ -1343,7 +1343,11 @@ def enviar_registro(registro_id):
 
         if r.status_code in (200, 201):
             datos  = r.json() or {}
-            creado = datos.get('formData') or datos.get('issue') or datos
+            # La creación envuelve el resultado en 'form'. Los otros
+            # nombres son de versiones anteriores y se dejan por si
+            # la API responde con el encabezado v1.
+            creado = (datos.get('form') or datos.get('formData')
+                      or datos.get('issue') or datos)
             nuevo  = creado.get('id')
             numero = creado.get('number') or creado.get('displayName')
 
