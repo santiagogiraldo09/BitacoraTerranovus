@@ -1203,3 +1203,172 @@ def listar_registros():
     except Exception as e:
         current_app.logger.exception('synchro listar_registros')
         return jsonify({'error': str(e)}), 500
+
+
+# ═════════════════════════════════════════════════════════════════════
+#  ENVÍO A SYNCHRO
+#
+#  El sobre sigue el formato documentado para la creación de issues,
+#  que es la API de la que nacieron los formularios y con la que
+#  comparte estructura: 'formId' obligatorio, los campos de sistema en
+#  la raíz y los propios dentro de 'properties'.
+# ═════════════════════════════════════════════════════════════════════
+
+# La documentación de creación no es pública y el encabezado Accept
+# cambió entre versiones. Se intentan en orden y se registra cuál sirvió.
+VERSIONES_CREACION = ('v2', 'v1')
+
+
+def _post(token, url, cuerpo, version='v2'):
+    return requests.post(url, json=cuerpo, timeout=TIMEOUT, headers={
+        'Authorization': f'Bearer {token}',
+        'Accept':        f'application/vnd.bentley.itwin-platform.{version}+json',
+        'Content-Type':  'application/json',
+    })
+
+
+def _valor_synchro(campo, valor):
+    """Convierte lo capturado al tipo que espera Bentley."""
+    tipo = campo.get('tipo')
+
+    if tipo == 'booleano':
+        return bool(valor)
+
+    if tipo == 'numero':
+        try:
+            n = float(valor)
+            return int(n) if n.is_integer() else n
+        except (TypeError, ValueError):
+            return None
+
+    if tipo == 'fecha':
+        # El navegador entrega 'AAAA-MM-DD'; la API espera ISO 8601
+        # completo.
+        s = str(valor).strip()
+        return f'{s}T00:00:00Z' if len(s) == 10 else s
+
+    if tipo == 'seleccion':
+        # Multi-selección: valores separados por coma SIN espacios.
+        if isinstance(valor, (list, tuple)):
+            return ','.join(str(v).strip() for v in valor)
+        return str(valor)
+
+    return str(valor)
+
+
+def _sobre(definicion_id, campos, respuestas):
+    """Arma el cuerpo del POST a partir de la definición y lo capturado."""
+    cuerpo = {'formId': definicion_id}
+    propias = {}
+
+    for c in campos:
+        if not c.get('enviable'):
+            continue
+
+        binding = c.get('binding')
+        if binding not in respuestas:
+            continue
+
+        valor = _valor_synchro(c, respuestas[binding])
+        if valor is None or valor == '':
+            continue
+
+        ruta = c.get('ruta') or ''
+        if ruta.startswith('properties.'):
+            propias[ruta.split('.', 1)[1]] = valor
+        else:
+            # Campo de sistema: va en la raíz. Meterlo en 'properties'
+            # produce un 422.
+            cuerpo[ruta] = valor
+
+    if propias:
+        cuerpo['properties'] = propias
+
+    return cuerpo
+
+
+@synchro_bp.route('/api/integraciones/synchro/registros/<int:registro_id>/enviar',
+                  methods=['POST'])
+def enviar_registro(registro_id):
+    """Sube a Synchro un registro ya guardado en Bitácora."""
+    from app import db_connection
+
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    token = _token_actual()
+    if not token:
+        return jsonify({'error': 'Reconecta tu cuenta de Synchro'}), 409
+
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT r.definicion_id, r.respuestas, r.estado, f.campos
+                FROM synchro_registros r
+                LEFT JOIN synchro_formularios f
+                       ON f.user_id = r.user_id
+                      AND f.definicion_id = r.definicion_id
+                WHERE r.id = %s AND r.user_id = %s
+            """, (registro_id, session['user_id']))
+            fila = cursor.fetchone()
+
+        if not fila:
+            return jsonify({'error': 'Registro no encontrado'}), 404
+
+        definicion_id, respuestas, estado, campos = fila
+
+        if estado == 'enviado':
+            return jsonify({'error': 'Ese registro ya esta en Synchro'}), 409
+        if not campos:
+            return jsonify({'error': 'El formulario ya no esta vinculado. '
+                                     'Vinculalo de nuevo para poder enviarlo'}), 409
+
+        cuerpo = _sobre(definicion_id, campos, respuestas or {})
+
+        r = None
+        for version in VERSIONES_CREACION:
+            r = _post(token, f'{API}/forms/', cuerpo, version=version)
+            current_app.logger.warning('[SYNCHRO] crear (%s) -> %s: %s',
+                                       version, r.status_code, r.text[:500])
+            # Sólo se reintenta cuando el fallo puede ser de versión.
+            if r.status_code not in (404, 406, 415):
+                break
+
+        if r.status_code in (200, 201):
+            datos  = r.json() or {}
+            creado = datos.get('formData') or datos.get('issue') or datos
+            nuevo  = creado.get('id')
+            numero = creado.get('number') or creado.get('displayName')
+
+            with db_connection() as (conn, cursor):
+                cursor.execute("""
+                    UPDATE synchro_registros
+                    SET estado = 'enviado', synchro_form_id = %s,
+                        synchro_numero = %s, enviado_en = NOW(),
+                        error = NULL, intentos = intentos + 1,
+                        actualizado_en = NOW()
+                    WHERE id = %s
+                """, (nuevo, str(numero) if numero else None, registro_id))
+                conn.commit()
+
+            return jsonify({'success': True, 'numero': numero,
+                            'synchro_form_id': nuevo})
+
+        # El mensaje de Bentley se guarda tal cual: es lo que dice qué
+        # campo sobra, cuál falta o cuál tiene el tipo equivocado.
+        detalle = (r.text or '')[:600]
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                UPDATE synchro_registros
+                SET estado = 'error', error = %s,
+                    intentos = intentos + 1, actualizado_en = NOW()
+                WHERE id = %s
+            """, (f'{r.status_code}: {detalle}', registro_id))
+            conn.commit()
+
+        return jsonify({'error': f'Synchro respondio {r.status_code}',
+                        'detalle': detalle}), 502
+
+    except Exception as e:
+        current_app.logger.exception('synchro enviar_registro')
+        return jsonify({'error': str(e)}), 500

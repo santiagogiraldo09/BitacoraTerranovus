@@ -232,6 +232,11 @@
                             </div>
                         </div>
                         <span class="sy-estado ${clase}">${texto}</span>
+                        ${r.estado === 'enviado' ? '' : `
+                            <button class="sy-btn" style="padding:7px 13px;font-size:12px;"
+                                    onclick="enviar(${r.id}, this)">
+                                <i class="fas fa-paper-plane"></i> Enviar
+                            </button>`}
                     </div>`;
             }).join('');
 
@@ -242,6 +247,33 @@
 
     function llenar(definicionId) {
         window.location.href = '/synchro/' + encodeURIComponent(definicionId);
+    }
+
+    async function enviar(id, btn) {
+        const antes = btn.innerHTML;
+        btn.disabled  = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando…';
+
+        try {
+            const res  = await fetch(
+                `/api/integraciones/synchro/registros/${id}/enviar`,
+                { method: 'POST' });
+            const data = await res.json();
+
+            if (data.success) {
+                alert('Enviado a Synchro' + (data.numero ? ' como ' + data.numero : ''));
+            } else {
+                // El detalle de Bentley se muestra completo: es lo que
+                // dice qué hay que corregir.
+                alert('No se pudo enviar.\n\n' + (data.detalle || data.error || ''));
+            }
+            cargarRegistros();
+
+        } catch {
+            alert('Error de conexión.');
+            btn.disabled  = false;
+            btn.innerHTML = antes;
+        }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
