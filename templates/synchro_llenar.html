@@ -222,6 +222,12 @@
         }
     }
 
+    /** Los campos que el usuario puede llenar. Se excluye el estado:
+     *  lo gobierna el flujo de trabajo de Synchro al crear. */
+    function camposEditables() {
+        return CAMPOS.filter(c => c.enviable && c.ruta !== 'status');
+    }
+
     async function cargar() {
         try {
             const data = await (await fetch('/api/integraciones/synchro/vinculados')).json();
@@ -239,11 +245,11 @@
             document.getElementById('sl-proyecto').textContent = form.proyecto || '';
 
             CAMPOS = form.campos || [];
-            const enviables    = CAMPOS.filter(c => c.enviable);
-            const noEnviables  = CAMPOS.filter(c => !c.enviable);
+            const editables   = camposEditables();
+            const noEnviables = CAMPOS.filter(c => !c.enviable || c.ruta === 'status');
 
             document.getElementById('sl-form').innerHTML =
-                enviables.map(campoHTML).join('');
+                editables.map(campoHTML).join('');
 
             // Se nombran los campos que Synchro gestiona por su cuenta,
             // para que nadie los busque creyendo que faltan.
@@ -267,10 +273,11 @@
      *  Los vacíos no se mandan: un campo en blanco no es un valor. */
     function recoger() {
         const out = {};
-        const enviables = CAMPOS.filter(c => c.enviable && !c.usuarios);
+        const editables = camposEditables();
 
-        enviables.forEach((c, idxOriginal) => {
-            const i  = CAMPOS.filter(x => x.enviable).indexOf(c);
+        editables.forEach(c => {
+            if (c.usuarios) return;
+            const i  = editables.indexOf(c);
             const el = document.getElementById('sl-' + i);
             if (!el) return;
 
@@ -328,7 +335,7 @@
                 (data.campos || []).forEach(etiqueta => {
                     const c = CAMPOS.find(x => x.etiqueta === etiqueta);
                     if (!c) return;
-                    const i  = CAMPOS.filter(x => x.enviable).indexOf(c);
+                    const i  = camposEditables().indexOf(c);
                     const el = document.getElementById('sl-' + i);
                     if (el) {
                         el.classList.add('sl-falta');

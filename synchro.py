@@ -1255,6 +1255,10 @@ def _valor_synchro(campo, valor):
 
     return str(valor)
 
+# Synchro gobierna el estado con su propio flujo de trabajo y lo asigna
+# al crear. Mandarlo nosotros —y más uno final como 'Rejected'— no es
+# una transición válida y su backend responde 500 en vez de 422.
+CAMPOS_NO_CREACION = {'status'}
 
 def _sobre(definicion_id, campos, respuestas):
     """Arma el cuerpo del POST a partir de la definición y lo capturado."""
@@ -1274,6 +1278,8 @@ def _sobre(definicion_id, campos, respuestas):
             continue
 
         ruta = c.get('ruta') or ''
+        if ruta in CAMPOS_NO_CREACION:
+            continue
         if ruta.startswith('properties.'):
             propias[ruta.split('.', 1)[1]] = valor
         else:
