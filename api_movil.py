@@ -966,13 +966,6 @@ def api_movil_crear_proyecto():
         return jsonify({"error": "datos_invalidos", "campos": errores}), 400
 
     try:
-        # Idempotencia: si ya se creó con este id_local, no duplicar
-        if id_local:
-            ya = (supabase_client.table("proyectos").select("id")
-                  .eq("id_local", id_local).eq("empresa_id", empresa_id).limit(1).execute())
-            if ya.data:
-                return jsonify({"success": True, "id": ya.data[0]["id"], "duplicado": True})
-
         # Tipo debe ser de la empresa
         tr = (supabase_client.table("tipos_proyecto").select("campos")
               .eq("id", _num(tipo_id)).eq("empresa_id", empresa_id).limit(1).execute())
@@ -1017,8 +1010,6 @@ def api_movil_crear_proyecto():
             "tipo_proyecto_id": _num(tipo_id), "datos_tipo": datos_tipo,
             "user_id": uid, "empresa_id": empresa_id,
         }
-        if id_local:
-            fila["id_local"] = id_local
         ins = supabase_client.table("proyectos").insert(fila).execute()
         nuevo_id = (ins.data or [{}])[0].get("id")
 
