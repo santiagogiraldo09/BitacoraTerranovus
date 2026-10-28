@@ -840,7 +840,7 @@ def api_movil_actualizar_proyecto(project_id):
          .eq("proyecto_id", project_id).execute())
         if formularios:
             supabase_client.table("proyecto_formularios").insert(
-                [{"proyecto_id": project_id, "formulario_id": f} for f in formularios]
+                [{"proyecto_id": project_id, "formulario_id": f, "empresa_id": empresa_id} for f in formularios]
             ).execute()
 
         # Limpiar activaciones huérfanas (recomendado por el repo web)
