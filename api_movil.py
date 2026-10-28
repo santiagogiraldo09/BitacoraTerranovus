@@ -1028,6 +1028,37 @@ def api_movil_crear_proyecto():
         current_app.logger.exception("api_movil_crear_proyecto")
         return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
 
+@api_movil.route("/api/movil/proyecto/<int:project_id>", methods=["DELETE"])
+@requiere_token
+def api_movil_eliminar_proyecto(project_id):
+    """Elimina un proyecto. Solo admin, misma empresa."""
+    from app import supabase_client
+    u = request.usuario
+    empresa_id = _num(u["empresa_id"])
+    if not _es_admin_db(u["uid"]):
+        return jsonify({"error": "solo_admin"}), 403
+    try:
+        pr = (supabase_client.table("proyectos").select("id")
+              .eq("id", project_id).eq("empresa_id", empresa_id).limit(1).execute())
+        if not (pr.data or []):
+            return jsonify({"error": "no_encontrado"}), 404
+
+        # Limpiar tablas hijas primero (evita filas huérfanas)
+        for tabla, col in (("proyecto_formularios_activos", "proyecto_id"),
+                           ("proyecto_formularios", "proyecto_id"),
+                           ("proyecto_usuarios", "id_proyecto")):
+            try:
+                supabase_client.table(tabla).delete().eq(col, project_id).execute()
+            except Exception:
+                pass
+
+        supabase_client.table("proyectos").delete() \
+            .eq("id", project_id).eq("empresa_id", empresa_id).execute()
+        return jsonify({"success": True, "id": project_id})
+    except Exception as e:
+        current_app.logger.exception("api_movil_eliminar_proyecto")
+        return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
+
 @api_movil.route("/api/movil/formulario/<int:formulario_id>", methods=["GET"])
 @requiere_token
 def api_movil_formulario(formulario_id):
