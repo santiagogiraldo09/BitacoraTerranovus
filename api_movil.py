@@ -639,6 +639,226 @@ def api_toggle_formulario(project_id, formulario_id):
         current_app.logger.exception("api_toggle_formulario")
         return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
 
+def _es_admin_db(uid):
+    from app import supabase_client
+    try:
+        r = (supabase_client.table("usuario").select("rol")
+             .eq("user_id", _num(uid)).limit(1).execute())
+        if r.data:
+            return (r.data[0].get("rol") or "").lower() in ("admin", "administrador")
+    except Exception:
+        pass
+    return False
+
+@api_movil.route("/api/movil/proyecto/<int:project_id>", methods=["GET"])
+@requiere_token
+def api_movil_proyecto_detalle(project_id):
+    from app import supabase_client
+    u = request.usuario
+    empresa_id = _num(u["empresa_id"])
+    if not _es_admin_db(u["uid"]):
+        return jsonify({"error": "solo_admin"}), 403
+    try:
+        pr = (supabase_client.table("proyectos")
+              .select("id, nombre_proyecto, fecha_inicio, fecha_fin, estado, tipo_proyecto_id, datos_tipo, empresa_id")
+              .eq("id", project_id).limit(1).execute())
+        if not (pr.data or []) or _num(pr.data[0].get("empresa_id")) != empresa_id:
+            return jsonify({"error": "no_encontrado"}), 404
+        p = pr.data[0]
+
+        # Tipo de proyecto con sus campos personalizados resueltos
+        tipo = None
+        tp_id = p.get("tipo_proyecto_id")
+        if tp_id:
+            tr = (supabase_client.table("tipos_proyecto").select("id, nombre, campos")
+                  .eq("id", tp_id).eq("empresa_id", empresa_id).limit(1).execute())
+            if tr.data:
+                t = tr.data[0]
+                refs = t.get("campos") or []
+                ids = [(c["id"] if isinstance(c, dict) else c) for c in refs]
+                catalogo = {}
+                if ids:
+                    cg = (supabase_client.table("campos_globales")
+                          .select("id, nombre, tipo, opciones, configuracion")
+                          .in_("id", ids).eq("empresa_id", empresa_id).execute())
+                    catalogo = {c["id"]: c for c in (cg.data or [])}
+                campos = []
+                for ref in refs:
+                    cid = ref["id"] if isinstance(ref, dict) else ref
+                    req = ref.get("requerido", False) if isinstance(ref, dict) else False
+                    base = catalogo.get(cid)
+                    if not base:
+                        continue
+                    campos.append({
+                        "id": base["id"], "requerido": req,
+                        "nombre": base.get("nombre", ""), "tipo": base.get("tipo", "texto_corto"),
+                        "opciones": base.get("opciones") or [], "configuracion": base.get("configuracion") or {},
+                    })
+                tipo = {"id": t["id"], "nombre": t.get("nombre", ""), "campos": campos}
+
+        mu = (supabase_client.table("proyecto_usuarios").select("user_id")
+              .eq("id_proyecto", project_id).execute())
+        miembros = [m["user_id"] for m in (mu.data or [])]
+
+        pf = (supabase_client.table("proyecto_formularios").select("formulario_id")
+              .eq("proyecto_id", project_id).execute())
+        formularios_actuales = [f["formulario_id"] for f in (pf.data or [])]
+
+        us = (supabase_client.table("usuario")
+              .select("user_id, name, apellido, cargo, estado")
+              .eq("empresa_id", empresa_id).execute())
+        usuarios = [{"user_id": x["user_id"], "name": x.get("name", ""),
+                     "apellido": x.get("apellido", "") or "", "cargo": x.get("cargo", "") or ""}
+                    for x in (us.data or []) if (x.get("estado") or "activo") != "inactivo"]
+
+        fm = (supabase_client.table("formularios").select("id, nombre, descripcion")
+              .eq("empresa_id", empresa_id).execute())
+        formularios = [{"id": f["id"], "nombre": f.get("nombre", ""),
+                        "descripcion": f.get("descripcion") or ""} for f in (fm.data or [])]
+
+        return jsonify({
+            "proyecto": {
+                "id": p["id"], "nombre": p.get("nombre_proyecto", ""),
+                "fecha_inicio": p.get("fecha_inicio") or "",
+                "fecha_fin": p.get("fecha_fin") or "",
+                "estado": p.get("estado") or "En Curso",
+                "tipo_proyecto_id": p.get("tipo_proyecto_id"),
+                "datos_tipo": p.get("datos_tipo") or {},
+            },
+            "tipo": tipo,
+            "miembros_actuales": miembros,
+            "formularios_actuales": formularios_actuales,
+            "usuarios": usuarios,
+            "formularios": formularios,
+        })
+    except Exception as e:
+        current_app.logger.exception("api_movil_proyecto_detalle")
+        return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
+
+@api_movil.route("/api/movil/proyecto/<int:project_id>", methods=["PUT"])
+@requiere_token
+def api_movil_actualizar_proyecto(project_id):
+    from app import supabase_client
+    import re
+    u = request.usuario
+    empresa_id = _num(u["empresa_id"])
+    uid = _num(u["uid"])
+
+    if not _es_admin_db(u["uid"]):
+        return jsonify({"error": "solo_admin"}), 403
+
+    data = request.get_json(silent=True) or {}
+    nombre = (data.get("nombre") or "").strip()
+    fi = data.get("fecha_inicio")
+    ff = data.get("fecha_fin")
+    datos_tipo = data.get("datos_tipo")
+    miembros = data.get("miembros")
+    formularios = data.get("formularios")
+
+    errores = []
+    if not nombre:
+        errores.append("nombre")
+
+    fi = None if fi in ("", None) else fi
+    ff = None if ff in ("", None) else ff
+    def _fecha_ok(v):
+        return v is None or (isinstance(v, str) and re.match(r"^\d{4}-\d{2}-\d{2}$", v))
+    if not _fecha_ok(fi): errores.append("fecha_inicio")
+    if not _fecha_ok(ff): errores.append("fecha_fin")
+    if fi and ff and ff < fi: errores.append("fecha_fin")
+
+    if datos_tipo is None: datos_tipo = {}
+    if not isinstance(datos_tipo, dict): errores.append("datos_tipo")
+
+    miembros = miembros if miembros is not None else []
+    formularios = formularios if formularios is not None else []
+    def _lista_int(v): return isinstance(v, list) and all(isinstance(x, int) for x in v)
+    if not _lista_int(miembros): errores.append("miembros")
+    if not _lista_int(formularios): errores.append("formularios")
+
+    if errores:
+        return jsonify({"error": "datos_invalidos", "campos": errores}), 400
+
+    try:
+        pr = (supabase_client.table("proyectos").select("id, tipo_proyecto_id")
+              .eq("id", project_id).eq("empresa_id", empresa_id).limit(1).execute())
+        if not (pr.data or []):
+            return jsonify({"error": "no_encontrado"}), 404
+
+        # Validar claves y requeridos de datos_tipo contra el tipo del proyecto
+        tp_id = pr.data[0].get("tipo_proyecto_id")
+        if tp_id:
+            tr = (supabase_client.table("tipos_proyecto").select("campos")
+                  .eq("id", tp_id).eq("empresa_id", empresa_id).limit(1).execute())
+            refs = (tr.data[0].get("campos") if tr.data else []) or []
+            ids_validos = set(str(c["id"] if isinstance(c, dict) else c) for c in refs)
+            requeridos = set(str(c["id"]) for c in refs if isinstance(c, dict) and c.get("requerido"))
+            for k in datos_tipo.keys():
+                if str(k) not in ids_validos:
+                    errores.append(str(k))
+            for rq in requeridos:
+                if datos_tipo.get(rq) in (None, "", [], {}):
+                    errores.append(rq)
+        elif datos_tipo:
+            errores.append("datos_tipo")
+        if errores:
+            return jsonify({"error": "datos_invalidos", "campos": errores}), 400
+
+        # El editor siempre queda como miembro (igual que la web)
+        if uid not in miembros:
+            miembros = miembros + [uid]
+
+        if miembros:
+            ur = (supabase_client.table("usuario").select("user_id")
+                  .in_("user_id", miembros).eq("empresa_id", empresa_id).execute())
+            validos = {x["user_id"] for x in (ur.data or [])}
+            malos = [m for m in miembros if m not in validos]
+            if malos:
+                return jsonify({"error": "usuario_no_autorizado", "ids": malos}), 403
+        if formularios:
+            fr = (supabase_client.table("formularios").select("id")
+                  .in_("id", formularios).eq("empresa_id", empresa_id).execute())
+            validos = {x["id"] for x in (fr.data or [])}
+            malos = [f for f in formularios if f not in validos]
+            if malos:
+                return jsonify({"error": "formulario_no_autorizado", "ids": malos}), 403
+
+        # ---- Escritura (ya validado todo arriba) ----
+        (supabase_client.table("proyectos").update({
+            "nombre_proyecto": nombre, "fecha_inicio": fi,
+            "fecha_fin": ff, "datos_tipo": datos_tipo,
+        }).eq("id", project_id).eq("empresa_id", empresa_id).execute())
+
+        (supabase_client.table("proyecto_usuarios").delete()
+         .eq("id_proyecto", project_id).execute())
+        if miembros:
+            supabase_client.table("proyecto_usuarios").insert(
+                [{"id_proyecto": project_id, "user_id": m, "empresa_id": empresa_id} for m in miembros]
+            ).execute()
+
+        (supabase_client.table("proyecto_formularios").delete()
+         .eq("proyecto_id", project_id).execute())
+        if formularios:
+            supabase_client.table("proyecto_formularios").insert(
+                [{"proyecto_id": project_id, "formulario_id": f} for f in formularios]
+            ).execute()
+
+        # Limpiar activaciones huérfanas (recomendado por el repo web)
+        try:
+            av = (supabase_client.table("proyecto_formularios_activos")
+                  .select("id, formulario_id, user_id").eq("proyecto_id", project_id).execute())
+            mset, fset = set(miembros), set(formularios)
+            for a in (av.data or []):
+                if a["formulario_id"] not in fset or a["user_id"] not in mset:
+                    supabase_client.table("proyecto_formularios_activos").delete().eq("id", a["id"]).execute()
+        except Exception:
+            pass
+
+        return jsonify({"success": True, "id": project_id})
+
+    except Exception as e:
+        current_app.logger.exception("api_movil_actualizar_proyecto")
+        return jsonify({"error": "error_servidor", "detalle": str(e)}), 500
 
 @api_movil.route("/api/movil/formulario/<int:formulario_id>", methods=["GET"])
 @requiere_token
