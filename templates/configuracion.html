@@ -1323,6 +1323,10 @@
     let builderCamposForm     = [];
     let builderFormId         = null;
     let dragSrcIndex          = null;
+    // Formularios creados por la integración de Synchro. No se editan
+    // desde el constructor: si alguien les quita un campo, los envíos
+    // empiezan a fallar en silencio.
+    let formulariosSynchro = new Set();
 
     // ── Builder de Tipos de Proyecto ──
     let proyectoCamposGlobales = [];
@@ -1384,6 +1388,18 @@
         renderCanvasProyecto();
     }
 
+    async function cargarFormulariosSynchro() {
+        try {
+            const r = await fetch('/api/integraciones/synchro/vinculados');
+            const d = await r.json();
+            formulariosSynchro = new Set(
+                (d.formularios || []).map(f => f.formulario_id).filter(Boolean));
+        } catch {
+            // Si falla, se dejan editables: es preferible a bloquear
+            // todo el constructor por un fallo de red.
+            formulariosSynchro = new Set();
+        }
+    }
 
     // ── Plantilla y tableros del informe ───────────────────────
     let plantillasReporte = [];
@@ -2738,6 +2754,16 @@
     };
 
     async function abrirBuilder(formId) {
+        // La estructura la manda Synchro. Editarla aquí rompería la
+        // correspondencia de campos y los envíos fallarían después,
+        // sin que nadie relacione una cosa con la otra.
+        if (formId && formulariosSynchro.has(formId)) {
+            mostrarToast('Este formulario lo gestiona Synchro. '
+                       + 'Para cambiarlo, hazlo en Synchro y pulsa '
+                       + 'Actualizar en Integraciones.', true);
+            return;
+        }
+
         builderFormId     = formId;
         builderCamposForm = [];
 
@@ -2756,7 +2782,11 @@
         try {
             const res  = await fetch('/api/campos-globales?objeto=formulario');
             const data = await res.json();
-            builderCamposGlobales = data.campos || [];
+            // Los campos de Synchro existen para que su formulario
+            // funcione, pero no son piezas del catálogo de la empresa:
+            // nadie debería armar un formulario propio con "Subject".
+            builderCamposGlobales = (data.campos || [])
+                .filter(c => (c.configuracion || {}).origen !== 'synchro');
         } catch { builderCamposGlobales = []; }
 
         // Si es edición, cargar datos del formulario
@@ -3199,6 +3229,7 @@
         const lista = document.getElementById('lista-formularios');
         if (!lista) return;
         try {
+            await cargarFormulariosSynchro();
             const res  = await fetch('/api/formularios');
             const data = await res.json();
             if (!data.formularios || data.formularios.length === 0) {
@@ -3209,20 +3240,25 @@
             data.formularios.forEach(form => {
                 const div = document.createElement('div');
                 div.className = 'formulario-item';
+                const esSynchro = formulariosSynchro.has(form.id);
                 div.innerHTML = `
                     <div class="formulario-item-info">
-                        <span class="formulario-item-nombre">${form.nombre}</span>
+                        <span class="formulario-item-nombre">
+                            ${form.nombre}${esSynchro ? ' 🔒' : ''}
+                        </span>
                         <span class="formulario-item-meta">
                             ${form.campos.length} campo${form.campos.length !== 1 ? 's' : ''} · ${form.created_at}
+                            ${esSynchro ? ' · se gestiona desde Integraciones' : ''}
                         </span>
                     </div>
                     <div class="formulario-item-actions">
+                        ${esSynchro ? '' : `
                         <button class="icon-btn" onclick="abrirBuilder(${form.id})" title="Editar">
                             <i class="fas fa-edit"></i>
                         </button>
                         <button class="icon-btn danger" onclick="eliminarFormulario(${form.id}, '${form.nombre}')" title="Eliminar">
                             <i class="fas fa-trash"></i>
-                        </button>
+                        </button>`}
                     </div>`;
                 lista.appendChild(div);
             });
@@ -4102,17 +4138,20 @@
                     : 'background:#fef3c7;color:#d97706;';
                 const objetoLabel = campo.objeto === 'proyecto' ? 'Proyecto' : 'Formulario';
 
+                const esSynchro = (campo.configuracion || {}).origen === 'synchro';
+                const bloqueado = campo.es_sistema || esSynchro;
+
                 const div = document.createElement('div');
                 div.className = 'campo-item';
                 div.innerHTML = `
                     <div class="campo-item-info">
-                        <span class="campo-item-nombre">${campo.nombre}${campo.es_sistema ? ' 🔒' : ''}</span>
+                        <span class="campo-item-nombre">${campo.nombre}${bloqueado ? ' 🔒' : ''}${esSynchro ? ' <span style="font-size:11px;padding:2px 7px;border-radius:10px;background:#e0e7ff;color:#4338ca;">Synchro</span>' : ''}</span>
                         <span class="campo-item-tipo">
                             <span class="campo-tipo-badge">${tipoLabel}</span>
                             <span style="font-size:11px;padding:2px 7px;border-radius:10px;${objetoBadgeColor}">${objetoLabel}</span>
                         </span>
                     </div>
-                    ${campo.es_sistema
+                    ${bloqueado
                         ? ''
                         : `<div style="display:flex; gap:8px; flex-shrink:0;">
                                 <button class="icon-btn" onclick="editarCampo(${campo.id})" title="Editar">
