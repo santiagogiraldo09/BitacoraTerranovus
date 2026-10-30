@@ -4277,13 +4277,14 @@
         cont.innerHTML = '<p class="rep-vacio">Consultando Synchro…</p>';
 
         try {
-            const [rd, rv] = await Promise.all([
+            const [rd, rv, rp] = await Promise.all([
                 fetch('/api/integraciones/synchro/disponibles'),
-                fetch('/api/integraciones/synchro/vinculados')
+                fetch('/api/integraciones/synchro/vinculados'),
+                fetch('/api/integraciones/synchro/proyectos')
             ]);
             const disp = await rd.json();
             const vinc = await rv.json();
-
+            sfProyectos = (await rp.json()).proyectos || [];
             // 409 cuando la conexión con Bentley expiró o no existe.
             if (disp.error) {
                 cont.innerHTML = `<p class="rep-vacio">${escHtml(disp.error)}</p>`;
@@ -4303,6 +4304,8 @@
         }
     }
 
+    let sfProyectos = [];   // proyectos de la empresa, para el selector
+
     function renderSynchroForms() {
         const cont = document.getElementById('synchro-forms-lista');
 
@@ -4314,48 +4317,88 @@
 
         cont.innerHTML = sfDisponibles.map(p => `
             <div class="rep-bloque-titulo">${escHtml(p.proyecto)}</div>
-            ${!(p.formularios || []).length
-                ? `<p class="rep-vacio">${escHtml(p.aviso || 'Sin formularios')}</p>`
-                : ''}
             ${(p.formularios || []).map(f => {
-                const v  = sfVinculados[f.definicion_id];
-                const id = f.definicion_id;
+                const v     = sfVinculados[f.definicion_id];
+                const id    = f.definicion_id;
+                const mios  = (v && v.proyectos) || [];
+                const donde = mios.map(x => escHtml(x.nombre)).join(', ');
                 return `
-                <div class="pbi-item">
+                <div class="pbi-item" style="flex-wrap:wrap;">
                     <div class="pbi-item-info">
-                        <span class="pbi-item-nombre">
-                            ${escHtml(f.nombre)}
-                            ${v ? '<span class="pbi-tag">vinculado</span>' : ''}
-                        </span>
+                        <span class="pbi-item-nombre">${escHtml(f.nombre)}</span>
                         <span class="pbi-item-meta">
                             ${escHtml(f.tipo || '—')}${f.estado_def && f.estado_def !== 'Approved'
                                 ? ` · <span style="color:#d97706;">${escHtml(f.estado_def)} — no admite registros nuevos</span>`
-                                : ''}${v ? ` · ${v.total} campo${v.total === 1 ? '' : 's'}` : ''}
+                                : ''}${mios.length ? ` · en ${donde}` : ''}
                         </span>
                     </div>
                     <div class="pbi-item-actions">
-                        ${v
-                            ? `<button class="icon-btn" title="Actualizar campos"
-                                       onclick="actualizarSynchroForm('${id}')">
-                                   <i class="fas fa-rotate"></i>
-                               </button>
-                               <button class="icon-btn danger" title="Quitar"
-                                       onclick="desvincularSynchroForm('${id}')">
-                                   <i class="fas fa-link-slash"></i>
-                               </button>`
-                            : `<button class="icon-btn" title="Vincular"
-                                       onclick="vincularSynchroForm('${id}')">
-                                   <i class="fas fa-link"></i>
-                               </button>`}
+                        ${mios.length ? `
+                            <button class="icon-btn" title="Actualizar campos"
+                                    onclick="actualizarSynchroForm('${id}')">
+                                <i class="fas fa-rotate"></i>
+                            </button>` : ''}
+                        <button class="icon-btn" title="${mios.length ? 'Proyectos' : 'Vincular'}"
+                                onclick="abrirProyectos('${id}')">
+                            <i class="fas fa-${mios.length ? 'folder-open' : 'link'}"></i>
+                        </button>
+                    </div>
+                    <div id="sfp-${id}" style="display:none; width:100%;
+                         border-top:1px solid #e5e7eb; margin-top:10px; padding-top:10px;">
                     </div>
                 </div>`;
             }).join('')}
         `).join('');
     }
 
-    async function vincularSynchroForm(definicionId) {
+    /** Abre el selector de proyectos de un formulario, con los que el
+     *  usuario ya tiene marcados. Es el mismo panel para vincular por
+     *  primera vez y para agregar o quitar proyectos después. */
+    function abrirProyectos(definicionId) {
+        const caja = document.getElementById('sfp-' + definicionId);
+        if (!caja) return;
+
+        if (caja.style.display !== 'none') { caja.style.display = 'none'; return; }
+
+        if (!sfProyectos.length) {
+            caja.innerHTML = '<p class="rep-vacio">No hay proyectos en la empresa.</p>';
+            caja.style.display = '';
+            return;
+        }
+
+        const v     = sfVinculados[definicionId];
+        const mios  = new Set(((v && v.proyectos) || []).map(x => x.id));
+
+        caja.innerHTML = `
+            <p class="rep-hint" style="margin-bottom:8px;">
+                Proyectos donde quieres tener este formulario:
+            </p>
+            ${sfProyectos.map(p => `
+                <label class="rep-check-item">
+                    <input type="checkbox" value="${p.id}"
+                           data-sfp="${definicionId}"
+                           ${mios.has(p.id) ? 'checked' : ''}>
+                    <span>${escHtml(p.nombre)}</span>
+                </label>`).join('')}
+            <button class="send-invite-btn" style="margin-top:10px;"
+                    onclick="guardarProyectos('${definicionId}')">
+                <i class="fas fa-save"></i> Guardar
+            </button>`;
+        caja.style.display = '';
+    }
+
+    async function guardarProyectos(definicionId) {
         const hit = _buscarSynchroForm(definicionId);
         if (!hit) return;
+
+        const proyectos = Array.from(
+            document.querySelectorAll(`[data-sfp="${definicionId}"]:checked`)
+        ).map(c => parseInt(c.value));
+
+        if (!proyectos.length) {
+            mostrarToast('Marca al menos un proyecto', true);
+            return;
+        }
 
         try {
             const res = await fetch('/api/integraciones/synchro/vincular', {
@@ -4364,7 +4407,8 @@
                 body:    JSON.stringify({
                     itwin_id:      hit.proyecto.itwin_id,
                     proyecto:      hit.proyecto.proyecto,
-                    definicion_id: definicionId
+                    definicion_id: definicionId,
+                    proyectos:     proyectos
                 })
             });
             const data = await res.json();
@@ -4380,6 +4424,7 @@
             mostrarToast('❌ Error de conexión', true);
         }
     }
+
 
     async function actualizarSynchroForm(definicionId) {
         try {

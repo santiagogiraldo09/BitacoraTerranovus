@@ -869,10 +869,16 @@ def formularios_disponibles():
 
     try:
         with db_connection() as (conn, cursor):
+            # Marcado como vinculado sólo si ESTE usuario lo ve en algún
+            # proyecto, no si la empresa lo tiene.
             cursor.execute("""
-                SELECT definicion_id FROM synchro_formularios
-                WHERE user_id = %s
-            """, (session['user_id'],))
+                SELECT DISTINCT sf.definicion_id
+                FROM synchro_formularios sf
+                JOIN proyecto_formularios_activos pfa
+                  ON pfa.formulario_id = sf.formulario_id
+                 AND pfa.user_id = %s
+                WHERE sf.empresa_id = %s
+            """, (session['user_id'], session.get('empresa_id')))
             vinculados = {x[0] for x in cursor.fetchall()}
 
         r = _get(token, f'{API}/itwins/',
@@ -938,19 +944,45 @@ def listar_vinculados():
 
     try:
         with db_connection() as (conn, cursor):
+            # 'Vinculado' pasa a significar "este usuario lo ve": la
+            # definición es de la empresa, pero la visibilidad es suya.
+            # Por eso el segundo usuario que lo vincula no ve un aviso
+            # de que ya existe — para él es su primera vinculación.
             cursor.execute("""
-                SELECT definicion_id, nombre, tipo, proyecto, itwin_id,
-                       campos, actualizado_en
-                FROM synchro_formularios
-                WHERE user_id = %s
-                ORDER BY proyecto, nombre
-            """, (session['user_id'],))
+                SELECT sf.definicion_id, sf.nombre, sf.tipo, sf.proyecto,
+                       sf.itwin_id, sf.campos, sf.actualizado_en,
+                       sf.formulario_id,
+                       COALESCE(json_agg(
+                           json_build_object('id', p.id,
+                                             'nombre', p.nombre_proyecto)
+                           ORDER BY p.nombre_proyecto
+                       ) FILTER (WHERE p.id IS NOT NULL), '[]') AS proyectos
+                FROM synchro_formularios sf
+                LEFT JOIN proyecto_formularios_activos pfa
+                       ON pfa.formulario_id = sf.formulario_id
+                      AND pfa.user_id = %s
+                LEFT JOIN proyectos p ON p.id = pfa.proyecto_id
+                WHERE sf.empresa_id = %s
+                GROUP BY sf.id
+                ORDER BY sf.nombre
+            """, (session['user_id'], session.get('empresa_id')))
             filas = cursor.fetchall()
 
-        return jsonify({'formularios': [_fila(f) for f in filas]})
+        return jsonify({'formularios': [{
+            'definicion_id': f[0],
+            'nombre':        f[1],
+            'tipo':          f[2],
+            'proyecto':      f[3],
+            'itwin_id':      f[4],
+            'campos':        f[5] or [],
+            'total':         len(_materializables(f[5] or [])),
+            'actualizado':   f[6].isoformat() if f[6] else None,
+            'formulario_id': f[7],
+            'proyectos':     f[8] or [],
+        } for f in filas]})
 
     except Exception as e:
-        current_app.logger.exception('synchro vinculados')
+        current_app.logger.exception('synchro listar_vinculados')
         return jsonify({'error': str(e)}), 500
 
 
@@ -975,40 +1007,60 @@ def vincular_formulario():
         return jsonify({'error': 'Reconecta tu cuenta de Synchro'}), 409
 
     try:
+        proyectos = datos.get('proyectos') or []
+        if not isinstance(proyectos, list) or not proyectos:
+            return jsonify({'error': 'Elige al menos un proyecto'}), 400
+
         full, campos = _descargar_campos(token, definicion_id)
         if full is None:
             return jsonify({'error': 'No se pudo leer la definicion en '
                                      'Synchro'}), 502
 
-        enviables = [c for c in campos if c.get('enviable')]
-        if not enviables:
-            # Las plantillas de fábrica vienen sin controles: vincularlas
-            # dejaría una pantalla vacía.
+        utiles = _materializables(campos)
+        if not utiles:
             return jsonify({'error': 'Ese formulario no tiene campos que '
                                      'se puedan llenar desde Bitacora'}), 422
 
+        nombre_form = full.get('displayName') or definicion_id
+        empresa_id  = session.get('empresa_id')
+
         with db_connection() as (conn, cursor):
+            formulario_id, campos = _materializar(
+                cursor, empresa_id, session['user_id'], definicion_id,
+                nombre_form, campos, proyectos)
+
+            # El conjunto marcado en pantalla ES la visibilidad del
+            # usuario: lo que destildó deja de verlo. No se toca la
+            # asignación al proyecto, que es de la empresa y puede
+            # estar en uso por otros.
+            cursor.execute("""
+                DELETE FROM proyecto_formularios_activos
+                WHERE formulario_id = %s AND user_id = %s
+                  AND NOT (proyecto_id = ANY(%s))
+            """, (formulario_id, session['user_id'],
+                  [int(p) for p in proyectos]))
+
             cursor.execute("""
                 INSERT INTO synchro_formularios
                     (empresa_id, user_id, itwin_id, proyecto,
-                     definicion_id, nombre, tipo, campos)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s::jsonb)
-                ON CONFLICT (user_id, definicion_id) DO UPDATE SET
+                     definicion_id, nombre, tipo, campos, formulario_id)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s::jsonb,%s)
+                ON CONFLICT (empresa_id, definicion_id) DO UPDATE SET
                     itwin_id       = EXCLUDED.itwin_id,
                     proyecto       = EXCLUDED.proyecto,
                     nombre         = EXCLUDED.nombre,
                     tipo           = EXCLUDED.tipo,
                     campos         = EXCLUDED.campos,
+                    formulario_id  = EXCLUDED.formulario_id,
                     actualizado_en = NOW()
-            """, (session.get('empresa_id'), session['user_id'],
-                  itwin_id, proyecto, definicion_id,
-                  full.get('displayName') or definicion_id,
-                  full.get('type') or '', json.dumps(campos)))
+            """, (empresa_id, session['user_id'], itwin_id, proyecto,
+                  definicion_id, nombre_form, full.get('type') or '',
+                  json.dumps(campos), formulario_id))
             conn.commit()
 
-        return jsonify({'success': True,
-                        'nombre': full.get('displayName'),
-                        'total': len(enviables)})
+        return jsonify({'success': True, 'nombre': nombre_form,
+                        'total': len(utiles),
+                        'formulario_id': formulario_id})
 
     except Exception as e:
         current_app.logger.exception('synchro vincular')
@@ -1394,3 +1446,184 @@ def enviar_registro(registro_id):
     except Exception as e:
         current_app.logger.exception('synchro enviar_registro')
         return jsonify({'error': str(e)}), 500
+
+# ═════════════════════════════════════════════════════════════════════
+#  MATERIALIZACIÓN
+#
+#  Un formulario de Synchro se convierte en un formulario de Bitácora
+#  para que viva dentro de un proyecto como cualquier otro. Eso le da
+#  gratis el llenado por voz, las fotos, el modo sin señal, la app
+#  móvil y la analítica.
+#
+#  Cinco capas, cuatro de empresa y una de usuario:
+#    campos_globales          campos, marcados como de origen Synchro
+#    formularios              el formulario
+#    proyecto_formularios     en qué proyectos está
+#    synchro_formularios      la definición y el mapeo de vuelta
+#    proyecto_formularios_activos   quién lo ve  ← la única personal
+# ═════════════════════════════════════════════════════════════════════
+
+def _materializables(campos):
+    """Los campos de Synchro que se vuelven campos de Bitácora.
+
+    Quedan fuera el estado —lo gobierna Synchro—, los de usuarios
+    —esperan identificadores de Bentley y se asignan allá— y los no
+    enviables, como el control compuesto de clima.
+    """
+    return [c for c in (campos or [])
+            if c.get('enviable')
+            and not c.get('usuarios')
+            and (c.get('ruta') or '') not in CAMPOS_NO_CREACION]
+
+
+def _config_campo(definicion_id, campo):
+    """Lo que viaja dentro del campo global.
+
+    El 'binding' y la 'ruta' son el puente de vuelta: al enviar, las
+    respuestas vienen con el id del campo de Bitácora y hay que
+    traducirlas al nombre que espera Synchro. Guardarlo aquí evita una
+    tabla de correspondencias aparte.
+    """
+    return {
+        'origen':        'synchro',
+        'definicion_id': definicion_id,
+        'binding':       campo.get('binding'),
+        'ruta':          campo.get('ruta'),
+        'tipo_synchro':  campo.get('tipo'),
+    }
+
+@synchro_bp.route('/api/integraciones/synchro/proyectos', methods=['GET'])
+def proyectos_empresa():
+    """Proyectos a los que se puede vincular un formulario.
+
+    Se listan todos los de la empresa, no solo los del usuario: quien
+    configura la integración suele ser un administrador que no está
+    asignado a las obras.
+    """
+    from app import db_connection
+
+    if 'user_id' not in session:
+        return jsonify({'error': 'No autorizado'}), 401
+
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT id, nombre_proyecto
+                FROM proyectos
+                WHERE empresa_id = %s
+                ORDER BY nombre_proyecto
+            """, (session.get('empresa_id'),))
+            filas = cursor.fetchall()
+
+        return jsonify({'proyectos': [{'id': f[0], 'nombre': f[1]}
+                                      for f in filas]})
+
+    except Exception as e:
+        current_app.logger.exception('synchro proyectos_empresa')
+        return jsonify({'error': str(e)}), 500
+
+def _materializar(cursor, empresa_id, user_id, definicion_id,
+                  nombre_form, campos, proyectos):
+    """Crea o actualiza el formulario y lo deja en los proyectos dados.
+
+    Es idempotente a propósito: si un segundo usuario vincula lo mismo,
+    las cuatro capas de empresa ya existen y lo único que se agrega es
+    su fila de visibilidad. Para él la operación se ve igual que la
+    primera vez.
+
+    Devuelve (formulario_id, campos con su campo_global_id).
+    """
+    # Lo que ya exista para esta definición, para reutilizar los campos
+    # en vez de duplicarlos en cada actualización.
+    cursor.execute("""
+        SELECT formulario_id, campos
+        FROM synchro_formularios
+        WHERE empresa_id = %s AND definicion_id = %s
+    """, (empresa_id, definicion_id))
+    previo = cursor.fetchone()
+    formulario_id = previo[0] if previo else None
+    ids_previos = {c.get('binding'): c.get('campo_global_id')
+                   for c in ((previo[1] if previo else None) or [])
+                   if c.get('campo_global_id')}
+
+    # ── Campos globales ──
+    utiles = _materializables(campos)
+    for c in utiles:
+        config   = _config_campo(definicion_id, c)
+        opciones = c.get('opciones') or []
+        viejo_id = ids_previos.get(c.get('binding'))
+
+        if viejo_id:
+            cursor.execute("""
+                UPDATE campos_globales
+                SET nombre = %s, tipo = %s, opciones = %s::jsonb,
+                    configuracion = %s::jsonb
+                WHERE id = %s AND empresa_id = %s
+            """, (c.get('etiqueta'), c.get('tipo'), json.dumps(opciones),
+                  json.dumps(config), viejo_id, empresa_id))
+            c['campo_global_id'] = viejo_id
+        else:
+            cursor.execute("""
+                INSERT INTO campos_globales
+                    (empresa_id, nombre, tipo, objeto, opciones, configuracion)
+                VALUES (%s, %s, %s, 'formulario', %s::jsonb, %s::jsonb)
+                RETURNING id
+            """, (empresa_id, c.get('etiqueta'), c.get('tipo'),
+                  json.dumps(opciones), json.dumps(config)))
+            c['campo_global_id'] = cursor.fetchone()[0]
+
+    # ── Formulario ──
+    referencias = [{'id': c['campo_global_id'],
+                    'requerido': bool(c.get('requerido'))} for c in utiles]
+    descripcion = f'Formulario de Synchro Control · {definicion_id[:12]}'
+
+    if formulario_id:
+        cursor.execute("""
+            UPDATE formularios
+            SET nombre = %s, descripcion = %s, campos = %s::jsonb
+            WHERE id = %s AND empresa_id = %s
+        """, (nombre_form, descripcion, json.dumps(referencias),
+              formulario_id, empresa_id))
+    else:
+        cursor.execute("""
+            INSERT INTO formularios (empresa_id, nombre, descripcion, campos)
+            VALUES (%s, %s, %s, %s::jsonb)
+            RETURNING id
+        """, (empresa_id, nombre_form, descripcion,
+              json.dumps(referencias)))
+        formulario_id = cursor.fetchone()[0]
+
+    # ── Proyectos y visibilidad ──
+    for proyecto_id in proyectos:
+        # El proyecto tiene que ser de la empresa de la sesión: el id
+        # llega del navegador y no se confía en él.
+        cursor.execute("SELECT 1 FROM proyectos WHERE id = %s AND empresa_id = %s",
+                       (proyecto_id, empresa_id))
+        if not cursor.fetchone():
+            continue
+
+        cursor.execute("""
+            SELECT 1 FROM proyecto_formularios
+            WHERE proyecto_id = %s AND formulario_id = %s
+        """, (proyecto_id, formulario_id))
+        if not cursor.fetchone():
+            cursor.execute("""
+                INSERT INTO proyecto_formularios
+                    (proyecto_id, formulario_id, empresa_id)
+                VALUES (%s, %s, %s)
+            """, (proyecto_id, formulario_id, empresa_id))
+
+        # La visibilidad sí es por persona: es lo que hace que el
+        # segundo usuario vea el formulario sin duplicar nada.
+        cursor.execute("""
+            SELECT 1 FROM proyecto_formularios_activos
+            WHERE proyecto_id = %s AND formulario_id = %s AND user_id = %s
+        """, (proyecto_id, formulario_id, user_id))
+        if not cursor.fetchone():
+            cursor.execute("""
+                INSERT INTO proyecto_formularios_activos
+                    (proyecto_id, formulario_id, user_id, empresa_id)
+                VALUES (%s, %s, %s, %s)
+            """, (proyecto_id, formulario_id, user_id, empresa_id))
+
+    return formulario_id, campos
