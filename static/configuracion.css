@@ -70,7 +70,38 @@ button { font-family: inherit; cursor: pointer; }
     display: flex;
     flex-direction: column;
     gap: 4px;
-    flex: 1;
+
+    /* Ocupa el alto sobrante y, si no cabe, se desplaza por dentro.
+       'min-height: 0' es la clave: sin él, un elemento flexible se
+       niega a encogerse por debajo de su contenido y en vez de
+       desplazarse empuja el pie fuera de la pantalla. */
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+
+    /* Al llegar al final del menú no arrastra la página de atrás. */
+    overscroll-behavior: contain;
+
+    /* Barra delgada: una gruesa dentro de 260px se come el espacio. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--gris-borde) transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-nav::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+    background: var(--gris-borde);
+    border-radius: 3px;
+}
+
+.sidebar-nav:hover::-webkit-scrollbar-thumb {
+    background: #d1d5db;
 }
 
 .sidebar-nav-item {
@@ -110,6 +141,7 @@ button { font-family: inherit; cursor: pointer; }
 .sidebar-footer {
     border-top: 1px solid var(--gris-borde);
     padding-top: 16px;
+    flex: 0 0 auto;          /* siempre visible, pase lo que pase arriba */
 }
 
 .sidebar-user {
