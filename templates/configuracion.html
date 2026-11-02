@@ -4129,8 +4129,21 @@
                 lista.innerHTML = '<p style="color:var(--gris-texto);font-size:13px;">Aún no hay campos creados.</p>';
                 return;
             }
+            // Los campos de Synchro existen para que su formulario
+            // funcione, pero no son piezas del catálogo de la empresa y
+            // nadie puede editarlos. Mostrarlos sólo llena la lista:
+            // con cinco formularios vinculados serían decenas.
+            const propios = (data.campos || [])
+                .filter(c => (c.configuracion || {}).origen !== 'synchro');
+
+            if (!propios.length) {
+                lista.innerHTML = '<p style="color:var(--gris-texto);font-size:13px;">' +
+                                  'Aún no hay campos creados.</p>';
+                return;
+            }
+
             lista.innerHTML = '';
-            data.campos.forEach(campo => {
+            propios.forEach(campo => {
                 const tipoLabel = tipoLabels[campo.tipo] || campo.tipo;
 
                 const objetoBadgeColor = campo.objeto === 'proyecto'
@@ -4138,20 +4151,17 @@
                     : 'background:#fef3c7;color:#d97706;';
                 const objetoLabel = campo.objeto === 'proyecto' ? 'Proyecto' : 'Formulario';
 
-                const esSynchro = (campo.configuracion || {}).origen === 'synchro';
-                const bloqueado = campo.es_sistema || esSynchro;
-
                 const div = document.createElement('div');
                 div.className = 'campo-item';
                 div.innerHTML = `
                     <div class="campo-item-info">
-                        <span class="campo-item-nombre">${campo.nombre}${bloqueado ? ' 🔒' : ''}${esSynchro ? ' <span style="font-size:11px;padding:2px 7px;border-radius:10px;background:#e0e7ff;color:#4338ca;">Synchro</span>' : ''}</span>
+                        <span class="campo-item-nombre">${campo.nombre}${campo.es_sistema ? ' 🔒' : ''}</span>
                         <span class="campo-item-tipo">
                             <span class="campo-tipo-badge">${tipoLabel}</span>
                             <span style="font-size:11px;padding:2px 7px;border-radius:10px;${objetoBadgeColor}">${objetoLabel}</span>
                         </span>
                     </div>
-                    ${bloqueado
+                    ${campo.es_sistema
                         ? ''
                         : `<div style="display:flex; gap:8px; flex-shrink:0;">
                                 <button class="icon-btn" onclick="editarCampo(${campo.id})" title="Editar">
