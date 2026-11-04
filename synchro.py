@@ -1707,10 +1707,16 @@ def _anotar_envio(cursor, respuesta_id, empresa_id, user_id, sf,
 
 
 def _subir(respuesta_id, user_id, empresa_id):
-    """Hilo que sube un registro a Synchro. No interrumpe nada si falla."""
-    from app import db_connection
+    """Hilo que sube un registro a Synchro. No interrumpe nada si falla.
 
-    with _semaforo_envio:
+    Todo corre dentro de un contexto de aplicación: un hilo no hereda
+    el de la petición, y sin él revienta cualquier uso de current_app,
+    incluido el refresco del token y el propio registro de errores.
+    """
+    import traceback
+    from app import app, db_connection
+
+    with _semaforo_envio, app.app_context():
         try:
             with db_connection() as (conn, cursor):
                 # Sin sesión de Flask, db_connection deja el tenant en 1.
@@ -1779,8 +1785,10 @@ def _subir(respuesta_id, user_id, empresa_id):
                 conn.commit()
 
         except Exception:
-            current_app.logger.exception('synchro _subir %s', respuesta_id)
-
+            # Con print y no con current_app: el registro del error no
+            # puede ser lo que falle cuando el error es del contexto.
+            print(f"[SYNCHRO] Error subiendo el registro {respuesta_id}:")
+            traceback.print_exc()
 
 def lanzar_envio(respuesta_id, user_id, empresa_id):
     """Dispara el envío si el formulario es de Synchro. Nunca lanza.
