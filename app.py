@@ -19,7 +19,7 @@ from office365.sharepoint.lists.list import List
 from office365.sharepoint.listitems.listitem import ListItem
 import psycopg2
 from werkzeug.security import generate_password_hash, check_password_hash
-from flask import session
+from flask import session, has_request_context
 import secrets
 from pydub import AudioSegment
 import tempfile
@@ -372,7 +372,13 @@ def db_connection():
                 "No se pudo obtener una conexión válida"
             )
 
-        empresa_id = session.get('empresa_id', 1)
+        # Un hilo de segundo plano no tiene contexto de petición y por
+        # tanto no tiene 'session'. Se fija 0 en vez de omitir el SET:
+        # la conexión viene de un pool y conserva el valor que le dejó
+        # quien la usó antes, así que omitirlo dejaría al hilo leyendo
+        # datos de otra empresa. El código que corre en hilos debe
+        # fijar su propio tenant apenas abre la conexión.
+        empresa_id = session.get('empresa_id', 1) if has_request_context() else 0
 
         cursor.execute(
             "SET app.empresa_id = %s",
@@ -3951,7 +3957,7 @@ def get_db_connection():
         cursor.execute("SELECT 1")
         cursor.fetchone()
 
-        empresa_id = session.get('empresa_id', 1)
+        empresa_id = session.get('empresa_id', 1) if has_request_context() else 0
 
         cursor.execute(
             "SET app.empresa_id = %s",
