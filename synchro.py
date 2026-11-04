@@ -1576,7 +1576,7 @@ def _materializar(cursor, empresa_id, user_id, definicion_id,
     # ── Formulario ──
     referencias = [{'id': c['campo_global_id'],
                     'requerido': bool(c.get('requerido'))} for c in utiles]
-    descripcion = f'Formulario de Synchro Control · {definicion_id[:12]}'
+    descripcion = 'Formulario de Synchro Control'
 
     if formulario_id:
         cursor.execute("""
