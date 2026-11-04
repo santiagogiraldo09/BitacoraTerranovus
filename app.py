@@ -5467,20 +5467,22 @@ def guardar_respuesta_formulario(_reintento=0):
             # Enlazar las transcripciones de esta sesión con el registro final.
             # Permite comparar lo que extrajo el modelo contra lo que quedó
             # guardado, es decir, medir las correcciones manuales del usuario.
-            sesion_uuid = data.get('sesion_uuid')
-            if sesion_uuid:
-                try:
-                    cursor.execute("""
-                        UPDATE transcripciones_log
-                        SET respuesta_id = %s
-                        WHERE sesion_uuid = %s AND respuesta_id IS NULL
-                    """, (nuevo_id, sesion_uuid))
-                except Exception as e:
-                    print(f"[LOG-TRANS] No se pudo enlazar la sesión: {e}")
 
-            return jsonify({'success': True, 'id': nuevo_id})
+        # Fuera del 'with': aquí la transacción ya cerró y el registro
+        # está confirmado en la base, así que el hilo que lo sube a
+        # Synchro lo va a encontrar. Dentro del bloque podría leerlo
+        # antes del commit y no hallar nada.
+        try:
+            from synchro import lanzar_envio
+            lanzar_envio(nuevo_id, session['user_id'],
+                         session.get('empresa_id'))
+        except Exception as e:
+            print(f"[SYNCHRO] No se pudo lanzar el envio: {e}")
+
+        return jsonify({'success': True, 'id': nuevo_id})
 
     except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
+
         print(f"Error de conexión al guardar respuesta: {e} (intento {_reintento + 1})")
         if _reintento < 2:
             return guardar_respuesta_formulario(_reintento=_reintento + 1)

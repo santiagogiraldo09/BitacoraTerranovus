@@ -28,6 +28,7 @@ import json
 import time
 import secrets
 from datetime import datetime, timedelta, timezone
+import threading
 
 import requests
 from flask import (Blueprint, request, jsonify, session,
@@ -1627,3 +1628,169 @@ def _materializar(cursor, empresa_id, user_id, definicion_id,
             """, (proyecto_id, formulario_id, user_id, empresa_id))
 
     return formulario_id, campos
+
+# ═════════════════════════════════════════════════════════════════════
+#  ENVÍO AUTOMÁTICO
+#
+#  Al guardar un registro de un formulario de origen Synchro se intenta
+#  subirlo. En segundo plano a propósito: guardar no puede quedarse
+#  esperando a Bentley, porque en obra con mala señal el usuario cree
+#  que falló y vuelve a pulsar Guardar.
+# ═════════════════════════════════════════════════════════════════════
+
+# Tope de envíos simultáneos: la instancia es pequeña y un lote de
+# registros sincronizados a la vez no debe tumbarla.
+_semaforo_envio = threading.Semaphore(3)
+
+
+def _sobre_desde_respuestas(definicion_id, campos, respuestas):
+    """Traduce las respuestas de Bitácora al sobre de Synchro.
+
+    Las respuestas llegan con el id del campo global como llave. El
+    'binding' y la 'ruta' viven dentro de cada campo, guardados al
+    materializar el formulario: esa es la traducción de vuelta.
+    """
+    cuerpo  = {'formId': definicion_id}
+    propias = {}
+
+    for c in campos or []:
+        cgid = c.get('campo_global_id')
+        if cgid is None:
+            continue
+
+        # Las llaves del JSONB son cadenas, pero por si acaso se mira
+        # también el entero.
+        valor = respuestas.get(str(cgid))
+        if valor is None:
+            valor = respuestas.get(cgid)
+        if valor is None or valor == '' or valor == []:
+            continue
+
+        valor = _valor_synchro(c, valor)
+        if valor is None or valor == '':
+            continue
+
+        ruta = c.get('ruta') or ''
+        if ruta in CAMPOS_NO_CREACION:
+            continue
+        if ruta.startswith('properties.'):
+            propias[ruta.split('.', 1)[1]] = valor
+        else:
+            cuerpo[ruta] = valor
+
+    if propias:
+        cuerpo['properties'] = propias
+    return cuerpo
+
+
+def _anotar_envio(cursor, respuesta_id, empresa_id, user_id, sf,
+                  estado, error=None, form_id=None, numero=None):
+    """Deja constancia del intento, exitoso o no."""
+    cursor.execute("""
+        INSERT INTO synchro_registros
+            (empresa_id, user_id, itwin_id, proyecto, definicion_id,
+             formulario, respuesta_id, estado, intentos, error,
+             synchro_form_id, synchro_numero, enviado_en)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,1,%s,%s,%s,
+                CASE WHEN %s = 'enviado' THEN NOW() ELSE NULL END)
+        ON CONFLICT (respuesta_id) DO UPDATE SET
+            estado          = EXCLUDED.estado,
+            error           = EXCLUDED.error,
+            synchro_form_id = EXCLUDED.synchro_form_id,
+            synchro_numero  = EXCLUDED.synchro_numero,
+            enviado_en      = EXCLUDED.enviado_en,
+            intentos        = synchro_registros.intentos + 1,
+            actualizado_en  = NOW()
+    """, (empresa_id, user_id, sf['itwin_id'], sf['proyecto'],
+          sf['definicion_id'], sf['nombre'], respuesta_id, estado,
+          error, form_id, numero, estado))
+
+
+def _subir(respuesta_id, user_id, empresa_id):
+    """Hilo que sube un registro a Synchro. No interrumpe nada si falla."""
+    from app import db_connection
+
+    with _semaforo_envio:
+        try:
+            with db_connection() as (conn, cursor):
+                # Sin sesión de Flask, db_connection deja el tenant en 1.
+                # Hay que fijarlo a mano o las políticas de la base
+                # filtrarían por la empresa equivocada.
+                cursor.execute("SET app.empresa_id = %s", (str(empresa_id),))
+
+                # El guardado pudo no haber confirmado todavía cuando
+                # arrancó el hilo; se reintenta una vez.
+                fila = None
+                for intento in (0, 1):
+                    cursor.execute("""
+                        SELECT rf.respuestas, rf.formulario_id,
+                               sf.definicion_id, sf.campos, sf.itwin_id,
+                               sf.proyecto, sf.nombre
+                        FROM respuestas_formulario rf
+                        JOIN synchro_formularios sf
+                          ON sf.formulario_id = rf.formulario_id
+                         AND sf.empresa_id = %s
+                        WHERE rf.id = %s
+                    """, (empresa_id, respuesta_id))
+                    fila = cursor.fetchone()
+                    if fila or intento:
+                        break
+                    conn.rollback()
+                    time.sleep(1.5)
+
+                if not fila:
+                    return   # no es de Synchro, o no existe
+
+                respuestas, _fid, definicion_id, campos, itwin, proy, nombre = fila
+                sf = {'itwin_id': itwin, 'proyecto': proy,
+                      'definicion_id': definicion_id, 'nombre': nombre}
+
+                token = token_de_usuario(cursor, user_id)
+                conn.commit()
+
+                if not token:
+                    with db_connection() as (c2, cur2):
+                        cur2.execute("SET app.empresa_id = %s", (str(empresa_id),))
+                        _anotar_envio(cur2, respuesta_id, empresa_id, user_id,
+                                      sf, 'error',
+                                      'Sin conexion con Synchro: conectala en '
+                                      'Configuracion y reintenta')
+                        c2.commit()
+                    return
+
+            cuerpo = _sobre_desde_respuestas(definicion_id, campos,
+                                             respuestas or {})
+            r = _post(token, f'{API}/forms/', cuerpo, version='v2')
+            current_app.logger.warning('[SYNCHRO] auto %s -> %s: %s',
+                                       respuesta_id, r.status_code, r.text[:400])
+
+            with db_connection() as (conn, cursor):
+                cursor.execute("SET app.empresa_id = %s", (str(empresa_id),))
+                if r.status_code in (200, 201):
+                    creado = (r.json() or {}).get('form') or {}
+                    _anotar_envio(cursor, respuesta_id, empresa_id, user_id,
+                                  sf, 'enviado', None,
+                                  creado.get('id'),
+                                  str(creado.get('number') or '') or None)
+                else:
+                    _anotar_envio(cursor, respuesta_id, empresa_id, user_id,
+                                  sf, 'error',
+                                  f'{r.status_code}: {(r.text or "")[:500]}')
+                conn.commit()
+
+        except Exception:
+            current_app.logger.exception('synchro _subir %s', respuesta_id)
+
+
+def lanzar_envio(respuesta_id, user_id, empresa_id):
+    """Dispara el envío si el formulario es de Synchro. Nunca lanza.
+
+    La llama el guardado normal de Bitácora: si el formulario no es de
+    Synchro el hilo se cierra enseguida sin hacer nada.
+    """
+    try:
+        hilo = threading.Thread(target=_subir, daemon=True,
+                                args=(respuesta_id, user_id, empresa_id))
+        hilo.start()
+    except Exception:
+        current_app.logger.exception('synchro lanzar_envio')
