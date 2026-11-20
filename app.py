@@ -10221,10 +10221,14 @@ from informes import informes_bp
 app.register_blueprint(informes_bp)
 from bi_publica import bi_publica_bp
 app.register_blueprint(bi_publica_bp)
+
+from api_publica import api_publica
+app.register_blueprint(api_publica)
 from resumen_ia import resumen_bp
 app.register_blueprint(resumen_bp)
 from synchro import synchro_bp
 app.register_blueprint(synchro_bp)
+
 
 if __name__ == '__main__':
     app.run(debug=True)
