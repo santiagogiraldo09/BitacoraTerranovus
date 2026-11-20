@@ -235,3 +235,135 @@ def filtro_proyectos(alias='p'):
     if not permitidos:
         return '', []
     return f' AND {alias}.id = ANY(%s)', [list(permitidos)]
+
+# ──────────────────────────── Paginación ────────────────────────────
+
+LIMITE_POR_DEFECTO = 50
+LIMITE_MAXIMO = 200
+
+
+def _limite():
+    """Tamaño de página pedido, acotado para que nadie pida la base entera."""
+    try:
+        n = int(request.args.get('limite', LIMITE_POR_DEFECTO))
+    except (TypeError, ValueError):
+        n = LIMITE_POR_DEFECTO
+    return max(1, min(n, LIMITE_MAXIMO))
+
+
+def _despues_de():
+    """Cursor: el id del último elemento de la página anterior."""
+    valor = request.args.get('despues_de')
+    if valor is None:
+        return None
+    try:
+        return int(valor)
+    except ValueError:
+        return None
+
+
+def _pagina(filas, limite, clave_id=0):
+    """Parte el resultado en (elementos, siguiente_cursor).
+
+    Se consulta un elemento de más que el límite: si vuelve, hay otra
+    página y ese elemento no se entrega.
+    """
+    hay_mas = len(filas) > limite
+    visibles = filas[:limite]
+    siguiente = visibles[-1][clave_id] if (hay_mas and visibles) else None
+    return visibles, siguiente
+
+
+# ──────────────────────────── Proyectos ────────────────────────────
+
+def _fila_proyecto(f):
+    return {
+        'id':               f[0],
+        'nombre':           f[1],
+        'cliente':          f[2],
+        'contratista':      f[3],
+        'ubicacion':        f[4],
+        'orden_de_trabajo': f[5],
+        'fecha_inicio':     f[6].isoformat() if f[6] else None,
+        'estado':           f[7],
+    }
+
+
+_SQL_PROYECTO = """
+    SELECT p.id, p.nombre_proyecto, p.cliente, p.contratista,
+           p.ubicacion, p.orden_de_trabajo, p.fecha_inicio, p.estado
+    FROM proyectos p
+    WHERE p.empresa_id = %s
+"""
+
+
+@api_publica.route('/proyectos', methods=['GET'])
+@requiere_api_key('proyectos:leer')
+def listar_proyectos():
+    """Proyectos visibles para la clave, paginados por cursor."""
+    limite = _limite()
+    desde = _despues_de()
+
+    sql = _SQL_PROYECTO
+    params = [g.empresa_id]
+
+    filtro, p_filtro = filtro_proyectos('p')
+    sql += filtro
+    params += p_filtro
+
+    if desde is not None:
+        sql += " AND p.id > %s"
+        params.append(desde)
+
+    sql += " ORDER BY p.id LIMIT %s"
+    params.append(limite + 1)
+
+    try:
+        with conexion_api() as (conn, cursor):
+            cursor.execute(sql, params)
+            filas = cursor.fetchall()
+    except Exception:
+        import traceback
+        print('[API] Error listando proyectos:')
+        traceback.print_exc()
+        return _error(500, 'error_interno',
+                      'No se pudieron consultar los proyectos.')
+
+    visibles, siguiente = _pagina(filas, limite)
+
+    return jsonify({
+        'datos': [_fila_proyecto(f) for f in visibles],
+        'paginacion': {'siguiente': siguiente},
+    })
+
+
+@api_publica.route('/proyectos/<int:proyecto_id>', methods=['GET'])
+@requiere_api_key('proyectos:leer')
+def obtener_proyecto(proyecto_id):
+    """Un proyecto. Respeta la restricción de proyectos de la clave."""
+    sql = _SQL_PROYECTO + " AND p.id = %s"
+    params = [g.empresa_id, proyecto_id]
+
+    filtro, p_filtro = filtro_proyectos('p')
+    sql += filtro
+    params += p_filtro
+
+    try:
+        with conexion_api() as (conn, cursor):
+            cursor.execute(sql, params)
+            fila = cursor.fetchone()
+    except Exception:
+        import traceback
+        print('[API] Error obteniendo el proyecto:')
+        traceback.print_exc()
+        return _error(500, 'error_interno',
+                      'No se pudo consultar el proyecto.')
+
+    if not fila:
+        # Mismo mensaje exista o no: si dijéramos "existe pero no puede
+        # verlo", estaríamos confirmando datos de otra empresa.
+        return _error(404, 'no_encontrado',
+                      'No existe un proyecto con ese id, o la clave no '
+                      'tiene acceso a él.')
+
+    return jsonify({'datos': _fila_proyecto(fila)})
