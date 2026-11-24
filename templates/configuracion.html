@@ -738,6 +738,39 @@
 
                 </div>
             </div>
+            <!-- Dirección contraria: otros entran a Bitácora -->
+            <div class="cfg-card">
+                <div class="cfg-card-title">
+                    <i class="fas fa-code cfg-icon-orange"></i>
+                    <span>API de Bitácora</span>
+                </div>
+                <p class="cfg-card-subtitle">
+                    Permite que otras herramientas lean los datos de tu empresa.
+                </p>
+
+                <div class="cfg-inner-divider"></div>
+
+                <div class="integraciones-grid">
+                    <div class="integracion-card">
+                        <div class="integracion-head">
+                            <div class="integracion-logo">
+                                <i class="fas fa-key"></i>
+                            </div>
+                            <span class="integracion-badge activa">Disponible</span>
+                        </div>
+                        <h4 class="integracion-nombre">Claves de API</h4>
+                        <p class="integracion-desc">
+                            Genera claves para que un sistema externo consulte
+                            proyectos, formularios y registros. Cada clave puede
+                            limitarse a ciertos datos y a ciertos proyectos.
+                        </p>
+                        <span class="integracion-meta" id="apik-resumen">—</span>
+                        <button class="integracion-btn" onclick="abrirModalClaves()">
+                            <i class="fas fa-key"></i> Gestionar claves
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- ── SECCIÓN: REPORTES AUTOMÁTICOS ── -->
@@ -1268,6 +1301,109 @@
             Los campos se leen al vincular y quedan guardados. Si alguien
             cambia el formulario en Synchro, usa el botón de actualizar.
         </p>
+    </div>
+</div>
+
+<!-- MODAL: CLAVES DE API -->
+<div class="invite-overlay" id="modal-claves">
+    <div class="invite-modal">
+        <div class="invite-header">
+            <h3><i class="fas fa-key"></i> Claves de API</h3>
+            <button class="invite-close" onclick="cerrarModalClaves()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <p class="invite-subtitle">
+            Cada clave da acceso de lectura a los datos de tu empresa.
+            Trátala como una contraseña.
+        </p>
+
+        <!-- Clave recién creada: se muestra UNA sola vez -->
+        <div class="pbi-token-nuevo" id="apik-token-nuevo" style="display:none;">
+            <div class="pbi-token-aviso">
+                <i class="fas fa-triangle-exclamation"></i>
+                Cópiala ahora. No se puede volver a consultar.
+            </div>
+            <div class="pbi-token-caja">
+                <code id="apik-token-valor"></code>
+                <button class="pbi-btn-copiar" onclick="copiarClaveApi()" title="Copiar">
+                    <i class="fas fa-copy"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Formulario de creación -->
+        <div id="apik-form-nuevo" style="display:none;">
+            <div class="cfg-inner-divider"></div>
+            <div class="rep-bloque-titulo">Nueva clave</div>
+
+            <div class="invite-field">
+                <label>Nombre *</label>
+                <input type="text" id="apik-nombre" placeholder="Ej: Tablero del cliente">
+                <span class="rep-hint">Para saber de quién es cuando haya varias.</span>
+            </div>
+
+            <div class="invite-field">
+                <label>Qué puede leer *</label>
+                <div id="apik-alcances" class="rep-lista-check"></div>
+                <span class="rep-hint">Marca sólo lo que esa herramienta necesite.</span>
+            </div>
+
+            <div class="invite-field">
+                <label>Proyectos</label>
+                <div id="apik-proyectos" class="rep-lista-check"></div>
+                <span class="rep-hint">
+                    Sin marcar ninguno, la clave ve todos los proyectos de la
+                    empresa. Acotarla es lo correcto para un contratista o un cliente.
+                </span>
+            </div>
+
+            <div class="invite-field">
+                <label>Expira el (opcional)</label>
+                <input type="date" id="apik-expira">
+                <span class="rep-hint">En blanco, no expira.</span>
+            </div>
+
+            <p class="invite-feedback" id="apik-feedback"></p>
+
+            <div class="pbi-form-acciones">
+                <button class="tb-btn-sec pbi-btn-cancelar" onclick="toggleFormClave(false)">
+                    Cancelar
+                </button>
+                <button class="send-invite-btn" onclick="crearClaveApi()">
+                    <i class="fas fa-key"></i> Generar clave
+                </button>
+            </div>
+        </div>
+
+        <!-- Lista -->
+        <div id="apik-lista-wrap">
+            <div class="cfg-inner-divider"></div>
+            <div class="rep-bloque-titulo">Claves existentes</div>
+            <div id="apik-lista"></div>
+            <button class="btn-nuevo-campo" onclick="toggleFormClave(true)" style="margin-top:12px;">
+                <i class="fas fa-plus"></i> Nueva clave
+            </button>
+        </div>
+
+        <!-- Ayuda -->
+        <div class="cfg-inner-divider"></div>
+        <details class="pbi-ayuda">
+            <summary><i class="fas fa-circle-info"></i> Cómo usar la clave</summary>
+            <ol class="pbi-pasos">
+                <li>Envíala en la cabecera <code>Authorization</code> con el valor
+                    <code>Bearer &lt;tu-clave&gt;</code>.</li>
+                <li>Los datos empiezan en:<br>
+                    <code class="pbi-url" id="apik-url-base"></code></li>
+                <li>Las respuestas vienen paginadas. Usa el valor
+                    <code>paginacion.siguiente</code> en el parámetro
+                    <code>despues_de</code> para traer la página siguiente.</li>
+            </ol>
+            <p class="rep-hint">
+                La clave no funciona desde un navegador: se usa desde un
+                servidor, para que no quede expuesta en el código del cliente.
+            </p>
+        </details>
     </div>
 </div>
 
@@ -3564,6 +3700,9 @@
         //Cargar accesos de Power BI
         cargarTokensBI();
 
+        //Cargar claves de API
+        cargarClavesApi();
+
         //Estado real de la tarjeta de Synchro
         estadoTarjetaSynchro();
 
@@ -4564,6 +4703,200 @@
             // bloquear botones por un fallo de red sería peor.
         }
     }
+
+    // ══════════════════════════════════════════════════════════════
+    //  CLAVES DE API
+    // ══════════════════════════════════════════════════════════════
+
+    let apikProyectos = [];
+    let apikAlcances  = [];
+
+    async function cargarClavesApi() {
+        const lista   = document.getElementById('apik-lista');
+        const resumen = document.getElementById('apik-resumen');
+        if (!lista) return;
+
+        try {
+            const res  = await fetch('/api/claves');
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error);
+
+            apikProyectos = data.proyectos || [];
+            apikAlcances  = data.alcances  || [];
+
+            const claves  = data.claves || [];
+            const activas = claves.filter(c => c.activa).length;
+
+            if (resumen) {
+                resumen.textContent = activas
+                    ? `${activas} clave${activas !== 1 ? 's' : ''} activa${activas !== 1 ? 's' : ''}`
+                    : 'Sin claves configuradas';
+            }
+
+            if (!claves.length) {
+                lista.innerHTML = '<p class="rep-vacio">Aún no hay claves creadas.</p>';
+                return;
+            }
+
+            lista.innerHTML = claves.map(c => {
+                const ambito = c.proyectos && c.proyectos.length
+                    ? `${c.proyectos.length} proyecto${c.proyectos.length !== 1 ? 's' : ''}`
+                    : 'toda la empresa';
+                return `
+                <div class="pbi-item ${c.activa ? '' : 'revocado'}">
+                    <div class="pbi-item-info">
+                        <span class="pbi-item-nombre">
+                            ${escHtml(c.nombre)}
+                            ${c.activa ? '' : '<span class="pbi-tag">revocada</span>'}
+                        </span>
+                        <span class="pbi-item-prefijo">${escHtml(c.prefijo)}…</span>
+                        <span class="pbi-item-meta">
+                            ${escHtml(ambito)} · ${c.alcances.length} permiso(s) ·
+                            ${c.llamadas} llamada(s) · último uso: ${escHtml(c.ultimo_uso)}
+                            ${c.expira_en ? ' · expira ' + c.expira_en : ''}
+                        </span>
+                        <span class="pbi-item-meta">creada por ${escHtml(c.creada_por)}</span>
+                    </div>
+                    <div class="pbi-item-actions">
+                        ${c.activa ? `
+                            <button class="icon-btn" onclick="revocarClaveApi(${c.id})"
+                                    title="Revocar">
+                                <i class="fas fa-ban"></i>
+                            </button>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+
+        } catch {
+            lista.innerHTML = '<p class="rep-vacio">Error al cargar las claves.</p>';
+        }
+    }
+
+    function abrirModalClaves() {
+        document.getElementById('apik-url-base').textContent =
+            `${window.location.origin}/api/v1/proyectos`;
+        toggleFormClave(false);
+        document.getElementById('apik-token-nuevo').style.display = 'none';
+        cargarClavesApi();
+        document.getElementById('modal-claves').classList.add('active');
+    }
+
+    function cerrarModalClaves() {
+        document.getElementById('modal-claves').classList.remove('active');
+        // La clave no debe seguir en pantalla si alguien reabre el modal.
+        document.getElementById('apik-token-nuevo').style.display = 'none';
+        document.getElementById('apik-token-valor').textContent = '';
+    }
+
+    function toggleFormClave(mostrar) {
+        document.getElementById('apik-form-nuevo').style.display = mostrar ? '' : 'none';
+        document.getElementById('apik-lista-wrap').style.display = mostrar ? 'none' : '';
+        if (!mostrar) return;
+
+        document.getElementById('apik-nombre').value = '';
+        document.getElementById('apik-expira').value = '';
+        document.getElementById('apik-feedback').textContent = '';
+
+        document.getElementById('apik-alcances').innerHTML = apikAlcances.map(a => `
+            <label class="rep-check-item">
+                <input type="checkbox" value="${escHtml(a.id)}">
+                <span>${escHtml(a.nombre)}</span>
+            </label>`).join('');
+
+        document.getElementById('apik-proyectos').innerHTML = apikProyectos.length
+            ? apikProyectos.map(p => `
+                <label class="rep-check-item">
+                    <input type="checkbox" value="${p.id}">
+                    <span>${escHtml(p.nombre)}</span>
+                </label>`).join('')
+            : '<p class="rep-vacio">No hay proyectos.</p>';
+
+        document.getElementById('apik-nombre').focus();
+    }
+
+    async function crearClaveApi() {
+        const fb     = document.getElementById('apik-feedback');
+        const nombre = document.getElementById('apik-nombre').value.trim();
+        const alcances = Array.from(
+            document.querySelectorAll('#apik-alcances input:checked')
+        ).map(c => c.value);
+
+        fb.className = 'invite-feedback error';
+        if (!nombre)          { fb.textContent = 'Ponle un nombre a la clave.'; return; }
+        if (!alcances.length) { fb.textContent = 'Marca al menos un permiso.';  return; }
+        fb.textContent = '';
+
+        const proyectos = Array.from(
+            document.querySelectorAll('#apik-proyectos input:checked')
+        ).map(c => parseInt(c.value));
+
+        try {
+            const res = await fetch('/api/claves', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({
+                    nombre, alcances, proyectos,
+                    expira_en: document.getElementById('apik-expira').value || null
+                })
+            });
+            const data = await res.json();
+
+            if (!data.success) {
+                fb.textContent = data.error || 'No se pudo generar la clave.';
+                return;
+            }
+
+            document.getElementById('apik-token-valor').textContent = data.token;
+            document.getElementById('apik-token-nuevo').style.display = '';
+            toggleFormClave(false);
+            cargarClavesApi();
+            mostrarToast('✅ Clave generada — cópiala ahora');
+
+        } catch {
+            fb.textContent = 'Error de conexión.';
+        }
+    }
+
+    function copiarClaveApi() {
+        const texto = document.getElementById('apik-token-valor').textContent;
+        if (!texto) return;
+        const exito = () => mostrarToast('📋 Clave copiada');
+        if (navigator.clipboard?.writeText) {
+            navigator.clipboard.writeText(texto).then(exito)
+                .catch(() => copiarRespaldo(texto, exito));
+        } else {
+            copiarRespaldo(texto, exito);
+        }
+    }
+
+    async function revocarClaveApi(id) {
+        const ok = await confirmar({
+            titulo:  'Revocar esta clave',
+            mensaje: 'La herramienta que la use dejará de recibir datos de inmediato.',
+            detalle: 'No se puede reactivar. El registro de uso se conserva.',
+            textoOk: 'Revocar',
+            peligro: true
+        });
+        if (!ok) return;
+
+        try {
+            const res  = await fetch(`/api/claves/${id}/revocar`, { method: 'POST' });
+            const data = await res.json();
+            if (data.success) {
+                cargarClavesApi();
+                mostrarToast('🚫 Clave revocada');
+            } else {
+                mostrarToast('❌ ' + (data.error || 'Error al revocar'), true);
+            }
+        } catch {
+            mostrarToast('❌ Error de conexión', true);
+        }
+    }
+
+    document.getElementById('modal-claves')?.addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalClaves();
+    });
+
 </script>
 </body>
 </html>
