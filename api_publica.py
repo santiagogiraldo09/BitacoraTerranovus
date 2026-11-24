@@ -11,6 +11,7 @@ import functools
 import hashlib
 import secrets
 from contextlib import contextmanager
+from flask import Blueprint, request, jsonify, g, session
 
 from flask import Blueprint, request, jsonify, g
 
@@ -195,6 +196,19 @@ def requiere_api_key(alcance):
     return decorador
 
 
+@api_publica.before_request
+def _sin_cookie_de_sesion():
+    """Una API no devuelve cookies de sesión.
+
+    Algún before_request global marca la sesión como permanente, y Flask
+    la reenvía en cada respuesta. Aquí se deshace para este blueprint: la
+    cookie no sirve de nada a un cliente de API y el 'Vary: Cookie' que
+    arrastra estorba a cualquier caché intermedia.
+    """
+    from flask import session
+    session.permanent = False
+    session.modified = False
+
 # ──────────────────────────── Auditoría ────────────────────────────
 
 @api_publica.after_request
@@ -367,3 +381,452 @@ def obtener_proyecto(proyecto_id):
                       'tiene acceso a él.')
 
     return jsonify({'datos': _fila_proyecto(fila)})
+
+
+# ──────────────────────────── Formularios ────────────────────────────
+
+@api_publica.route('/formularios', methods=['GET'])
+@requiere_api_key('formularios:leer')
+def listar_formularios():
+    """Formularios de la empresa.
+
+    Si la clave está limitada a ciertos proyectos, sólo se devuelven los
+    formularios asignados a esos proyectos.
+    """
+    limite = _limite()
+    desde = _despues_de()
+    permitidos = getattr(g, 'proyectos_permitidos', None)
+
+    if permitidos:
+        sql = """
+            SELECT DISTINCT f.id, f.nombre, f.descripcion
+            FROM formularios f
+            JOIN proyecto_formularios pf ON pf.formulario_id = f.id
+            WHERE f.empresa_id = %s AND pf.proyecto_id = ANY(%s)
+        """
+        params = [g.empresa_id, list(permitidos)]
+    else:
+        sql = """
+            SELECT f.id, f.nombre, f.descripcion
+            FROM formularios f
+            WHERE f.empresa_id = %s
+        """
+        params = [g.empresa_id]
+
+    if desde is not None:
+        sql += " AND f.id > %s"
+        params.append(desde)
+
+    sql += " ORDER BY 1 LIMIT %s"
+    params.append(limite + 1)
+
+    try:
+        with conexion_api() as (conn, cursor):
+            cursor.execute(sql, params)
+            filas = cursor.fetchall()
+    except Exception:
+        import traceback
+        print('[API] Error listando formularios:')
+        traceback.print_exc()
+        return _error(500, 'error_interno',
+                      'No se pudieron consultar los formularios.')
+
+    visibles, siguiente = _pagina(filas, limite)
+
+    return jsonify({
+        'datos': [{'id': f[0], 'nombre': f[1], 'descripcion': f[2]}
+                  for f in visibles],
+        'paginacion': {'siguiente': siguiente},
+    })
+
+
+@api_publica.route('/formularios/<int:formulario_id>', methods=['GET'])
+@requiere_api_key('formularios:leer')
+def obtener_formulario(formulario_id):
+    """Un formulario con la definición de sus campos.
+
+    'formularios.campos' guarda sólo referencias; las definiciones reales
+    viven en 'campos_globales'.
+    """
+    permitidos = getattr(g, 'proyectos_permitidos', None)
+
+    try:
+        with conexion_api() as (conn, cursor):
+            if permitidos:
+                cursor.execute("""
+                    SELECT DISTINCT f.id, f.nombre, f.descripcion, f.campos
+                    FROM formularios f
+                    JOIN proyecto_formularios pf ON pf.formulario_id = f.id
+                    WHERE f.id = %s AND f.empresa_id = %s
+                      AND pf.proyecto_id = ANY(%s)
+                """, (formulario_id, g.empresa_id, list(permitidos)))
+            else:
+                cursor.execute("""
+                    SELECT f.id, f.nombre, f.descripcion, f.campos
+                    FROM formularios f
+                    WHERE f.id = %s AND f.empresa_id = %s
+                """, (formulario_id, g.empresa_id))
+
+            fila = cursor.fetchone()
+            if not fila:
+                return _error(404, 'no_encontrado',
+                              'No existe un formulario con ese id, o la '
+                              'clave no tiene acceso a él.')
+
+            referencias = fila[3] or []
+            obligatorios = {}
+            ids = []
+            for ref in referencias:
+                if isinstance(ref, dict) and 'id' in ref:
+                    ids.append(ref['id'])
+                    obligatorios[ref['id']] = bool(ref.get('requerido'))
+
+            campos = []
+            if ids:
+                cursor.execute("""
+                    SELECT id, nombre, tipo, opciones
+                    FROM campos_globales
+                    WHERE id = ANY(%s) AND empresa_id = %s
+                """, (ids, g.empresa_id))
+                definiciones = {c[0]: c for c in cursor.fetchall()}
+
+                # Se recorre 'ids' y no el resultado para conservar el
+                # orden en que el formulario declara sus campos.
+                for cid in ids:
+                    d = definiciones.get(cid)
+                    if not d:
+                        continue
+                    campos.append({
+                        'id':        d[0],
+                        'nombre':    d[1],
+                        'tipo':      d[2],
+                        'opciones':  d[3] or [],
+                        'requerido': obligatorios.get(cid, False),
+                    })
+    except Exception:
+        import traceback
+        print('[API] Error obteniendo el formulario:')
+        traceback.print_exc()
+        return _error(500, 'error_interno',
+                      'No se pudo consultar el formulario.')
+
+    return jsonify({'datos': {
+        'id':          fila[0],
+        'nombre':      fila[1],
+        'descripcion': fila[2],
+        'campos':      campos,
+    }})
+
+
+# ──────────────────────────── Registros ────────────────────────────
+
+@api_publica.route('/registros', methods=['GET'])
+@requiere_api_key('registros:leer')
+def listar_registros():
+    """Respuestas capturadas en campo.
+
+    Filtros: proyecto_id, formulario_id, desde, hasta (fechas ISO).
+    Con 'incluir=campos' se agrega al nivel raíz un diccionario que mapea
+    id de campo a nombre, para no tener que pedir cada formulario aparte.
+    """
+    limite = _limite()
+    desde_cursor = _despues_de()
+
+    sql = """
+        SELECT rf.id, rf.id_proyecto, rf.formulario_id,
+               rf.created_at, rf.respuestas
+        FROM respuestas_formulario rf
+        JOIN proyectos p ON p.id = rf.id_proyecto
+        WHERE p.empresa_id = %s
+    """
+    params = [g.empresa_id]
+
+    filtro, p_filtro = filtro_proyectos('p')
+    sql += filtro
+    params += p_filtro
+
+    if request.args.get('proyecto_id'):
+        try:
+            sql += " AND rf.id_proyecto = %s"
+            params.append(int(request.args['proyecto_id']))
+        except ValueError:
+            return _error(400, 'parametro_invalido',
+                          "'proyecto_id' debe ser un número entero.")
+
+    if request.args.get('formulario_id'):
+        try:
+            sql += " AND rf.formulario_id = %s"
+            params.append(int(request.args['formulario_id']))
+        except ValueError:
+            return _error(400, 'parametro_invalido',
+                          "'formulario_id' debe ser un número entero.")
+
+    if request.args.get('desde'):
+        sql += " AND rf.created_at >= %s"
+        params.append(request.args['desde'])
+
+    if request.args.get('hasta'):
+        sql += " AND rf.created_at <= %s"
+        params.append(request.args['hasta'])
+
+    if desde_cursor is not None:
+        sql += " AND rf.id > %s"
+        params.append(desde_cursor)
+
+    sql += " ORDER BY rf.id LIMIT %s"
+    params.append(limite + 1)
+
+    try:
+        with conexion_api() as (conn, cursor):
+            cursor.execute(sql, params)
+            filas = cursor.fetchall()
+
+            visibles, siguiente = _pagina(filas, limite)
+
+            nombres = None
+            if request.args.get('incluir') == 'campos' and visibles:
+                usados = set()
+                for f in visibles:
+                    for k in (f[4] or {}):
+                        usados.add(k)
+                if usados:
+                    cursor.execute("""
+                        SELECT id, nombre FROM campos_globales
+                        WHERE id = ANY(%s) AND empresa_id = %s
+                    """, ([int(u) for u in usados if str(u).isdigit()],
+                          g.empresa_id))
+                    nombres = {str(c[0]): c[1] for c in cursor.fetchall()}
+    except Exception:
+        import traceback
+        print('[API] Error listando registros:')
+        traceback.print_exc()
+        return _error(500, 'error_interno',
+                      'No se pudieron consultar los registros.')
+
+    cuerpo = {
+        'datos': [{
+            'id':            f[0],
+            'proyecto_id':   f[1],
+            'formulario_id': f[2],
+            'creado_en':     f[3].isoformat() if f[3] else None,
+            'respuestas':    f[4] or {},
+        } for f in visibles],
+        'paginacion': {'siguiente': siguiente},
+    }
+    if nombres is not None:
+        cuerpo['campos'] = nombres
+
+    return jsonify(cuerpo)
+
+
+@api_publica.route('/registros/<int:registro_id>', methods=['GET'])
+@requiere_api_key('registros:leer')
+def obtener_registro(registro_id):
+    """Un registro. Respeta empresa y restricción de proyectos."""
+    sql = """
+        SELECT rf.id, rf.id_proyecto, rf.formulario_id,
+               rf.created_at, rf.respuestas
+        FROM respuestas_formulario rf
+        JOIN proyectos p ON p.id = rf.id_proyecto
+        WHERE p.empresa_id = %s AND rf.id = %s
+    """
+    params = [g.empresa_id, registro_id]
+
+    filtro, p_filtro = filtro_proyectos('p')
+    sql += filtro
+    params += p_filtro
+
+    try:
+        with conexion_api() as (conn, cursor):
+            cursor.execute(sql, params)
+            fila = cursor.fetchone()
+    except Exception:
+        import traceback
+        print('[API] Error obteniendo el registro:')
+        traceback.print_exc()
+        return _error(500, 'error_interno',
+                      'No se pudo consultar el registro.')
+
+    if not fila:
+        return _error(404, 'no_encontrado',
+                      'No existe un registro con ese id, o la clave no '
+                      'tiene acceso a él.')
+
+    return jsonify({'datos': {
+        'id':            fila[0],
+        'proyecto_id':   fila[1],
+        'formulario_id': fila[2],
+        'creado_en':     fila[3].isoformat() if fila[3] else None,
+        'respuestas':    fila[4] or {},
+    }})
+
+
+# ══════════════════════════════════════════════════════════════════════
+#  Administración de claves — autenticada por SESIÓN, no por clave.
+#  Vive en otro blueprint a propósito: son dos modelos de autenticación
+#  distintos y mezclarlos en el mismo sitio es como se cuelan los huecos.
+# ══════════════════════════════════════════════════════════════════════
+
+api_claves = Blueprint('api_claves', __name__, url_prefix='/api/claves')
+
+
+def _solo_admin():
+    """Devuelve una respuesta de error si quien llama no es administrador."""
+    if 'user_id' not in session or session.get('user_rol') != 'admin':
+        return jsonify({
+            'success': False,
+            'error': 'Solo los administradores pueden gestionar las claves de API.'
+        }), 403
+    return None
+
+
+@api_claves.route('', methods=['GET'])
+def listar_claves():
+    """Claves de la empresa, más los datos que necesita el formulario."""
+    error = _solo_admin()
+    if error:
+        return error
+
+    from app import db_connection
+    empresa_id = session.get('empresa_id')
+
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                SELECT k.id, k.nombre, k.prefijo, k.alcances, k.proyectos,
+                       k.creada_en, k.expira_en, k.ultimo_uso_en, k.revocada_en,
+                       u.name, u.apellido,
+                       (SELECT count(*) FROM api_keys_uso x WHERE x.api_key_id = k.id)
+                FROM api_keys k
+                LEFT JOIN usuario u ON u.user_id = k.creada_por
+                WHERE k.empresa_id = %s
+                ORDER BY k.revocada_en NULLS FIRST, k.creada_en DESC
+            """, (empresa_id,))
+            filas = cursor.fetchall()
+
+            cursor.execute("""
+                SELECT id, nombre_proyecto FROM proyectos
+                WHERE empresa_id = %s ORDER BY nombre_proyecto
+            """, (empresa_id,))
+            proyectos = [{'id': p[0], 'nombre': p[1]} for p in cursor.fetchall()]
+
+    except Exception as e:
+        print(f'[API] Error listando claves: {e}')
+        return jsonify({'success': False, 'error': 'No se pudieron cargar las claves.'}), 500
+
+    def fecha(d):
+        return d.strftime('%Y-%m-%d') if d else None
+
+    claves = [{
+        'id':          f[0],
+        'nombre':      f[1],
+        'prefijo':     f[2],
+        'alcances':    f[3] or [],
+        'proyectos':   f[4],
+        'creada_en':   fecha(f[5]),
+        'expira_en':   fecha(f[6]),
+        'ultimo_uso':  fecha(f[7]) or 'nunca',
+        'activa':      f[8] is None,
+        'creada_por':  (f'{f[9] or ""} {f[10] or ""}').strip() or 'desconocido',
+        'llamadas':    f[11],
+    } for f in filas]
+
+    return jsonify({
+        'success':   True,
+        'claves':    claves,
+        'proyectos': proyectos,
+        # Sólo los de lectura: 'registros:escribir' existe pero no hay
+        # endpoints todavía, y ofrecerlo sería prometer algo que no hace.
+        'alcances': [
+            {'id': 'proyectos:leer',   'nombre': 'Proyectos'},
+            {'id': 'formularios:leer', 'nombre': 'Definición de formularios'},
+            {'id': 'registros:leer',   'nombre': 'Registros de campo'},
+            {'id': 'archivos:leer',    'nombre': 'Fotos y adjuntos'},
+            {'id': 'analitica:leer',   'nombre': 'Indicadores'},
+        ],
+    })
+
+
+@api_claves.route('', methods=['POST'])
+def crear_clave():
+    """Crea una clave y devuelve el token UNA sola vez."""
+    error = _solo_admin()
+    if error:
+        return error
+
+    from app import db_connection
+    datos      = request.get_json(silent=True) or {}
+    empresa_id = session.get('empresa_id')
+    nombre     = (datos.get('nombre') or '').strip()
+
+    if not nombre:
+        return jsonify({'success': False,
+                        'error': 'Ponle un nombre para saber de quién es.'}), 400
+
+    try:
+        alcances = validar_alcances(datos.get('alcances') or [])
+    except ValueError as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+    # Los proyectos llegan del navegador: se aceptan sólo los que
+    # realmente son de esta empresa.
+    pedidos = datos.get('proyectos') or []
+    proyectos = None
+
+    token, prefijo, hash_token = generar_clave()
+
+    try:
+        with db_connection() as (conn, cursor):
+            if pedidos:
+                cursor.execute("""
+                    SELECT id FROM proyectos
+                    WHERE empresa_id = %s AND id = ANY(%s)
+                """, (empresa_id, [int(p) for p in pedidos]))
+                proyectos = [r[0] for r in cursor.fetchall()]
+                if not proyectos:
+                    return jsonify({'success': False,
+                                    'error': 'Ninguno de los proyectos indicados '
+                                             'pertenece a tu empresa.'}), 400
+
+            cursor.execute("""
+                INSERT INTO api_keys
+                    (empresa_id, nombre, prefijo, hash, alcances,
+                     proyectos, creada_por, expira_en)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+            """, (empresa_id, nombre, prefijo, hash_token, alcances,
+                  proyectos, session.get('user_id'),
+                  datos.get('expira_en') or None))
+            nueva_id = cursor.fetchone()[0]
+
+    except Exception as e:
+        print(f'[API] Error creando la clave: {e}')
+        return jsonify({'success': False,
+                        'error': 'No se pudo crear la clave.'}), 500
+
+    # El token viaja una única vez, aquí. No queda guardado en ningún lado.
+    return jsonify({'success': True, 'id': nueva_id, 'token': token})
+
+
+@api_claves.route('/<int:clave_id>/revocar', methods=['POST'])
+def revocar_clave(clave_id):
+    """Revoca sin borrar: la fila se queda para conservar la auditoría."""
+    error = _solo_admin()
+    if error:
+        return error
+
+    from app import db_connection
+    try:
+        with db_connection() as (conn, cursor):
+            cursor.execute("""
+                UPDATE api_keys SET revocada_en = now()
+                WHERE id = %s AND empresa_id = %s AND revocada_en IS NULL
+            """, (clave_id, session.get('empresa_id')))
+            if cursor.rowcount == 0:
+                return jsonify({'success': False,
+                                'error': 'Esa clave no existe o ya estaba revocada.'}), 404
+    except Exception as e:
+        print(f'[API] Error revocando la clave: {e}')
+        return jsonify({'success': False, 'error': 'No se pudo revocar.'}), 500
+
+    return jsonify({'success': True})

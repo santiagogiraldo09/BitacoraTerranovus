@@ -10222,8 +10222,9 @@ app.register_blueprint(informes_bp)
 from bi_publica import bi_publica_bp
 app.register_blueprint(bi_publica_bp)
 
-from api_publica import api_publica
+from api_publica import api_publica, api_claves
 app.register_blueprint(api_publica)
+app.register_blueprint(api_claves)
 from resumen_ia import resumen_bp
 app.register_blueprint(resumen_bp)
 from synchro import synchro_bp
