@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Configuración — Bitácora IAC</title>
     <link rel="icon" href="{{ url_for('static', filename='logo_nuevo.png') }}" type="image/x-icon">
-    <link rel="stylesheet" href="{{ url_for('static', filename='configuracion.css') }}?v=7">
+    <link rel="stylesheet" href="{{ url_for('static', filename='configuracion.css') }}?v=8">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
@@ -769,6 +769,25 @@
                             <i class="fas fa-key"></i> Gestionar claves
                         </button>
                     </div>
+
+                    <div class="integracion-card">
+                        <div class="integracion-head">
+                            <div class="integracion-logo">
+                                <i class="fas fa-bolt"></i>
+                            </div>
+                            <span class="integracion-badge activa">Disponible</span>
+                        </div>
+                        <h4 class="integracion-nombre">Webhooks</h4>
+                        <p class="integracion-desc">
+                            Avisa a otro sistema en el momento en que se guarda
+                            un registro o se crea un proyecto, sin que tenga que
+                            estar preguntando.
+                        </p>
+                        <span class="integracion-meta" id="whk-resumen">—</span>
+                        <button class="integracion-btn" onclick="abrirModalWebhooks()">
+                            <i class="fas fa-bolt"></i> Gestionar webhooks
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1402,6 +1421,114 @@
             <p class="rep-hint">
                 La clave no funciona desde un navegador: se usa desde un
                 servidor, para que no quede expuesta en el código del cliente.
+            </p>
+        </details>
+    </div>
+</div>
+
+<!-- MODAL: WEBHOOKS -->
+<div class="invite-overlay" id="modal-webhooks">
+    <div class="invite-modal">
+        <div class="invite-header">
+            <h3><i class="fas fa-bolt"></i> Webhooks</h3>
+            <button class="invite-close" onclick="cerrarModalWebhooks()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <p class="invite-subtitle">
+            Bitácora envía un aviso a la dirección que indiques cuando
+            ocurre un evento. Cada aviso va firmado.
+        </p>
+
+        <!-- Secreto recién creado: se muestra UNA sola vez -->
+        <div class="pbi-token-nuevo" id="whk-secreto-nuevo" style="display:none;">
+            <div class="pbi-token-aviso">
+                <i class="fas fa-triangle-exclamation"></i>
+                Guárdalo ahora. Con él tu sistema verifica que el aviso
+                viene de Bitácora. No se puede volver a consultar.
+            </div>
+            <div class="pbi-token-caja">
+                <code id="whk-secreto-valor"></code>
+                <button class="pbi-btn-copiar" onclick="copiarSecretoWebhook()" title="Copiar">
+                    <i class="fas fa-copy"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Formulario -->
+        <div id="whk-form-nuevo" style="display:none;">
+            <div class="cfg-inner-divider"></div>
+            <div class="rep-bloque-titulo">Nueva suscripción</div>
+
+            <div class="invite-field">
+                <label>Nombre *</label>
+                <input type="text" id="whk-nombre" placeholder="Ej: Avisos a Power Automate">
+            </div>
+
+            <div class="invite-field">
+                <label>URL de destino *</label>
+                <input type="url" id="whk-url" placeholder="https://..."
+                       autocapitalize="none" autocorrect="off" spellcheck="false">
+                <span class="rep-hint">
+                    Debe ser https y pública. No se admiten direcciones internas.
+                </span>
+            </div>
+
+            <div class="invite-field">
+                <label>Eventos *</label>
+                <div id="whk-eventos" class="rep-lista-check"></div>
+            </div>
+
+            <div class="invite-field">
+                <label>Proyectos</label>
+                <div id="whk-proyectos" class="rep-lista-check"></div>
+                <span class="rep-hint">
+                    Sin marcar ninguno, avisa de todos los proyectos.
+                </span>
+            </div>
+
+            <p class="invite-feedback" id="whk-feedback"></p>
+
+            <div class="pbi-form-acciones">
+                <button class="tb-btn-sec pbi-btn-cancelar" onclick="toggleFormWebhook(false)">
+                    Cancelar
+                </button>
+                <button class="send-invite-btn" onclick="crearWebhook()">
+                    <i class="fas fa-bolt"></i> Crear suscripción
+                </button>
+            </div>
+        </div>
+
+        <!-- Lista -->
+        <div id="whk-lista-wrap">
+            <div class="cfg-inner-divider"></div>
+            <div class="rep-bloque-titulo">Suscripciones</div>
+            <div id="whk-lista"></div>
+            <button class="btn-nuevo-campo" onclick="toggleFormWebhook(true)" style="margin-top:12px;">
+                <i class="fas fa-plus"></i> Nueva suscripción
+            </button>
+        </div>
+
+        <!-- Ayuda -->
+        <div class="cfg-inner-divider"></div>
+        <details class="pbi-ayuda">
+            <summary><i class="fas fa-circle-info"></i> Cómo verificar que el aviso es de Bitácora</summary>
+            <ol class="pbi-pasos">
+                <li>Cada envío trae las cabeceras
+                    <code>X-Bitacora-Timestamp</code> y
+                    <code>X-Bitacora-Firma</code>.</li>
+                <li>Calcula <code>HMAC-SHA256</code> sobre el texto
+                    <code>&lt;timestamp&gt;.&lt;cuerpo&gt;</code> usando tu secreto,
+                    y compáralo con la firma recibida.</li>
+                <li>Rechaza los avisos con una marca de tiempo de hace más
+                    de unos minutos: así un aviso capturado no sirve para
+                    reenviarlo después.</li>
+                <li>Usa <code>X-Bitacora-Id-Evento</code> para descartar
+                    repetidos: un reintento trae el mismo identificador.</li>
+            </ol>
+            <p class="rep-hint">
+                Responde con un código 2xx apenas recibas el aviso. Si tu
+                proceso es lento, acusa primero y procesa después.
             </p>
         </details>
     </div>
@@ -3703,6 +3830,9 @@
         //Cargar claves de API
         cargarClavesApi();
 
+        //Cargar webhooks
+        cargarWebhooks();
+
         //Estado real de la tarjeta de Synchro
         estadoTarjetaSynchro();
 
@@ -4895,6 +5025,272 @@
 
     document.getElementById('modal-claves')?.addEventListener('click', function(e) {
         if (e.target === this) cerrarModalClaves();
+    });
+
+    // ══════════════════════════════════════════════════════════════
+    //  WEBHOOKS
+    // ══════════════════════════════════════════════════════════════
+
+    let whkProyectos = [];
+    let whkEventos   = [];
+
+    async function cargarWebhooks() {
+        const lista   = document.getElementById('whk-lista');
+        const resumen = document.getElementById('whk-resumen');
+        if (!lista) return;
+
+        try {
+            const res  = await fetch('/api/webhooks');
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error);
+
+            whkProyectos = data.proyectos || [];
+            whkEventos   = data.eventos   || [];
+
+            const hooks   = data.webhooks || [];
+            const activos = hooks.filter(w => w.activo).length;
+
+            if (resumen) {
+                resumen.textContent = activos
+                    ? `${activos} suscripción${activos !== 1 ? 'es' : ''} activa${activos !== 1 ? 's' : ''}`
+                    : 'Sin suscripciones';
+            }
+
+            if (!hooks.length) {
+                lista.innerHTML = '<p class="rep-vacio">Aún no hay suscripciones.</p>';
+                return;
+            }
+
+            lista.innerHTML = hooks.map(w => {
+                const ambito = w.proyectos && w.proyectos.length
+                    ? `${w.proyectos.length} proyecto${w.proyectos.length !== 1 ? 's' : ''}`
+                    : 'todos los proyectos';
+                // Desactivado por fallos: hay que distinguirlo de un
+                // apagado manual, porque la acción a tomar es distinta.
+                const porFallos = !w.activo && w.fallos_seguidos > 0;
+                return `
+                <div class="pbi-item ${w.activo ? '' : 'revocado'}">
+                    <div class="pbi-item-info">
+                        <span class="pbi-item-nombre">
+                            ${escHtml(w.nombre)}
+                            ${w.activo ? '' : `<span class="pbi-tag">${porFallos ? 'desactivado por fallos' : 'inactivo'}</span>`}
+                        </span>
+                        <span class="pbi-item-prefijo">${escHtml(w.url)}</span>
+                        <span class="pbi-item-meta">
+                            ${w.eventos.map(escHtml).join(', ')} · ${escHtml(ambito)} ·
+                            último envío: ${escHtml(w.ultimo_envio)}
+                            ${w.fallos_seguidos ? ` · ${w.fallos_seguidos} fallo(s) seguidos` : ''}
+                        </span>
+                        <div id="whk-entregas-${w.id}" class="whk-entregas"></div>
+                    </div>
+                    <div class="pbi-item-actions">
+                        <button class="icon-btn" onclick="probarWebhook(${w.id})" title="Enviar prueba">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                        <button class="icon-btn" onclick="verEntregas(${w.id})" title="Ver envíos">
+                            <i class="fas fa-list"></i>
+                        </button>
+                        <button class="icon-btn" onclick="alternarWebhook(${w.id}, ${!w.activo})"
+                                title="${w.activo ? 'Desactivar' : 'Activar'}">
+                            <i class="fas fa-${w.activo ? 'pause' : 'play'}"></i>
+                        </button>
+                        <button class="icon-btn danger" onclick="eliminarWebhook(${w.id})" title="Eliminar">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>`;
+            }).join('');
+
+        } catch {
+            lista.innerHTML = '<p class="rep-vacio">Error al cargar los webhooks.</p>';
+        }
+    }
+
+    function abrirModalWebhooks() {
+        toggleFormWebhook(false);
+        document.getElementById('whk-secreto-nuevo').style.display = 'none';
+        cargarWebhooks();
+        document.getElementById('modal-webhooks').classList.add('active');
+    }
+
+    function cerrarModalWebhooks() {
+        document.getElementById('modal-webhooks').classList.remove('active');
+        document.getElementById('whk-secreto-nuevo').style.display = 'none';
+        document.getElementById('whk-secreto-valor').textContent = '';
+    }
+
+    function toggleFormWebhook(mostrar) {
+        document.getElementById('whk-form-nuevo').style.display = mostrar ? '' : 'none';
+        document.getElementById('whk-lista-wrap').style.display = mostrar ? 'none' : '';
+        if (!mostrar) return;
+
+        document.getElementById('whk-nombre').value = '';
+        document.getElementById('whk-url').value    = '';
+        document.getElementById('whk-feedback').textContent = '';
+
+        document.getElementById('whk-eventos').innerHTML = whkEventos.map(e => `
+            <label class="rep-check-item">
+                <input type="checkbox" value="${escHtml(e.id)}">
+                <span>${escHtml(e.nombre)}</span>
+            </label>`).join('');
+
+        document.getElementById('whk-proyectos').innerHTML = whkProyectos.length
+            ? whkProyectos.map(p => `
+                <label class="rep-check-item">
+                    <input type="checkbox" value="${p.id}">
+                    <span>${escHtml(p.nombre)}</span>
+                </label>`).join('')
+            : '<p class="rep-vacio">No hay proyectos.</p>';
+
+        document.getElementById('whk-nombre').focus();
+    }
+
+    async function crearWebhook() {
+        const fb     = document.getElementById('whk-feedback');
+        const nombre = document.getElementById('whk-nombre').value.trim();
+        const url    = document.getElementById('whk-url').value.trim();
+        const eventos = Array.from(
+            document.querySelectorAll('#whk-eventos input:checked')
+        ).map(c => c.value);
+
+        fb.className = 'invite-feedback error';
+        if (!nombre)        { fb.textContent = 'Ponle un nombre.';            return; }
+        if (!url)           { fb.textContent = 'Escribe la URL de destino.';  return; }
+        if (!eventos.length){ fb.textContent = 'Marca al menos un evento.';   return; }
+        fb.textContent = '';
+
+        const proyectos = Array.from(
+            document.querySelectorAll('#whk-proyectos input:checked')
+        ).map(c => parseInt(c.value));
+
+        try {
+            const res = await fetch('/api/webhooks', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ nombre, url, eventos, proyectos })
+            });
+            const data = await res.json();
+
+            if (!data.success) {
+                fb.textContent = data.error || 'No se pudo crear.';
+                return;
+            }
+
+            document.getElementById('whk-secreto-valor').textContent = data.secreto;
+            document.getElementById('whk-secreto-nuevo').style.display = '';
+            toggleFormWebhook(false);
+            cargarWebhooks();
+            mostrarToast('✅ Suscripción creada — guarda el secreto');
+
+        } catch {
+            fb.textContent = 'Error de conexión.';
+        }
+    }
+
+    function copiarSecretoWebhook() {
+        const texto = document.getElementById('whk-secreto-valor').textContent;
+        if (!texto) return;
+        const exito = () => mostrarToast('📋 Secreto copiado');
+        if (navigator.clipboard?.writeText) {
+            navigator.clipboard.writeText(texto).then(exito)
+                .catch(() => copiarRespaldo(texto, exito));
+        } else {
+            copiarRespaldo(texto, exito);
+        }
+    }
+
+    async function probarWebhook(id) {
+        mostrarToast('Enviando prueba…');
+        try {
+            const res  = await fetch(`/api/webhooks/${id}/probar`, { method: 'POST' });
+            const data = await res.json();
+            if (!data.success) {
+                mostrarToast('❌ ' + (data.error || 'No se pudo enviar'), true);
+                return;
+            }
+            mostrarToast(data.exitoso
+                ? `✅ Respondió ${data.estado_http}`
+                : `❌ ${data.estado_http || 'sin respuesta'} — ${data.detalle || ''}`,
+                !data.exitoso);
+            verEntregas(id, true);
+        } catch {
+            mostrarToast('❌ Error de conexión', true);
+        }
+    }
+
+    async function verEntregas(id, forzar) {
+        const caja = document.getElementById(`whk-entregas-${id}`);
+        if (!caja) return;
+
+        if (caja.innerHTML && !forzar) { caja.innerHTML = ''; return; }
+
+        caja.innerHTML = '<p class="rep-vacio">Cargando…</p>';
+        try {
+            const res  = await fetch(`/api/webhooks/${id}/entregas`);
+            const data = await res.json();
+            if (!data.success) throw new Error();
+
+            if (!data.entregas.length) {
+                caja.innerHTML = '<p class="rep-vacio">Sin envíos todavía.</p>';
+                return;
+            }
+
+            caja.innerHTML = data.entregas.map(e => `
+                <div class="whk-entrega ${e.exitoso ? 'ok' : 'falla'}">
+                    <span>${escHtml(e.creado_en)}</span>
+                    <span>${escHtml(e.evento)}</span>
+                    <span>intento ${e.intento}</span>
+                    <span>${e.estado_http || '—'}</span>
+                    ${e.error ? `<span class="whk-error">${escHtml(e.error)}</span>` : ''}
+                </div>`).join('');
+        } catch {
+            caja.innerHTML = '<p class="rep-vacio">Error al cargar los envíos.</p>';
+        }
+    }
+
+    async function alternarWebhook(id, activar) {
+        try {
+            const res = await fetch(`/api/webhooks/${id}/estado`, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ activo: activar })
+            });
+            const data = await res.json();
+            if (data.success) {
+                cargarWebhooks();
+                mostrarToast(activar ? '✅ Suscripción activada' : '⏸️ Suscripción desactivada');
+            } else {
+                mostrarToast('❌ ' + (data.error || 'Error'), true);
+            }
+        } catch {
+            mostrarToast('❌ Error de conexión', true);
+        }
+    }
+
+    async function eliminarWebhook(id) {
+        const ok = await confirmar({
+            titulo:  'Eliminar la suscripción',
+            mensaje: 'Se borra también su historial de envíos.',
+            detalle: 'Si sólo quieres cortar los avisos por un tiempo, desactívala en vez de borrarla.',
+            textoOk: 'Eliminar',
+            peligro: true
+        });
+        if (!ok) return;
+
+        try {
+            const res  = await fetch(`/api/webhooks/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                cargarWebhooks();
+                mostrarToast('🗑️ Suscripción eliminada');
+            }
+        } catch {
+            mostrarToast('❌ Error de conexión', true);
+        }
+    }
+
+    document.getElementById('modal-webhooks')?.addEventListener('click', function(e) {
+        if (e.target === this) cerrarModalWebhooks();
     });
 
 </script>

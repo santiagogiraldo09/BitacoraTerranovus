@@ -2361,3 +2361,12 @@ button { font-family: inherit; cursor: pointer; }
 }
 .confirmar-btn-ok:hover { filter: brightness(.93); }
 .confirmar-btn-ok.peligro { background: #dc2626; }
+
+/* Historial de envíos de un webhook */
+.whk-entregas           { margin-top: 8px; }
+.whk-entrega            { display: flex; flex-wrap: wrap; gap: 10px;
+                          font-size: 11.5px; color: #6b7280;
+                          padding: 4px 0; border-top: 1px solid #f3f4f6; }
+.whk-entrega.ok span:nth-child(4)    { color: #16a34a; font-weight: 600; }
+.whk-entrega.falla span:nth-child(4) { color: #dc2626; font-weight: 600; }
+.whk-error              { flex-basis: 100%; color: #dc2626; }
