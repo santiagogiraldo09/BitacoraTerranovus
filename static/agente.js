@@ -177,7 +177,20 @@
             // Se lleva al constructor, que es donde se ajusta el orden,
             // los grupos y las opciones de las selecciones.
             setTimeout(function () {
-                window.location.href = '/configuracion#formularios';
+                // Si ya estamos en Configuración, cambiar sólo el ancla no
+                // recarga la página: hay que mover la sección a mano.
+                if (window.location.pathname === '/configuracion') {
+                    window.location.hash = 'formularios';
+                    if (typeof mostrarSeccion === 'function') {
+                        mostrarSeccion('formularios');
+                    }
+                    if (typeof cargarFormularios === 'function') {
+                        cargarFormularios();
+                    }
+                    cerrar();
+                } else {
+                    window.location.href = '/configuracion#formularios';
+                }
             }, 1200);
 
         } catch (e) {
