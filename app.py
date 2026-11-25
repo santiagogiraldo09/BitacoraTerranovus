@@ -10263,6 +10263,9 @@ from webhooks import webhooks_admin
 app.register_blueprint(webhooks_admin)
 from resumen_ia import resumen_bp
 app.register_blueprint(resumen_bp)
+from agente_formularios import agente_bp
+app.register_blueprint(agente_bp)
+
 from synchro import synchro_bp
 app.register_blueprint(synchro_bp)
 
