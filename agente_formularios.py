@@ -32,9 +32,11 @@ MAX_HISTORIAL = 20       # mensajes que se le pasan al modelo
 INSTRUCCIONES = """Eres el asistente de formularios de Bitácora Digital, una \
 aplicación donde se registra lo que pasa en obras y plantas de producción.
 
-Tu única función es ayudar a armar formularios. No consultas registros, no \
-generas informes y no respondes preguntas sobre los datos de la empresa. Si \
-te piden algo de eso, dilo en una frase y ofrece lo que sí puedes hacer.
+Haces dos cosas: armar formularios, y crear campos globales sueltos cuando el \
+administrador quiere dejarlos listos antes de usarlos en algún formulario. No \
+consultas registros, no generas informes y no respondes preguntas sobre los \
+datos de la empresa. Si te piden algo de eso, dilo en una frase y ofrece lo \
+que sí puedes hacer.
 
 CÓMO TRABAJAS
 
@@ -50,6 +52,9 @@ rompe sus tableros, porque el mismo dato queda repartido en campos distintos.
 
 4. Cuando tengas la estructura, llama a `proponer_formulario`. No describas \
 el formulario en texto: entrégalo por la herramienta.
+
+5. Si te piden campos sueltos, sin formulario, usa `proponer_campos`. Busca \
+primero igual que siempre: si alguno ya existe, dilo en vez de duplicarlo.
 
 CRITERIO
 
@@ -120,6 +125,35 @@ HERRAMIENTAS = [
                     },
                 },
                 'required': ['nombre', 'campos'],
+            },
+        },
+    },
+    {
+        'type': 'function',
+        'function': {
+            'name': 'proponer_campos',
+            'description': ('Entrega campos globales sueltos, sin formulario. '
+                            'Úsala sólo si el usuario pidió campos, no un '
+                            'formulario.'),
+            'parameters': {
+                'type': 'object',
+                'properties': {
+                    'campos': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'nombre': {'type': 'string'},
+                                'tipo':   {'type': 'string',
+                                           'enum': sorted(TIPOS_PERMITIDOS)},
+                                'opciones': {'type': 'array',
+                                             'items': {'type': 'string'}},
+                            },
+                            'required': ['nombre', 'tipo'],
+                        },
+                    },
+                },
+                'required': ['campos'],
             },
         },
     },
@@ -258,6 +292,7 @@ def validar_propuesta(cursor, empresa_id, cruda):
         raise ValueError('Ningún campo de la propuesta resultó válido.')
 
     propuesta = {
+        'tipo':        'formulario',
         'nombre':      nombre[:120],
         'descripcion': (cruda.get('descripcion') or '').strip()[:300],
         'campos':      campos,
@@ -342,6 +377,35 @@ def responder(cursor, empresa_id, historial):
                          f'{propuesta["nuevos"]} nuevos.')
                 return texto, propuesta, avisos
 
+            elif nombre == 'proponer_campos':
+                # Se reusa la misma validación con un nombre de relleno:
+                # las reglas de tipos y de duplicados son idénticas.
+                try:
+                    propuesta, avisos = validar_propuesta(
+                        cursor, empresa_id,
+                        {'nombre': 'campos',
+                         'campos': [dict(c, accion='crear')
+                                    for c in (args.get('campos') or [])]})
+                except ValueError as e:
+                    mensajes.append({
+                        'role': 'tool',
+                        'tool_call_id': llamada.id,
+                        'content': json.dumps({'error': str(e)},
+                                              ensure_ascii=False),
+                    })
+                    continue
+
+                propuesta['tipo'] = 'campos'
+                propuesta.pop('nombre', None)
+
+                if propuesta['nuevos'] == 0:
+                    return ('Todos esos campos ya existen en tu empresa, '
+                            'así que no hace falta crear ninguno.'), None, avisos
+
+                texto = (f'Te propongo crear {propuesta["nuevos"]} '
+                         f'campo{"s" if propuesta["nuevos"] != 1 else ""}.')
+                return texto, propuesta, avisos
+
             else:
                 mensajes.append({
                     'role': 'tool',
@@ -361,6 +425,26 @@ def crear_desde_propuesta(cursor, empresa_id, user_id, propuesta):
     Es el único punto que escribe. Va todo en la misma transacción: o
     queda el formulario completo, o no queda nada a medias.
     """
+    # Campos sueltos: se crean y se acaba ahí, sin formulario.
+    if propuesta.get('tipo') == 'campos':
+        creados = 0
+        for campo in propuesta.get('campos', []):
+            if campo.get('accion') != 'crear':
+                continue
+            cursor.execute("""
+                INSERT INTO campos_globales
+                    (empresa_id, nombre, tipo, objeto, opciones, configuracion)
+                VALUES (%s, %s, %s, 'formulario', %s::jsonb, '{}'::jsonb)
+                RETURNING id
+            """, (empresa_id, campo['nombre'], campo['tipo'],
+                  json.dumps(campo.get('opciones') or [])))
+            cursor.fetchone()
+            creados += 1
+
+        if not creados:
+            raise ValueError('No quedó ningún campo nuevo por crear.')
+        return {'tipo': 'campos', 'creados': creados}
+
     referencias = []
 
     for campo in propuesta.get('campos', []):
@@ -397,7 +481,7 @@ def crear_desde_propuesta(cursor, empresa_id, user_id, propuesta):
     """, (empresa_id, propuesta['nombre'],
           propuesta.get('descripcion') or '', json.dumps(referencias)))
 
-    return cursor.fetchone()[0]
+    return {'tipo': 'formulario', 'formulario_id': cursor.fetchone()[0]}
 
 # ══════════════════════════════════════════════════════════════════════
 #  Endpoints — autenticados por sesión, sólo administradores.
@@ -615,9 +699,9 @@ def crear_formulario():
                                 'error': 'Esa propuesta no existe.'}), 404
 
             try:
-                nuevo_id = crear_desde_propuesta(cursor, empresa_id,
-                                                 session.get('user_id'),
-                                                 fila[0])
+                resultado = crear_desde_propuesta(cursor, empresa_id,
+                                                  session.get('user_id'),
+                                                  fila[0])
             except ValueError as e:
                 return jsonify({'success': False, 'error': str(e)}), 400
 
@@ -628,4 +712,4 @@ def crear_formulario():
         return jsonify({'success': False,
                         'error': 'No se pudo crear el formulario.'}), 500
 
-    return jsonify({'success': True, 'formulario_id': nuevo_id})
+    return jsonify(dict({'success': True}, **resultado))
