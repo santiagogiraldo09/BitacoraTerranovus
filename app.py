@@ -5485,6 +5485,16 @@ def guardar_respuesta_formulario(_reintento=0):
         except Exception as e:
             print(f"[SYNCHRO] No se pudo lanzar el envio: {e}")
 
+        try:
+            from webhooks import lanzar_evento
+            lanzar_evento('registro.creado',
+                          session.get('empresa_id'),
+                          registro_id=nuevo_id,
+                          proyecto_id=project_id,
+                          user_id=session['user_id'])
+        except Exception as e:
+            print(f"[WEBHOOK] No se pudo lanzar el evento: {e}")
+
         return jsonify({'success': True, 'id': nuevo_id})
 
     except (psycopg2.OperationalError, psycopg2.InterfaceError) as e:
@@ -5552,8 +5562,24 @@ def actualizar_respuesta_formulario(registro_id):
                         FROM proyectos
                         WHERE empresa_id = %s
                     )
+                RETURNING id_proyecto
             """, (json.dumps(respuestas), user_id, registro_id, session.get('empresa_id')))
+            fila_actualizada = cursor.fetchone()
             conn.commit()
+
+            # Sólo se avisa si de verdad se actualizó algo: el WHERE
+            # también filtra por empresa, así que una fila ajena no
+            # dispara nada.
+            if fila_actualizada:
+                try:
+                    from webhooks import lanzar_evento
+                    lanzar_evento('registro.actualizado',
+                                  session.get('empresa_id'),
+                                  registro_id=registro_id,
+                                  proyecto_id=fila_actualizada[0],
+                                  user_id=user_id)
+                except Exception as e:
+                    print(f"[WEBHOOK] No se pudo lanzar el evento: {e}")
 
             return jsonify({'success': True})
 
@@ -6828,6 +6854,14 @@ def add_project():
                         INSERT INTO proyecto_formularios (proyecto_id, formulario_id, empresa_id)
                         VALUES (%s, %s, %s)
                     """, (nuevo_id, fid, empresa_id))
+
+            try:
+                from webhooks import lanzar_evento
+                lanzar_evento('proyecto.creado', empresa_id,
+                              proyecto_id=nuevo_id,
+                              user_id=session['user_id'])
+            except Exception as e:
+                print(f"[WEBHOOK] No se pudo lanzar el evento: {e}")
 
             return jsonify({"status": "success", "message": "Proyecto registrado exitosamente"}), 201
 
@@ -10225,6 +10259,8 @@ app.register_blueprint(bi_publica_bp)
 from api_publica import api_publica, api_claves
 app.register_blueprint(api_publica)
 app.register_blueprint(api_claves)
+from webhooks import webhooks_admin
+app.register_blueprint(webhooks_admin)
 from resumen_ia import resumen_bp
 app.register_blueprint(resumen_bp)
 from synchro import synchro_bp
