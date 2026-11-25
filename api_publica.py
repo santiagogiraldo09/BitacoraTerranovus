@@ -29,6 +29,9 @@ ALCANCES_VALIDOS = {
     'analitica:leer',
     'registros:escribir',   # reservado, ningún endpoint lo usa todavía
 }
+# 120 por minuto alcanza de sobra para un tablero que refresca cada hora
+# y frena a una integración en bucle. Una clave puede tener el suyo.
+LIMITE_POR_MINUTO = 120
 
 
 # ──────────────────────────── Claves ────────────────────────────
@@ -110,7 +113,8 @@ def _buscar_clave(token):
         cursor.execute("""
             SELECT id, empresa_id, alcances, proyectos,
                    expira_en, revocada_en,
-                   (expira_en IS NOT NULL AND expira_en < now()) AS vencida
+                   (expira_en IS NOT NULL AND expira_en < now()) AS vencida,
+                   limite_por_minuto
             FROM api_keys
             WHERE hash = %s
         """, (_hash(token),))
@@ -120,8 +124,8 @@ def _buscar_clave(token):
             return None, _error(401, 'clave_invalida',
                                 'La clave de API no existe o fue eliminada.')
 
-        clave_id, empresa_id, alcances, proyectos, _exp, revocada, vencida = fila
-
+        (clave_id, empresa_id, alcances, proyectos,
+         _exp, revocada, vencida, limite) = fila
         if revocada is not None:
             return None, _error(401, 'clave_revocada',
                                 'Esta clave de API fue revocada.')
@@ -138,6 +142,22 @@ def _buscar_clave(token):
             WHERE id = %s
               AND (ultimo_uso_en IS NULL OR ultimo_uso_en < now() - interval '1 hour')
         """, (clave_id,))
+
+        # El límite se mide aquí, con la conexión ya abierta, para no
+        # pagar una segunda ida a la base en cada petición.
+        cursor.execute("""
+            SELECT count(*) FROM api_keys_uso
+            WHERE api_key_id = %s AND creado_en > now() - interval '1 minute'
+        """, (clave_id,))
+        usadas = cursor.fetchone()[0]
+        tope = limite or LIMITE_POR_MINUTO
+
+        if usadas >= tope:
+            respuesta = _error(429, 'limite_excedido',
+                               f'Superaste el límite de {tope} peticiones por '
+                               f'minuto para esta clave. Reintenta en un momento.')
+            respuesta[0].headers['Retry-After'] = '60'
+            return None, respuesta
 
         return {
             'id': clave_id,
@@ -830,3 +850,111 @@ def revocar_clave(clave_id):
         return jsonify({'success': False, 'error': 'No se pudo revocar.'}), 500
 
     return jsonify({'success': True})
+
+
+# ──────────────────────────── Archivos ────────────────────────────
+
+# Los tipos de campo cuyo valor es un archivo en el bucket privado.
+TIPOS_ARCHIVO = ('imagen', 'adjunto')
+
+# Una hora alcanza para que un cliente descargue lo que necesite y es
+# poco para que una URL filtrada sirva de algo.
+VIGENCIA_URL = 3600
+
+
+@api_publica.route('/registros/<int:registro_id>/archivos', methods=['GET'])
+@requiere_api_key('archivos:leer')
+def archivos_del_registro(registro_id):
+    """URLs temporales de las fotos y adjuntos de un registro.
+
+    Se piden por registro y no por ruta a propósito: así el acceso a un
+    archivo hereda los mismos permisos del registro que lo contiene
+    —empresa y restricción de proyectos— en vez de depender de adivinar
+    o no una ruta.
+    """
+    from app import generar_url_firmada_foto
+
+    sql = """
+        SELECT rf.id, rf.formulario_id, rf.respuestas
+        FROM respuestas_formulario rf
+        JOIN proyectos p ON p.id = rf.id_proyecto
+        WHERE p.empresa_id = %s AND rf.id = %s
+    """
+    params = [g.empresa_id, registro_id]
+
+    filtro, p_filtro = filtro_proyectos('p')
+    sql += filtro
+    params += p_filtro
+
+    try:
+        with conexion_api() as (conn, cursor):
+            cursor.execute(sql, params)
+            fila = cursor.fetchone()
+
+            if not fila:
+                return _error(404, 'no_encontrado',
+                              'No existe un registro con ese id, o la clave '
+                              'no tiene acceso a él.')
+
+            respuestas = fila[2] or {}
+            if not respuestas:
+                return jsonify({'datos': {'registro_id': registro_id,
+                                          'archivos': []}})
+
+            # Qué campos de este registro son de tipo archivo.
+            ids = [int(k) for k in respuestas.keys() if str(k).isdigit()]
+            if not ids:
+                return jsonify({'datos': {'registro_id': registro_id,
+                                          'archivos': []}})
+
+            cursor.execute("""
+                SELECT id, nombre, tipo
+                FROM campos_globales
+                WHERE id = ANY(%s) AND empresa_id = %s AND tipo = ANY(%s)
+            """, (ids, g.empresa_id, list(TIPOS_ARCHIVO)))
+            campos = {c[0]: (c[1], c[2]) for c in cursor.fetchall()}
+
+    except Exception:
+        import traceback
+        print('[API] Error listando archivos del registro:')
+        traceback.print_exc()
+        return _error(500, 'error_interno',
+                      'No se pudieron consultar los archivos.')
+
+    archivos = []
+    for campo_id, (nombre, tipo) in campos.items():
+        valor = respuestas.get(str(campo_id))
+        if valor is None:
+            valor = respuestas.get(campo_id)
+        if not valor:
+            continue
+
+        # Un campo de imagen puede traer una foto o varias.
+        rutas = valor if isinstance(valor, (list, tuple)) else [valor]
+
+        for ruta in rutas:
+            if not isinstance(ruta, str) or not ruta.strip():
+                continue
+
+            firmada = generar_url_firmada_foto(ruta, VIGENCIA_URL)
+
+            # La función devuelve la ruta tal cual cuando no puede
+            # firmarla: registros viejos que guardaron sólo el nombre
+            # del archivo, de antes de que las fotos vivieran en el
+            # bucket privado. Se informan, pero sin URL.
+            pudo_firmar = firmada != ruta
+
+            archivos.append({
+                'campo_id':   campo_id,
+                'campo':      nombre,
+                'tipo':       tipo,
+                'ruta':       ruta,
+                'url':        firmada if pudo_firmar else None,
+                'disponible': pudo_firmar,
+                'vigencia_segundos': VIGENCIA_URL if pudo_firmar else None,
+            })
+
+    return jsonify({'datos': {
+        'registro_id': registro_id,
+        'archivos':    archivos,
+    }})
