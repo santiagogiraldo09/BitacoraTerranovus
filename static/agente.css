@@ -1,0 +1,162 @@
+/* ===========================================================
+   Asistente de formularios — panel flotante
+   Se carga sólo para administradores.
+   =========================================================== */
+
+.ag-boton {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    width: 56px;
+    height: 56px;
+    border: none;
+    border-radius: 50%;
+    background: var(--naranja, #FFAF33);
+    color: #fff;
+    font-size: 20px;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, .18);
+    z-index: 900;
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+.ag-boton:hover  { transform: translateY(-2px); box-shadow: 0 8px 26px rgba(0,0,0,.22); }
+.ag-boton.oculto { display: none; }
+
+.ag-panel {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    width: 390px;
+    max-width: calc(100vw - 32px);
+    height: 560px;
+    max-height: calc(100vh - 48px);
+    background: #fff;
+    border: 1px solid var(--gris-borde, #e5e7eb);
+    border-radius: 14px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, .18);
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 901;
+    font-family: 'DM Sans', sans-serif;
+}
+.ag-panel.abierto { display: flex; }
+
+.ag-cabecera {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--gris-borde, #e5e7eb);
+    flex: 0 0 auto;
+}
+.ag-cabecera h4 { font-size: 14.5px; font-weight: 600; margin: 0; flex: 1; }
+.ag-cabecera button {
+    background: none; border: none; cursor: pointer;
+    color: #9ca3af; font-size: 14px; padding: 4px 6px; border-radius: 6px;
+}
+.ag-cabecera button:hover { background: #f3f4f6; color: #374151; }
+
+/* min-height en 0 es lo que permite que el hijo flexible encoja
+   y muestre su propia barra de desplazamiento. */
+.ag-mensajes {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: #fafafa;
+}
+
+.ag-msg { max-width: 86%; font-size: 13.2px; line-height: 1.55; }
+.ag-msg.usuario {
+    align-self: flex-end;
+    background: var(--naranja, #FFAF33);
+    color: #fff;
+    padding: 9px 13px;
+    border-radius: 13px 13px 3px 13px;
+}
+.ag-msg.asistente {
+    align-self: flex-start;
+    background: #fff;
+    color: #374151;
+    border: 1px solid var(--gris-borde, #e5e7eb);
+    padding: 9px 13px;
+    border-radius: 13px 13px 13px 3px;
+}
+.ag-msg.escribiendo { color: #9ca3af; font-style: italic; }
+
+/* Propuesta */
+.ag-propuesta {
+    align-self: stretch;
+    background: #fff;
+    border: 1px solid var(--naranja, #FFAF33);
+    border-radius: 11px;
+    padding: 13px 14px;
+}
+.ag-propuesta h5 { margin: 0 0 3px; font-size: 13.5px; font-weight: 600; color: #111827; }
+.ag-propuesta .ag-resumen { font-size: 11.5px; color: #6b7280; margin-bottom: 9px; }
+
+.ag-campos { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.ag-campo  { display: flex; align-items: center; gap: 7px; font-size: 12.3px; color: #374151; }
+.ag-tag {
+    font-size: 10px; padding: 1px 6px; border-radius: 9px;
+    text-transform: uppercase; letter-spacing: .03em; font-weight: 600;
+}
+.ag-tag.nuevo  { background: #dcfce7; color: #15803d; }
+.ag-tag.reuso  { background: #e0e7ff; color: #4338ca; }
+.ag-campo .ag-tipo { color: #9ca3af; font-size: 11.5px; margin-left: auto; }
+
+.ag-avisos {
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+    border-radius: 7px;
+    padding: 8px 10px;
+    font-size: 11.5px;
+    color: #92400e;
+    line-height: 1.5;
+    margin-bottom: 10px;
+}
+.ag-avisos div + div { margin-top: 3px; }
+
+.ag-crear {
+    width: 100%; border: none; border-radius: 8px;
+    background: var(--naranja, #FFAF33); color: #fff;
+    font-size: 13px; font-weight: 600; padding: 9px; cursor: pointer;
+    font-family: inherit;
+}
+.ag-crear:hover:not(:disabled) { filter: brightness(.95); }
+.ag-crear:disabled { background: #e5e7eb; color: #9ca3af; cursor: default; }
+
+/* Entrada */
+.ag-entrada {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 8px;
+    padding: 11px 13px;
+    border-top: 1px solid var(--gris-borde, #e5e7eb);
+    background: #fff;
+}
+.ag-entrada textarea {
+    flex: 1; resize: none; height: 40px; max-height: 110px;
+    border: 1px solid var(--gris-borde, #e5e7eb); border-radius: 9px;
+    padding: 10px 12px; font-size: 13px; font-family: inherit;
+    outline: none;
+}
+.ag-entrada textarea:focus { border-color: var(--naranja, #FFAF33); }
+.ag-entrada button {
+    width: 40px; height: 40px; border: none; border-radius: 9px;
+    background: var(--naranja, #FFAF33); color: #fff; cursor: pointer;
+    flex: 0 0 auto;
+}
+.ag-entrada button:disabled { background: #e5e7eb; color: #9ca3af; cursor: default; }
+
+@media (max-width: 640px) {
+    .ag-panel {
+        right: 8px; left: 8px; bottom: 8px;
+        width: auto; height: calc(100vh - 80px);
+    }
+    .ag-boton { right: 16px; bottom: 78px; }
+}

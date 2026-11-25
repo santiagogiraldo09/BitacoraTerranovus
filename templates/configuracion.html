@@ -5293,6 +5293,12 @@
         if (e.target === this) cerrarModalWebhooks();
     });
 
+    
+
 </script>
+{% if session.get('user_rol') == 'admin' %}
+<link rel="stylesheet" href="{{ url_for('static', filename='agente.css') }}?v=1">
+<script src="{{ url_for('static', filename='agente.js') }}?v=1" defer></script>
+{% endif %}
 </body>
 </html>
