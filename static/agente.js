@@ -55,12 +55,21 @@
         var div = document.createElement('div');
         div.className = 'ag-propuesta';
 
+        // Una propuesta de campos sueltos no tiene nombre de formulario
+        // y su encabezado y su botón dicen otra cosa.
+        var soloCampos = propuesta.tipo === 'campos';
+
         var campos = (propuesta.campos || []).map(function (c) {
             var nuevo = c.accion === 'crear';
+            // En campos sueltos, lo que ya existe no se va a crear:
+            // se muestra para que el usuario sepa por qué no está.
+            var etiqueta = nuevo ? 'nuevo'
+                                 : (soloCampos ? 'ya la tienes' : 'ya existe');
             return '<div class="ag-campo">' +
                      '<span class="ag-tag ' + (nuevo ? 'nuevo' : 'reuso') + '">' +
-                        (nuevo ? 'nuevo' : 'ya existe') + '</span>' +
-                     '<span>' + esc(c.nombre) + (c.requerido ? ' *' : '') + '</span>' +
+                        etiqueta + '</span>' +
+                     '<span>' + esc(c.nombre) +
+                        (!soloCampos && c.requerido ? ' *' : '') + '</span>' +
                      '<span class="ag-tipo">' +
                         esc(NOMBRE_TIPO[c.tipo] || c.tipo) + '</span>' +
                    '</div>';
@@ -72,14 +81,29 @@
               '</div>'
             : '';
 
+        var titulo, resumen, textoBoton;
+        if (soloCampos) {
+            titulo  = 'Campos globales';
+            resumen = propuesta.nuevos + ' por crear' +
+                      (propuesta.reusados
+                          ? ' · ' + propuesta.reusados + ' que ya tenías'
+                          : '');
+            textoBoton = propuesta.nuevos === 1
+                ? 'Crear el campo' : 'Crear los campos';
+        } else {
+            titulo  = esc(propuesta.nombre);
+            resumen = (propuesta.campos || []).length + ' campos · ' +
+                      propuesta.reusados + ' reutilizados · ' +
+                      propuesta.nuevos + ' nuevos';
+            textoBoton = 'Crear formulario';
+        }
+
         div.innerHTML =
-            '<h5>' + esc(propuesta.nombre) + '</h5>' +
-            '<div class="ag-resumen">' + (propuesta.campos || []).length +
-                ' campos · ' + propuesta.reusados + ' reutilizados · ' +
-                propuesta.nuevos + ' nuevos</div>' +
+            '<h5>' + titulo + '</h5>' +
+            '<div class="ag-resumen">' + resumen + '</div>' +
             '<div class="ag-campos">' + campos + '</div>' +
             bloqueAvisos +
-            '<button class="ag-crear">Crear formulario</button>';
+            '<button class="ag-crear">' + textoBoton + '</button>';
 
         div.querySelector('.ag-crear')
            .addEventListener('click', function () { crear(mensajeId, this); });
@@ -170,26 +194,29 @@
                 return;
             }
 
-            boton.textContent = 'Formulario creado';
-            pintarMensaje('asistente',
-                'Listo. Lo abro en el constructor para que lo revises.');
+            var soloCampos = data.tipo === 'campos';
+            var seccion    = soloCampos ? 'campos' : 'formularios';
+            var recargar   = soloCampos ? 'cargarCampos' : 'cargarFormularios';
 
-            // Se lleva al constructor, que es donde se ajusta el orden,
-            // los grupos y las opciones de las selecciones.
+            boton.textContent = soloCampos ? 'Campos creados' : 'Formulario creado';
+            pintarMensaje('asistente', soloCampos
+                ? 'Listos. Te los muestro en Gestión de Campos.'
+                : 'Listo. Lo abro en el constructor para que lo revises.');
+
             setTimeout(function () {
                 // Si ya estamos en Configuración, cambiar sólo el ancla no
                 // recarga la página: hay que mover la sección a mano.
                 if (window.location.pathname === '/configuracion') {
-                    window.location.hash = 'formularios';
+                    window.location.hash = seccion;
                     if (typeof mostrarSeccion === 'function') {
-                        mostrarSeccion('formularios');
+                        mostrarSeccion(seccion);
                     }
-                    if (typeof cargarFormularios === 'function') {
-                        cargarFormularios();
+                    if (typeof window[recargar] === 'function') {
+                        window[recargar]();
                     }
                     cerrar();
                 } else {
-                    window.location.href = '/configuracion#formularios';
+                    window.location.href = '/configuracion#' + seccion;
                 }
             }, 1200);
 
