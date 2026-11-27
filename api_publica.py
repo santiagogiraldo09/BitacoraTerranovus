@@ -9,6 +9,7 @@ nunca de la petición. Si llega en la URL o en el cuerpo, se ignora.
 
 import functools
 import hashlib
+import json
 import secrets
 from contextlib import contextmanager
 from flask import Blueprint, request, jsonify, g, session
@@ -763,6 +764,8 @@ def listar_claves():
             {'id': 'registros:leer',   'nombre': 'Registros de campo'},
             {'id': 'archivos:leer',    'nombre': 'Fotos y adjuntos'},
             {'id': 'analitica:leer',   'nombre': 'Indicadores'},
+            {'id': 'registros:escribir',
+             'nombre': 'Crear registros (escritura)'},
         ],
     })
 
@@ -958,3 +961,319 @@ def archivos_del_registro(registro_id):
         'registro_id': registro_id,
         'archivos':    archivos,
     }})
+
+
+# ════════════════════════════════════════════════════════════════════
+#  Validación de respuestas entrantes
+#
+#  Separado del endpoint a propósito: cuando llegue el actualizar,
+#  esta es la parte que se reusa entera.
+# ════════════════════════════════════════════════════════════════════
+
+from datetime import datetime as _dt
+
+# Tipos cuyo valor es un archivo en el bucket privado. Un sistema
+# externo no puede subir ahí, así que por ahora no se aceptan.
+TIPOS_NO_ACEPTADOS = {'imagen', 'adjunto'}
+
+TIPOS_NUMERICOS = {'numero', 'moneda', 'porcentaje'}
+TIPOS_SELECCION = {'seleccion', 'seleccion_unica'}
+
+
+def _texto_opcion(opcion):
+    """Las opciones pueden ser texto o {izquierda, derecha}."""
+    if isinstance(opcion, dict):
+        return str(opcion.get('izquierda') or opcion.get('nombre') or '').strip()
+    return str(opcion).strip()
+
+
+def _valor_fecha(valor):
+    s = str(valor).strip()
+    try:
+        _dt.strptime(s[:10], '%Y-%m-%d')
+        return s[:10]
+    except ValueError:
+        raise ValueError('se esperaba una fecha con formato AAAA-MM-DD')
+
+
+def _valor_hora(valor):
+    s = str(valor).strip()
+    for formato in ('%H:%M', '%H:%M:%S'):
+        try:
+            _dt.strptime(s, formato)
+            return s[:5]
+        except ValueError:
+            continue
+    raise ValueError('se esperaba una hora con formato HH:MM')
+
+
+def _valor_numero(valor):
+    try:
+        n = float(str(valor).replace(',', '.').strip())
+    except (TypeError, ValueError):
+        raise ValueError('se esperaba un número')
+    return int(n) if n.is_integer() else n
+
+
+def _valor_booleano(valor):
+    if isinstance(valor, bool):
+        return valor
+    s = str(valor).strip().lower()
+    if s in ('true', '1', 'si', 'sí'):
+        return True
+    if s in ('false', '0', 'no'):
+        return False
+    raise ValueError('se esperaba verdadero o falso')
+
+
+def _normalizar(campo, valor):
+    """Convierte y verifica un valor según el tipo del campo.
+
+    Levanta ValueError con un mensaje que el cliente pueda entender.
+    """
+    tipo     = campo['tipo']
+    opciones = campo.get('opciones') or []
+
+    if tipo in TIPOS_NUMERICOS:
+        return _valor_numero(valor)
+    if tipo == 'fecha':
+        return _valor_fecha(valor)
+    if tipo == 'hora':
+        return _valor_hora(valor)
+    if tipo == 'booleano':
+        return _valor_booleano(valor)
+
+    if tipo == 'seleccion_unica':
+        permitidas = [_texto_opcion(o) for o in opciones]
+        s = str(valor).strip()
+        if permitidas and s not in permitidas:
+            raise ValueError(f'«{s}» no es una opción válida. '
+                             f'Válidas: {", ".join(permitidas)}')
+        return s
+
+    if tipo == 'seleccion':
+        permitidas = [_texto_opcion(o) for o in opciones]
+        lista = valor if isinstance(valor, (list, tuple)) else [valor]
+        salida = []
+        for v in lista:
+            s = str(v).strip()
+            if permitidas and s not in permitidas:
+                raise ValueError(f'«{s}» no es una opción válida. '
+                                 f'Válidas: {", ".join(permitidas)}')
+            salida.append(s)
+        return salida
+
+    # Texto, y la selección dinámica, cuyas opciones salen de otros
+    # registros y por eso no se validan contra una lista fija.
+    s = str(valor)
+    tope = (campo.get('configuracion') or {}).get('max_caracteres')
+    if tope and len(s) > int(tope):
+        raise ValueError(f'supera el límite de {tope} caracteres')
+    return s
+
+
+def validar_respuestas(cursor, empresa_id, proyecto_id, formulario_id,
+                       respuestas, proyectos_permitidos=None):
+    """Verifica un registro entrante antes de guardarlo.
+
+    Devuelve (respuestas_normalizadas, errores). Si 'errores' trae algo,
+    no se debe escribir nada.
+    """
+    errores = []
+
+    # ── El proyecto ──
+    sql = "SELECT 1 FROM proyectos WHERE id = %s AND empresa_id = %s"
+    params = [proyecto_id, empresa_id]
+    if proyectos_permitidos:
+        sql += " AND id = ANY(%s)"
+        params.append(list(proyectos_permitidos))
+
+    cursor.execute(sql, params)
+    if not cursor.fetchone():
+        return None, ['El proyecto no existe o la clave no tiene acceso a él.']
+
+    # ── El formulario y su asignación al proyecto ──
+    cursor.execute("""
+        SELECT f.campos
+        FROM formularios f
+        JOIN proyecto_formularios pf
+          ON pf.formulario_id = f.id AND pf.proyecto_id = %s
+        WHERE f.id = %s AND f.empresa_id = %s
+    """, (proyecto_id, formulario_id, empresa_id))
+    fila = cursor.fetchone()
+    if not fila:
+        return None, ['El formulario no existe, no es de tu empresa, '
+                      'o no está asignado a ese proyecto.']
+
+    referencias = fila[0] or []
+
+    # Los grupos repetibles guardan sus datos con otra forma; escribirlos
+    # por API es un problema aparte y todavía no está resuelto.
+    if any(isinstance(r, dict) and r.get('tipo') == 'grupo' and r.get('repetible')
+           for r in referencias):
+        return None, ['Este formulario tiene grupos repetibles y todavía '
+                      'no se puede llenar por la API.']
+
+    obligatorios = {}
+    ids = []
+    for ref in referencias:
+        if isinstance(ref, dict) and 'id' in ref and 'tipo' not in ref:
+            ids.append(ref['id'])
+            obligatorios[ref['id']] = bool(ref.get('requerido'))
+
+    if not ids:
+        return None, ['Ese formulario no tiene campos.']
+
+    cursor.execute("""
+        SELECT id, nombre, tipo, opciones, configuracion
+        FROM campos_globales
+        WHERE id = ANY(%s) AND empresa_id = %s
+    """, (ids, empresa_id))
+    campos = {c[0]: {'nombre': c[1], 'tipo': c[2],
+                     'opciones': c[3] or [],
+                     'configuracion': c[4] or {}} for c in cursor.fetchall()}
+
+    # ── Los valores recibidos ──
+    salida = {}
+    for clave, valor in (respuestas or {}).items():
+        try:
+            cid = int(clave)
+        except (TypeError, ValueError):
+            errores.append(f'«{clave}» no es un identificador de campo válido.')
+            continue
+
+        campo = campos.get(cid)
+        if not campo:
+            # Se rechaza en vez de ignorarlo: un campo que el cliente cree
+            # estar enviando y que desaparece en silencio es un dato
+            # perdido que nadie va a notar hasta mucho después.
+            errores.append(f'El campo {cid} no pertenece a este formulario.')
+            continue
+
+        if campo['tipo'] in TIPOS_NO_ACEPTADOS:
+            errores.append(f'El campo {cid} ({campo["nombre"]}) es de tipo '
+                           f'{campo["tipo"]} y no se puede enviar por la API.')
+            continue
+
+        if valor is None or valor == '' or valor == []:
+            continue
+
+        try:
+            salida[str(cid)] = _normalizar(campo, valor)
+        except ValueError as e:
+            errores.append(f'El campo {cid} ({campo["nombre"]}): {e}')
+
+    # ── Los obligatorios ──
+    for cid, requerido in obligatorios.items():
+        if not requerido:
+            continue
+        campo = campos.get(cid)
+        if campo and campo['tipo'] in TIPOS_NO_ACEPTADOS:
+            continue   # no se puede exigir lo que no se puede enviar
+        if str(cid) not in salida:
+            nombre = campo['nombre'] if campo else cid
+            errores.append(f'Falta el campo obligatorio {cid} ({nombre}).')
+
+    if errores:
+        return None, errores
+    return salida, []
+
+
+# ──────────────────────── Crear registros ────────────────────────
+
+def _huella_cuerpo():
+    """Hash del cuerpo crudo, para detectar una llave reusada con otro
+    contenido: eso no es un reintento, es un error del cliente."""
+    return hashlib.sha256(request.get_data() or b'').hexdigest()
+
+
+@api_publica.route('/registros', methods=['POST'])
+@requiere_api_key('registros:escribir')
+def crear_registro():
+    """Crea un registro desde un sistema externo.
+
+    Acepta la cabecera 'Idempotency-Key': si llega repetida con el mismo
+    cuerpo, se devuelve el registro que ya se creó en vez de duplicarlo.
+    """
+    datos = request.get_json(silent=True)
+    if not isinstance(datos, dict):
+        return _error(400, 'cuerpo_invalido',
+                      'El cuerpo debe ser un objeto JSON.')
+
+    try:
+        proyecto_id   = int(datos.get('proyecto_id'))
+        formulario_id = int(datos.get('formulario_id'))
+    except (TypeError, ValueError):
+        return _error(400, 'parametro_invalido',
+                      "Se requieren 'proyecto_id' y 'formulario_id' numéricos.")
+
+    respuestas = datos.get('respuestas')
+    if not isinstance(respuestas, dict) or not respuestas:
+        return _error(400, 'parametro_invalido',
+                      "'respuestas' debe ser un objeto con al menos un campo.")
+
+    llave = (request.headers.get('Idempotency-Key') or '').strip()[:200]
+    huella = _huella_cuerpo()
+
+    try:
+        with conexion_api() as (conn, cursor):
+
+            # ── Reintento ya atendido ──
+            if llave:
+                cursor.execute("""
+                    SELECT huella, respuesta FROM api_idempotencia
+                    WHERE api_key_id = %s AND clave = %s
+                """, (g.api_key_id, llave))
+                previo = cursor.fetchone()
+                if previo:
+                    if previo[0] != huella:
+                        return _error(422, 'idempotencia_en_conflicto',
+                                      'Ya usaste esa Idempotency-Key con un '
+                                      'contenido distinto. Usa una llave nueva.')
+                    respuesta = jsonify({'datos': previo[1], 'repetido': True})
+                    respuesta.headers['Idempotent-Replay'] = 'true'
+                    return respuesta, 200
+
+            # ── Validación ──
+            limpias, errores = validar_respuestas(
+                cursor, g.empresa_id, proyecto_id, formulario_id,
+                respuestas, getattr(g, 'proyectos_permitidos', None))
+
+            if errores:
+                return jsonify({'error': {
+                    'codigo':  'validacion',
+                    'mensaje': 'El registro no se guardó porque tiene errores.',
+                    'detalles': errores,
+                }}), 400
+
+            # El registro queda atribuido a la persona dueña de la clave,
+            # para no romper lo que ya existe, pero 'api_key_id' es lo que
+            # dice de verdad que lo escribió una integración.
+            cursor.execute("SELECT creada_por FROM api_keys WHERE id = %s",
+                           (g.api_key_id,))
+            fila = cursor.fetchone()
+            autor = fila[0] if fila else None
+
+            cursor.execute("""
+                INSERT INTO respuestas_formulario
+                    (formulario_id, id_proyecto, user_id, respuestas, api_key_id)
+                VALUES (%s, %s, %s, %s::jsonb, %s)
+                RETURNING id, created_at
+            """, (formulario_id, proyecto_id, autor,
+                  json.dumps(limpias), g.api_key_id))
+            nuevo_id, creado_en = cursor.fetchone()
+
+            cuerpo = {'id': nuevo_id,
+                      'proyecto_id': proyecto_id,
+                      'formulario_id': formulario_id,
+                      'creado_en': creado_en.isoformat() if creado_en else None}
+
+            # La anotación de idempotencia va en la MISMA transacción que
+            # el registro: si quedaran separadas, un fallo entre las dos
+            # dejaría el registro creado y el reintento creándolo otra vez.
+            if llave:
+                cursor.execute("""
+                    INSERT INTO api_idempotencia
+                        (api_key_id, empresa_id, clave, ruta, huella, respuesta)
+                    VALUES (%s, %s, %s, %s, %s, %s::jsonb)
+                    ON CONFLICT
