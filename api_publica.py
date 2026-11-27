@@ -1276,4 +1276,24 @@ def crear_registro():
                     INSERT INTO api_idempotencia
                         (api_key_id, empresa_id, clave, ruta, huella, respuesta)
                     VALUES (%s, %s, %s, %s, %s, %s::jsonb)
-                    ON CONFLICT
+                    ON CONFLICT (api_key_id, clave) DO NOTHING
+                """, (g.api_key_id, g.empresa_id, llave, request.path,
+                      huella, json.dumps(cuerpo)))
+
+    except Exception:
+        import traceback
+        print('[API] Error creando el registro:')
+        traceback.print_exc()
+        return _error(500, 'error_interno', 'No se pudo guardar el registro.')
+
+    # Fuera de la transacción: el aviso no puede afectar al guardado.
+    try:
+        from webhooks import lanzar_evento
+        lanzar_evento('registro.creado', g.empresa_id,
+                      registro_id=nuevo_id,
+                      proyecto_id=proyecto_id,
+                      user_id=autor)
+    except Exception as e:
+        print(f'[API] No se pudo lanzar el webhook: {e}')
+
+    return jsonify({'datos': cuerpo}), 201
